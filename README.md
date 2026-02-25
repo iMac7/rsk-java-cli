@@ -1,0 +1,255 @@
+# java cli for evm compatible chains
+
+
+## Prerequisites
+
+- Java 25 installed
+- Windows PowerShell or `cmd.exe`
+- Gradle wrapper is included (`gradlew`, `gradlew.bat`)
+
+## Build
+Compile and run tests for all modules:
+
+```powershell
+.\gradlew.bat build
+```
+
+## Run
+Run directly from source
+windows
+
+```powershell
+.\evm-cli.ps1 --help
+.\evm-cli.ps1 balance --help
+.\evm-cli.ps1 wallet list
+```
+
+`cmd.exe` equivalent
+
+```bat
+.\evm-cli.bat --help
+.\evm-cli.bat transfer --help
+```
+
+## CLI Syntax
+
+```bash
+evm-cli [--json] <command> [options]
+```
+
+Global options:
+
+- `--json`: structured JSON output mode (currently stub)
+- `-h|--help`: command help
+- `-V|--version`: version
+
+## Supported Commands and Subcommands
+
+`wallet`  
+Wallet management container command.
+Example:
+
+```powershell
+evm-cli wallet --help
+```
+
+`wallet create`  
+Create a wallet by name (prompts for password).
+Example:
+
+```powershell
+evm-cli wallet create alice
+```
+
+`wallet import`  
+Import wallet from private key (prompts for password).
+Example:
+
+```powershell
+evm-cli wallet import trading --privkey 0xabc123...
+```
+
+`wallet list`  
+List wallets.
+Example:
+
+```powershell
+evm-cli wallet list
+```
+
+`wallet switch`  
+Switch active wallet.
+Example:
+
+```powershell
+evm-cli wallet switch alice
+```
+
+`wallet rename`  
+Rename wallet.
+Example:
+
+```powershell
+evm-cli wallet rename alice alice-main
+```
+
+`wallet delete`  
+Delete wallet.
+Example:
+
+```powershell
+evm-cli wallet delete alice-main
+```
+
+`wallet backup`  
+Wallet backup TUI placeholder.
+Example:
+
+```powershell
+evm-cli wallet backup
+```
+
+`wallet address-book`  
+Address book TUI placeholder.
+Example:
+
+```powershell
+evm-cli wallet address-book
+```
+
+`config`  
+Config TUI placeholder.
+Example:
+
+```powershell
+evm-cli config
+```
+
+`balance`  
+Get native balance by wallet name or address.  
+Requires one of `--wallet` or `--address`.  
+Optional network selector: `--mainnet` or `--testnet` or `--chain <name>`.
+Examples:
+
+```powershell
+evm-cli balance --wallet alice --mainnet
+evm-cli balance --address 0x1234... --chain rskTestnet
+```
+
+`transfer`  
+Send native transfer.  
+Requires `--wallet`, `--value`, and one of `--address` or `--rns`.  
+Optional: `--token`, `--gas-limit`, `--gas-price`, `--data`, `--interactive`, network selector.
+Example:
+
+```powershell
+evm-cli transfer --wallet alice --address 0x1234... --value 10000000000000000 --mainnet
+```
+
+`tx`  
+Get transaction status, or start confirmation monitor.
+Example:
+
+```powershell
+evm-cli tx --txid 0xdeadbeef... --mainnet
+evm-cli tx --txid 0xdeadbeef... --monitor --confirmations 3 --mainnet
+```
+
+`monitor`  
+List/stop/start monitor sessions.
+Examples:
+
+```powershell
+evm-cli monitor --list
+evm-cli monitor --stop 123e4567-e89b-12d3-a456-426614174000
+evm-cli monitor --tx 0xdeadbeef... --confirmations 2
+```
+
+`resolve`  
+Resolve a name (placeholder behavior currently).
+Example:
+
+```powershell
+evm-cli resolve alice.rsk
+```
+
+`deploy`  
+Deploy contract flow placeholder.
+Example:
+
+```powershell
+evm-cli deploy --abi .\My.abi.json --bytecode .\My.bin --wallet alice --args arg1 arg2
+```
+
+`verify`  
+Contract verification placeholder.
+Example:
+
+```powershell
+evm-cli verify --json .\verify.json --name MyContract --address 0x1234...
+```
+
+`contract`  
+Interactive contract mode placeholder.
+Example:
+
+```powershell
+evm-cli contract --address 0x1234...
+```
+
+`bridge`  
+Bridge flow placeholder.
+Example:
+
+```powershell
+evm-cli bridge --wallet alice
+```
+
+`history`  
+History API placeholder.
+Example:
+
+```powershell
+evm-cli history --apiKey yourKey --number 10
+```
+
+`batch-transfer`  
+Batch transfer builder placeholder.
+Example:
+
+```powershell
+evm-cli batch-transfer --file .\batch.csv
+```
+
+`transaction`  
+Transaction builder placeholder.
+Example:
+
+```powershell
+evm-cli transaction
+```
+
+`simulate`  
+Simulation builder placeholder.
+Example:
+
+```powershell
+evm-cli simulate
+```
+
+## Useful Help Commands
+
+```powershell
+evm-cli --help
+evm-cli <command> --help
+evm-cli --version
+```
+
+## Data Directory
+
+Runtime files are written to:
+
+- `~/.evm-cli/config.json`
+- `~/.evm-cli/wallets.json`
+- `~/.evm-cli/wallets/*.json`
+- `~/.evm-cli/sessions.json`

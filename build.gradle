@@ -1,0 +1,65 @@
+plugins {
+    id 'com.diffplug.spotless' version '7.0.2' apply false
+    id 'com.github.spotbugs' version '6.1.7' apply false
+}
+
+allprojects {
+    group = 'com.evmcli'
+    version = '0.1.0'
+}
+
+subprojects {
+    apply plugin: 'java-library'
+    apply plugin: 'com.diffplug.spotless'
+    apply plugin: 'com.github.spotbugs'
+
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(25)
+        }
+    }
+
+    tasks.withType(Test).configureEach {
+        useJUnitPlatform()
+    }
+
+    dependencies {
+        testImplementation platform('org.junit:junit-bom:5.13.4')
+        testImplementation 'org.junit.jupiter:junit-jupiter-api'
+        testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine'
+        testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+        testImplementation 'org.assertj:assertj-core:3.27.3'
+    }
+
+    spotless {
+        java {
+            target 'src/*/java/**/*.java'
+            googleJavaFormat('1.24.0')
+        }
+    }
+
+    def enableSpotless = providers.gradleProperty('enableSpotless')
+        .map { it.toBoolean() }
+        .orElse(false)
+
+    tasks.matching { it.name.startsWith('spotless') }.configureEach {
+        enabled = enableSpotless.get()
+    }
+
+    spotbugs {
+        effort = 'max'
+        reportLevel = 'medium'
+    }
+
+    def enableSpotbugs = providers.gradleProperty('enableSpotbugs')
+        .map { it.toBoolean() }
+        .orElse(false)
+
+    tasks.withType(com.github.spotbugs.snom.SpotBugsTask).configureEach {
+        enabled = enableSpotbugs.get()
+        reports {
+            html.required = true
+            xml.required = false
+        }
+    }
+}
