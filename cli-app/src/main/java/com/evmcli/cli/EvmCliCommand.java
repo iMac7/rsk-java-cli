@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import org.fusesource.jansi.Ansi;
 import org.jline.reader.EndOfFileException;
 import org.jline.reader.LineReader;
 import org.jline.reader.LineReaderBuilder;
@@ -25,9 +26,9 @@ import picocli.CommandLine.Parameters;
 
 @Command(
     name = "evm-cli",
-    mixinStandardHelpOptions = true,
     description = "EVM multi-chain CLI",
     subcommands = {
+      EvmCliCommand.VersionCommand.class,
       EvmCliCommand.WalletCommand.class,
       EvmCliCommand.ConfigCommand.class,
       EvmCliCommand.BalanceCommand.class,
@@ -47,6 +48,9 @@ import picocli.CommandLine.Parameters;
 public class EvmCliCommand implements Callable<Integer> {
   private static CliContext ctx;
 
+  @Option(names = {"-h", "--help"}, usageHelp = true, description = "Show this help message and exit.")
+  boolean helpRequested;
+
   @Option(names = "--json", description = "Structured JSON output (stub)")
   boolean json;
 
@@ -60,11 +64,59 @@ public class EvmCliCommand implements Callable<Integer> {
     return 0;
   }
 
+  static String cliVersion() {
+    String implementationVersion = EvmCliCommand.class.getPackage().getImplementationVersion();
+    if (implementationVersion != null && !implementationVersion.isBlank()) {
+      return implementationVersion;
+    }
+    return "0.1.0";
+  }
+
   static ChainProfile resolveChain(NetworkOptions options) {
+    String chainUrl = options.selector.chainUrl;
+    if (chainUrl != null && !chainUrl.isBlank()) {
+      return new ChainProfile(
+          "custom-url",
+          chainUrl,
+          0L,
+          "NATIVE",
+          "",
+          "",
+          ChainFeatures.defaults());
+    }
+
+    String chainOption = normalizeChainOption(options.selector.chain);
+    if ("mainnet".equals(chainOption)) {
+      options.selector.mainnet = true;
+      options.selector.testnet = false;
+      chainOption = null;
+    } else if ("testnet".equals(chainOption)) {
+      options.selector.mainnet = false;
+      options.selector.testnet = true;
+      chainOption = null;
+    }
+
     return ChainSelector.resolve(
         ctx.configPort().load(),
         new ChainSelection(
-            options.selector.mainnet, options.selector.testnet, options.selector.chain));
+            options.selector.mainnet, options.selector.testnet, chainOption));
+  }
+
+  static String normalizeChainOption(String chainOption) {
+    if (chainOption == null || chainOption.isBlank()) {
+      return chainOption;
+    }
+    String normalized = chainOption.trim();
+    if (normalized.startsWith("chains.custom.")) {
+      return normalized.substring("chains.custom.".length());
+    }
+    if ("chains.mainnet".equals(normalized)) {
+      return "mainnet";
+    }
+    if ("chains.testnet".equals(normalized)) {
+      return "testnet";
+    }
+    return normalized;
   }
 
   static char[] readPassword(String prompt) {
@@ -89,10 +141,19 @@ public class EvmCliCommand implements Callable<Integer> {
   }
 
   static String promptText(LineReader reader, String label, String defaultValue) {
-    String prompt =
-        defaultValue == null || defaultValue.isBlank()
-            ? label + ": "
-            : label + " [" + defaultValue + "]: ";
+    String prompt;
+    if (defaultValue == null || defaultValue.isBlank()) {
+      prompt = Ansi.ansi().fg(Ansi.Color.WHITE).a(label + ": ").reset().toString();
+    } else {
+      prompt =
+          Ansi.ansi()
+              .fg(Ansi.Color.GREEN)
+              .a(label + " [")
+              .a(defaultValue)
+              .a("]: ")
+              .reset()
+              .toString();
+    }
     while (true) {
       try {
         String value = reader.readLine(prompt);
@@ -192,43 +253,61 @@ public class EvmCliCommand implements Callable<Integer> {
 
   static void printConfigSummary(CliConfig config, boolean dirty) {
     System.out.println();
-    System.out.println("=== Config TUI ===");
+    System.out.println(Ansi.ansi().fgRgb(255, 153, 51).bold().a("=== Config TUI ===").reset());
     if (dirty) {
-      System.out.println("* Unsaved changes");
+      System.out.println(Ansi.ansi().fgRgb(255, 183, 77).a("* Unsaved changes").reset());
     }
-    System.out.println(
-        "Wallet cache password in memory: "
-            + (config.getWallet().isCachePasswordInMemory() ? "enabled" : "disabled"));
+    System.out.printf(
+        "%s%s%n",
+        Ansi.ansi().fg(Ansi.Color.GREEN).a("Wallet cache password in memory: ").reset(),
+        config.getWallet().isCachePasswordInMemory() ? "enabled" : "disabled");
     printChainSlot("mainnet", config.getChains().getMainnet());
     printChainSlot("testnet", config.getChains().getTestnet());
-    System.out.println("Custom chains:");
+    System.out.println(Ansi.ansi().fg(Ansi.Color.GREEN).a("Custom chains:").reset());
     if (config.getChains().getCustom().isEmpty()) {
       System.out.println("- (none)");
     } else {
       for (Map.Entry<String, ChainProfile> entry : config.getChains().getCustom().entrySet()) {
         ChainProfile profile = entry.getValue();
-        System.out.printf("- %s -> rpc=%s chainId=%d symbol=%s%n", entry.getKey(), profile.rpcUrl(), profile.chainId(), profile.nativeSymbol());
+        System.out.printf(
+            "- %s -> rpc=%s chainId=%d symbol=%s%n",
+            Ansi.ansi().fg(Ansi.Color.GREEN).a(entry.getKey()).reset(),
+            profile.rpcUrl(),
+            profile.chainId(),
+            profile.nativeSymbol());
       }
     }
     System.out.println();
-    System.out.println("1) Edit mainnet");
-    System.out.println("2) Edit testnet");
-    System.out.println("3) Add or update custom chain");
-    System.out.println("4) Remove custom chain");
-    System.out.println("5) Toggle wallet password cache");
-    System.out.println("6) Save and exit");
-    System.out.println("7) Exit without saving");
+    printNumberedOption(1, "Edit mainnet");
+    printNumberedOption(2, "Edit testnet");
+    printNumberedOption(3, "Add or update custom chain");
+    printNumberedOption(4, "Remove custom chain");
+    printNumberedOption(5, "Toggle wallet password cache");
+    printNumberedOption(6, "Save and exit");
+    printNumberedOption(7, "Exit without saving");
     System.out.println();
   }
 
   static void printChainSlot(String label, ChainProfile profile) {
     if (profile == null) {
-      System.out.println(label + ": (not set)");
+      System.out.printf(
+          "%s%s%n", Ansi.ansi().fg(Ansi.Color.GREEN).a(label + ": ").reset(), "(not set)");
       return;
     }
     System.out.printf(
-        "%s: name=%s rpc=%s chainId=%d symbol=%s%n",
-        label, profile.name(), profile.rpcUrl(), profile.chainId(), profile.nativeSymbol());
+        "%sname=%s rpc=%s chainId=%d symbol=%s%n",
+        Ansi.ansi().fg(Ansi.Color.GREEN).a(label + ": ").reset(),
+        profile.name(),
+        profile.rpcUrl(),
+        profile.chainId(),
+        profile.nativeSymbol());
+  }
+
+  static void printNumberedOption(int number, String text) {
+    System.out.printf(
+        "%s %s%n",
+        Ansi.ansi().fgRgb(255, 153, 51).bold().a(number + ")").reset(),
+        Ansi.ansi().fg(Ansi.Color.WHITE).a(text).reset());
   }
 
   static class NetworkSelector {
@@ -238,8 +317,13 @@ public class EvmCliCommand implements Callable<Integer> {
     @Option(names = "--testnet", description = "Use chains.testnet")
     boolean testnet;
 
-    @Option(names = "--chain", description = "Use chains.custom.<name>")
+    @Option(
+        names = "--chain",
+        description = "Use config chain key, e.g. chains.custom.<name> or <name>")
     String chain;
+
+    @Option(names = "--chainurl", description = "Use an explicit RPC URL")
+    String chainUrl;
   }
 
   static class NetworkOptions {
@@ -247,9 +331,25 @@ public class EvmCliCommand implements Callable<Integer> {
     NetworkSelector selector = new NetworkSelector();
   }
 
+  static abstract class HelpCommand {
+    @Option(
+        names = {"-h", "--help"},
+        usageHelp = true,
+        description = "Show this help message and exit.")
+    boolean helpRequested;
+  }
+
+  @Command(name = "version", description = "Print CLI version")
+  static class VersionCommand extends HelpCommand implements Callable<Integer> {
+    @Override
+    public Integer call() {
+      System.out.println("evm-cli " + cliVersion());
+      return 0;
+    }
+  }
+
   @Command(
       name = "wallet",
-      mixinStandardHelpOptions = true,
       description = "Wallet management",
       subcommands = {
         WalletCreate.class,
@@ -261,16 +361,16 @@ public class EvmCliCommand implements Callable<Integer> {
         WalletBackup.class,
         WalletAddressBook.class
       })
-  static class WalletCommand implements Callable<Integer> {
+  static class WalletCommand extends HelpCommand implements Callable<Integer> {
     @Override
     public Integer call() {
-      System.out.println("Use a wallet subcommand.");
+      System.out.println("Use a wallet subcommand or add --help for a list of available commands.");
       return 0;
     }
   }
 
-  @Command(name = "create", mixinStandardHelpOptions = true, description = "Create wallet")
-  static class WalletCreate implements Callable<Integer> {
+  @Command(name = "create", description = "Create wallet")
+  static class WalletCreate extends HelpCommand implements Callable<Integer> {
     @Parameters(index = "0", description = "Wallet name")
     String name;
 
@@ -285,9 +385,8 @@ public class EvmCliCommand implements Callable<Integer> {
 
   @Command(
       name = "import",
-      mixinStandardHelpOptions = true,
       description = "Import wallet from private key")
-  static class WalletImport implements Callable<Integer> {
+  static class WalletImport extends HelpCommand implements Callable<Integer> {
     @Parameters(index = "0", description = "Wallet name")
     String name;
 
@@ -303,8 +402,8 @@ public class EvmCliCommand implements Callable<Integer> {
     }
   }
 
-  @Command(name = "list", mixinStandardHelpOptions = true, description = "List wallets")
-  static class WalletList implements Callable<Integer> {
+  @Command(name = "list", description = "List wallets")
+  static class WalletList extends HelpCommand implements Callable<Integer> {
     @Override
     public Integer call() {
       List<WalletMetadata> wallets = ctx.walletService().list();
@@ -312,13 +411,18 @@ public class EvmCliCommand implements Callable<Integer> {
         System.out.println("No wallets found.");
         return 0;
       }
-      wallets.forEach(w -> System.out.printf("- %s %s%n", w.name(), w.address()));
+      wallets.forEach(
+          w ->
+              System.out.printf(
+                  "- %s %s%n",
+                  Ansi.ansi().fg(Ansi.Color.GREEN).a(w.name()).reset(),
+                  w.address()));
       return 0;
     }
   }
 
-  @Command(name = "switch", mixinStandardHelpOptions = true, description = "Switch active wallet")
-  static class WalletSwitch implements Callable<Integer> {
+  @Command(name = "switch", description = "Switch active wallet")
+  static class WalletSwitch extends HelpCommand implements Callable<Integer> {
     @Parameters(index = "0", description = "Wallet name")
     String name;
 
@@ -330,8 +434,8 @@ public class EvmCliCommand implements Callable<Integer> {
     }
   }
 
-  @Command(name = "rename", mixinStandardHelpOptions = true, description = "Rename wallet")
-  static class WalletRename implements Callable<Integer> {
+  @Command(name = "rename", description = "Rename wallet")
+  static class WalletRename extends HelpCommand implements Callable<Integer> {
     @Parameters(index = "0", description = "Old name")
     String oldName;
 
@@ -346,8 +450,8 @@ public class EvmCliCommand implements Callable<Integer> {
     }
   }
 
-  @Command(name = "delete", mixinStandardHelpOptions = true, description = "Delete wallet")
-  static class WalletDelete implements Callable<Integer> {
+  @Command(name = "delete", description = "Delete wallet")
+  static class WalletDelete extends HelpCommand implements Callable<Integer> {
     @Parameters(index = "0", description = "Wallet name")
     String name;
 
@@ -359,8 +463,8 @@ public class EvmCliCommand implements Callable<Integer> {
     }
   }
 
-  @Command(name = "backup", mixinStandardHelpOptions = true, description = "Backup wallet")
-  static class WalletBackup implements Callable<Integer> {
+  @Command(name = "backup", description = "Backup wallet")
+  static class WalletBackup extends HelpCommand implements Callable<Integer> {
     @Override
     public Integer call() {
       System.out.println("Wallet backup TUI placeholder.");
@@ -369,8 +473,8 @@ public class EvmCliCommand implements Callable<Integer> {
   }
 
   @Command(
-      name = "address-book", mixinStandardHelpOptions = true, description = "Address book TUI")
-  static class WalletAddressBook implements Callable<Integer> {
+      name = "address-book", description = "Address book TUI")
+  static class WalletAddressBook extends HelpCommand implements Callable<Integer> {
     @Override
     public Integer call() {
       System.out.println("Address book TUI placeholder.");
@@ -378,8 +482,8 @@ public class EvmCliCommand implements Callable<Integer> {
     }
   }
 
-  @Command(name = "config", mixinStandardHelpOptions = true, description = "Config TUI")
-  static class ConfigCommand implements Callable<Integer> {
+  @Command(name = "config", description = "Config TUI")
+  static class ConfigCommand extends HelpCommand implements Callable<Integer> {
     @Override
     public Integer call() {
       CliConfig config = ctx.configPort().load();
@@ -454,12 +558,12 @@ public class EvmCliCommand implements Callable<Integer> {
     }
   }
 
-  @Command(name = "balance", mixinStandardHelpOptions = true, description = "Get native balance")
-  static class BalanceCommand implements Callable<Integer> {
-    @ArgGroup(exclusive = true, multiplicity = "1")
+  @Command(name = "balance", description = "Get native balance")
+  static class BalanceCommand extends HelpCommand implements Callable<Integer> {
+    @ArgGroup(exclusive = true, multiplicity = "0..1")
     Target target;
 
-    @Option(names = "--rns", description = "Optional resolver target")
+    @Option(names = "--rns", description = "RNS target (currently uses first wallet address)")
     String rns;
 
     @picocli.CommandLine.Mixin NetworkOptions networkOptions;
@@ -475,8 +579,21 @@ public class EvmCliCommand implements Callable<Integer> {
     @Override
     public Integer call() {
       ChainProfile chainProfile = resolveChain(networkOptions);
-      String address = target.address;
-      if (address == null) {
+      String address;
+      if (rns != null) {
+        List<WalletMetadata> wallets = ctx.walletService().list();
+        if (wallets.isEmpty()) {
+          throw new IllegalStateException(
+              "No wallets found. --rns currently requires at least one wallet.");
+        }
+        address = wallets.get(0).address();
+      } else {
+        if (target == null) {
+          throw new IllegalArgumentException("Provide one of --wallet, --address, or --rns.");
+        }
+        address = target.address;
+      }
+      if (rns == null && address == null) {
         WalletMetadata wallet =
             ctx.walletService().list().stream()
                 .filter(w -> w.name().equals(target.wallet))
@@ -485,21 +602,39 @@ public class EvmCliCommand implements Callable<Integer> {
                     () -> new IllegalArgumentException("Wallet not found: " + target.wallet));
         address = wallet.address();
       }
-      BigInteger wei = ctx.balanceService().nativeBalanceWei(chainProfile, address);
+      BigInteger wei;
+      try {
+        wei = ctx.balanceService().nativeBalanceWei(chainProfile, address);
+      } catch (Exception ex) {
+        throw new IllegalStateException(
+            "Unable to fetch balance on network '"
+                + chainProfile.name()
+                + "'. Try --testnet, --mainnet, --chain chains.custom.<name>, or --chainurl <rpcUrl>.",
+            ex);
+      }
+      String amountDisplay =
+          Ansi.ansi()
+              .fg(Ansi.Color.GREEN)
+              .a(
+                  String.format(
+                      "%s wei (%s %s)",
+                      wei,
+                      ctx.balanceService().toNative(wei).toPlainString(),
+                      chainProfile.nativeSymbol()))
+              .reset()
+              .toString();
       System.out.printf(
-          "%s balance on %s: %s wei (%s %s)%n",
+          "%s balance on %s: %s%n",
           address,
           chainProfile.name(),
-          wei,
-          ctx.balanceService().toNative(wei).toPlainString(),
-          chainProfile.nativeSymbol());
+          amountDisplay);
       return 0;
     }
   }
 
   @Command(
-      name = "transfer", mixinStandardHelpOptions = true, description = "Send native transfer")
-  static class TransferCommand implements Callable<Integer> {
+      name = "transfer", description = "Send native transfer")
+  static class TransferCommand extends HelpCommand implements Callable<Integer> {
     @Option(names = "--wallet", required = true)
     String wallet;
 
@@ -551,8 +686,8 @@ public class EvmCliCommand implements Callable<Integer> {
     }
   }
 
-  @Command(name = "tx", mixinStandardHelpOptions = true, description = "Transaction status")
-  static class TxCommand implements Callable<Integer> {
+  @Command(name = "tx", description = "Transaction status")
+  static class TxCommand extends HelpCommand implements Callable<Integer> {
     @Option(names = "--txid", required = true)
     String txid;
 
@@ -579,8 +714,8 @@ public class EvmCliCommand implements Callable<Integer> {
     }
   }
 
-  @Command(name = "monitor", mixinStandardHelpOptions = true, description = "Monitor sessions")
-  static class MonitorCommand implements Callable<Integer> {
+  @Command(name = "monitor", description = "Monitor sessions")
+  static class MonitorCommand extends HelpCommand implements Callable<Integer> {
     @Option(names = "--list")
     boolean list;
 
@@ -626,8 +761,8 @@ public class EvmCliCommand implements Callable<Integer> {
     }
   }
 
-  @Command(name = "resolve", mixinStandardHelpOptions = true, description = "Resolve name")
-  static class ResolveCommand implements Callable<Integer> {
+  @Command(name = "resolve", description = "Resolve name")
+  static class ResolveCommand extends HelpCommand implements Callable<Integer> {
     @Parameters(index = "0")
     String name;
 
@@ -641,8 +776,8 @@ public class EvmCliCommand implements Callable<Integer> {
     }
   }
 
-  @Command(name = "deploy", mixinStandardHelpOptions = true, description = "Deploy contract")
-  static class DeployCommand implements Callable<Integer> {
+  @Command(name = "deploy", description = "Deploy contract")
+  static class DeployCommand extends HelpCommand implements Callable<Integer> {
     @Option(names = "--abi")
     String abi;
 
@@ -662,8 +797,8 @@ public class EvmCliCommand implements Callable<Integer> {
     }
   }
 
-  @Command(name = "verify", mixinStandardHelpOptions = true, description = "Verify contract")
-  static class VerifyCommand implements Callable<Integer> {
+  @Command(name = "verify", description = "Verify contract")
+  static class VerifyCommand extends HelpCommand implements Callable<Integer> {
     @Option(names = "--json")
     String json;
 
@@ -685,9 +820,8 @@ public class EvmCliCommand implements Callable<Integer> {
 
   @Command(
       name = "contract",
-      mixinStandardHelpOptions = true,
       description = "Interactive contract mode")
-  static class ContractCommand implements Callable<Integer> {
+  static class ContractCommand extends HelpCommand implements Callable<Integer> {
     @Option(names = "--address")
     String address;
 
@@ -698,8 +832,8 @@ public class EvmCliCommand implements Callable<Integer> {
     }
   }
 
-  @Command(name = "bridge", mixinStandardHelpOptions = true, description = "Bridge flow")
-  static class BridgeCommand implements Callable<Integer> {
+  @Command(name = "bridge", description = "Bridge flow")
+  static class BridgeCommand extends HelpCommand implements Callable<Integer> {
     @Option(names = "--wallet")
     String wallet;
 
@@ -710,8 +844,8 @@ public class EvmCliCommand implements Callable<Integer> {
     }
   }
 
-  @Command(name = "history", mixinStandardHelpOptions = true, description = "History API")
-  static class HistoryCommand implements Callable<Integer> {
+  @Command(name = "history", description = "History API")
+  static class HistoryCommand extends HelpCommand implements Callable<Integer> {
     @Option(names = "--apiKey")
     String apiKey;
 
@@ -726,8 +860,8 @@ public class EvmCliCommand implements Callable<Integer> {
   }
 
   @Command(
-      name = "batch-transfer", mixinStandardHelpOptions = true, description = "Batch transfer")
-  static class BatchTransferCommand implements Callable<Integer> {
+      name = "batch-transfer", description = "Batch transfer")
+  static class BatchTransferCommand extends HelpCommand implements Callable<Integer> {
     @Option(names = "--interactive")
     boolean interactive;
 
@@ -746,9 +880,8 @@ public class EvmCliCommand implements Callable<Integer> {
 
   @Command(
       name = "transaction",
-      mixinStandardHelpOptions = true,
       description = "Transaction builder")
-  static class TransactionCommand implements Callable<Integer> {
+  static class TransactionCommand extends HelpCommand implements Callable<Integer> {
     @Override
     public Integer call() {
       System.out.println("Transaction builder placeholder.");
@@ -756,8 +889,8 @@ public class EvmCliCommand implements Callable<Integer> {
     }
   }
 
-  @Command(name = "simulate", mixinStandardHelpOptions = true, description = "Simulation builder")
-  static class SimulateCommand implements Callable<Integer> {
+  @Command(name = "simulate", description = "Simulation builder")
+  static class SimulateCommand extends HelpCommand implements Callable<Integer> {
     @Override
     public Integer call() {
       System.out.println("Simulation builder placeholder.");

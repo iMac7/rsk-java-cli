@@ -46,32 +46,29 @@ Global options:
 ## Supported Commands and Subcommands
 
 `wallet`  
-Wallet management container command.
-Example:
+Wallet management
 
+list of available commands
 ```powershell
-evm-cli wallet --help
+./evm-cli wallet --help
 ```
 
 `wallet create`  
-Create a wallet by name (prompts for password).
-Example:
+Create an encrypted wallet with name and password.
 
 ```powershell
-evm-cli wallet create alice
+evm-cli wallet create wallet1
 ```
 
 `wallet import`  
 Import wallet from private key (prompts for password).
-Example:
 
 ```powershell
-evm-cli wallet import trading --privkey 0xabc123...
+evm-cli wallet import wallet1 --privkey 0xabc123...
 ```
 
 `wallet list`  
 List wallets.
-Example:
 
 ```powershell
 evm-cli wallet list
@@ -117,9 +114,7 @@ Example:
 evm-cli wallet address-book
 ```
 
-`config`  
-Config TUI placeholder.
-Example:
+`config`
 
 ```powershell
 evm-cli config

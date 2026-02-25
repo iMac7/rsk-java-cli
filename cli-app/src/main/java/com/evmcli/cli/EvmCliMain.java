@@ -9,6 +9,7 @@ import org.jline.reader.LineReaderBuilder;
 import org.jline.reader.UserInterruptException;
 import org.jline.reader.impl.DefaultParser;
 import picocli.CommandLine;
+import picocli.CommandLine.Help;
 
 public final class EvmCliMain {
   private EvmCliMain() {}
@@ -18,11 +19,29 @@ public final class EvmCliMain {
     try {
       CliContext context = new CliContext(CliContext.defaultHome());
       CommandLine commandLine = new CommandLine(new EvmCliCommand(context));
+      commandLine.setColorScheme(createHelpColorScheme());
+      commandLine.setExecutionExceptionHandler(
+          (ex, cmd, parseResult) -> {
+            String message = ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage();
+            cmd.getErr()
+                .println(Ansi.ansi().fg(Ansi.Color.RED).bold().a("Error: ").a(message).reset());
+            return cmd.getCommandSpec().exitCodeOnExecutionException();
+          });
       int exitCode = args.length == 0 ? runInteractive(commandLine) : commandLine.execute(args);
       System.exit(exitCode);
     } finally {
       AnsiConsole.systemUninstall();
     }
+  }
+
+  private static Help.ColorScheme createHelpColorScheme() {
+    return new Help.ColorScheme.Builder(Help.Ansi.AUTO)
+        .commands(Help.Ansi.Style.bold, Help.Ansi.Style.fg("214"))
+        .options(Help.Ansi.Style.bold, Help.Ansi.Style.fg("208"))
+        .parameters(Help.Ansi.Style.fg("220"))
+        .optionParams(Help.Ansi.Style.fg("221"))
+        .errors(Help.Ansi.Style.bold, Help.Ansi.Style.fg_red)
+        .build();
   }
 
   private static int runInteractive(CommandLine commandLine) {
@@ -57,7 +76,7 @@ public final class EvmCliMain {
       List<String> words = parser.parse(line, 0).words();
       int exitCode = commandLine.execute(words.toArray(String[]::new));
       if (exitCode != 0) {
-        System.out.println(Ansi.ansi().fgRgb(255, 183, 77).a("Command failed.").reset());
+        System.out.println(Ansi.ansi().fg(Ansi.Color.RED).bold().a("Command failed.").reset());
       }
     }
   }
@@ -67,21 +86,21 @@ public final class EvmCliMain {
         Ansi.ansi().fgRgb(255, 153, 51).bold().a("Welcome to EVM CLI").reset().toString());
     System.out.println(Ansi.ansi().fgRgb(255, 183, 77).a("Type a command or use --help").reset());
     System.out.println();
-    System.out.println(Ansi.ansi().fgRgb(255, 153, 51).a("👛 wallet      Wallet management").reset());
-    System.out.println(Ansi.ansi().fgRgb(255, 153, 51).a("⚙️  config      Config TUI").reset());
-    System.out.println(Ansi.ansi().fgRgb(255, 153, 51).a("💰 balance     Check native balance").reset());
-    System.out.println(Ansi.ansi().fgRgb(255, 153, 51).a("🚀 transfer    Send native transfer").reset());
-    System.out.println(Ansi.ansi().fgRgb(255, 153, 51).a("🧾 tx          Transaction status").reset());
-    System.out.println(Ansi.ansi().fgRgb(255, 153, 51).a("📡 monitor     Session monitoring").reset());
-    System.out.println(Ansi.ansi().fgRgb(255, 153, 51).a("🔎 resolve     Resolve names").reset());
-    System.out.println(Ansi.ansi().fgRgb(255, 153, 51).a("🛠️  deploy      Deploy contract").reset());
-    System.out.println(Ansi.ansi().fgRgb(255, 153, 51).a("✅ verify      Verify contract").reset());
-    System.out.println(Ansi.ansi().fgRgb(255, 153, 51).a("📜 contract    Contract mode").reset());
-    System.out.println(Ansi.ansi().fgRgb(255, 153, 51).a("🌉 bridge      Bridge flow").reset());
-    System.out.println(Ansi.ansi().fgRgb(255, 153, 51).a("🕘 history     History API").reset());
-    System.out.println(Ansi.ansi().fgRgb(255, 153, 51).a("📦 batch-transfer  Batch transfer").reset());
-    System.out.println(Ansi.ansi().fgRgb(255, 153, 51).a("🧱 transaction Transaction builder").reset());
-    System.out.println(Ansi.ansi().fgRgb(255, 153, 51).a("🧪 simulate    Simulation builder").reset());
+    printMenuItem("\uD83D\uDC5B wallet      ", "Wallet management");
+    printMenuItem("\u2699\uFE0F  config      ", "Config TUI");
+    printMenuItem("\uD83D\uDCB0 balance     ", "Check native balance");
+    printMenuItem("\uD83D\uDE80 transfer    ", "Send native transfer");
+    printMenuItem("\uD83E\uDDFE tx          ", "Transaction status");
+    printMenuItem("\uD83D\uDCE1 monitor     ", "Session monitoring");
+    printMenuItem("\uD83D\uDD0E resolve     ", "Resolve names");
+    printMenuItem("\uD83D\uDEE0\uFE0F  deploy      ", "Deploy contract");
+    printMenuItem("\u2705 verify      ", "Verify contract");
+    printMenuItem("\uD83D\uDCDC contract    ", "Contract mode");
+    printMenuItem("\uD83C\uDF09 bridge      ", "Bridge flow");
+    printMenuItem("\uD83D\uDD58 history     ", "History API");
+    printMenuItem("\uD83D\uDCE6 batch-transfer  ", "Batch transfer");
+    printMenuItem("\uD83E\uDDF1 transaction ", "Transaction builder");
+    printMenuItem("\uD83E\uDDEA simulate    ", "Simulation builder");
     System.out.println();
     System.out.println(
         Ansi.ansi()
@@ -91,6 +110,18 @@ public final class EvmCliMain {
   }
 
   private static String prompt() {
-    return Ansi.ansi().fgRgb(255, 153, 51).bold().a("🟠 evm-cli> ").reset().toString();
+    return Ansi.ansi().fgRgb(255, 153, 51).bold().a("\uD83D\uDFE0 evm-cli> ").reset().toString();
+  }
+
+  private static void printMenuItem(String key, String description) {
+    System.out.println(
+        Ansi.ansi()
+            .fgRgb(255, 153, 51)
+            .bold()
+            .a(key)
+            .reset()
+            .fg(Ansi.Color.WHITE)
+            .a(description)
+            .reset());
   }
 }
