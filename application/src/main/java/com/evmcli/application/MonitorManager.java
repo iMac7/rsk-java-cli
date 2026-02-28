@@ -4,6 +4,7 @@ import com.evmcli.domain.model.MonitorSession;
 import com.evmcli.domain.port.MonitorSessionPort;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 
@@ -18,6 +19,10 @@ public class MonitorManager {
 
   public List<MonitorSession> list() {
     return sessionPort.list();
+  }
+
+  public Optional<MonitorSession> find(UUID id) {
+    return sessionPort.find(id);
   }
 
   public MonitorSession startTxConfirmations(

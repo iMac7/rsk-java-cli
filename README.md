@@ -196,6 +196,7 @@ Examples:
 evm-cli monitor --list
 evm-cli monitor --stop 123e4567-e89b-12d3-a456-426614174000
 evm-cli monitor --tx 0xdeadbeef... --confirmations 2
+evm-cli monitor 123e4567-e89b-12d3-a456-426614174000
 ```
 
 `resolve`  

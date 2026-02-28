@@ -10,9 +10,13 @@ import com.evmcli.domain.model.MonitorSession;
 import com.evmcli.domain.model.WalletMetadata;
 import java.io.Console;
 import java.math.BigInteger;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import org.fusesource.jansi.Ansi;
@@ -357,6 +361,175 @@ public class EvmCliCommand implements Callable<Integer> {
     return lookup
         .lookup(chainProfile.rpcUrl(), trimmed)
         .orElseThrow(() -> new IllegalArgumentException("RNS name not found: " + trimmed));
+  }
+
+  static Optional<ChainProfile> resolveChainProfileByRef(String chainRef) {
+    CliConfig config = ctx.configPort().load();
+    if (chainRef == null || chainRef.isBlank()) {
+      return Optional.empty();
+    }
+    if ("mainnet".equalsIgnoreCase(chainRef)) {
+      return Optional.ofNullable(config.getChains().getMainnet());
+    }
+    if ("testnet".equalsIgnoreCase(chainRef)) {
+      return Optional.ofNullable(config.getChains().getTestnet());
+    }
+
+    ChainProfile byCustomKey = config.getChains().getCustom().get(chainRef);
+    if (byCustomKey != null) {
+      return Optional.of(byCustomKey);
+    }
+
+    return config.getChains().getCustom().values().stream()
+        .filter(profile -> profile.name() != null && profile.name().equalsIgnoreCase(chainRef))
+        .findFirst();
+  }
+
+  static String formatInstant(Instant timestamp) {
+    if (timestamp == null) {
+      return "n/a";
+    }
+    DateTimeFormatter formatter =
+        DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss z").withZone(ZoneId.systemDefault());
+    return formatter.format(timestamp);
+  }
+
+  static String formatConfirmations(MonitorSession session) {
+    int required = Math.max(1, session.getConfirmationsRequired());
+    long current = Math.min(session.getCheckCount(), required);
+    return current + "/" + required;
+  }
+
+  static boolean confirmationsReached(MonitorSession session) {
+    return session.getConfirmationsRequired() > 0
+        && session.getCheckCount() >= session.getConfirmationsRequired();
+  }
+
+  static void printMonitorSessionHeader(MonitorSession session, ChainProfile chainProfile) {
+    String chainName = chainProfile == null ? session.getChainRef() : chainProfile.name();
+    String chainId = chainProfile == null ? "n/a" : Long.toString(chainProfile.chainId());
+    String rpcUrl = chainProfile == null ? "n/a" : chainProfile.rpcUrl();
+    String symbol = chainProfile == null ? "n/a" : chainProfile.nativeSymbol();
+    String senderWallet = "unknown";
+
+    System.out.println(
+        Ansi.ansi()
+            .fgRgb(255, 153, 51)
+            .bold()
+            .a("🛰️  Monitor Session Viewer")
+            .reset());
+    System.out.println();
+
+    System.out.printf(
+        "%s %s%n",
+        Ansi.ansi().fg(Ansi.Color.CYAN).a("🆔 Session:").reset(),
+        session.getId());
+    System.out.printf(
+        "%s %s%n",
+        Ansi.ansi().fg(Ansi.Color.CYAN).a("📌 Status:").reset(),
+        Ansi.ansi().fg(Ansi.Color.YELLOW).a("Monitoring").reset());
+    System.out.printf(
+        "%s %s%n",
+        Ansi.ansi().fg(Ansi.Color.CYAN).a("🧭 Type:").reset(),
+        session.getType());
+    System.out.printf(
+        "%s %s%n",
+        Ansi.ansi().fg(Ansi.Color.CYAN).a("🔗 Network:").reset(),
+        chainName);
+    System.out.printf(
+        "%s %s%n",
+        Ansi.ansi().fg(Ansi.Color.CYAN).a("🆔 Chain ID:").reset(),
+        chainId);
+    System.out.printf(
+        "%s %s%n",
+        Ansi.ansi().fg(Ansi.Color.CYAN).a("🌐 RPC:").reset(),
+        rpcUrl);
+    System.out.printf(
+        "%s %s%n",
+        Ansi.ansi().fg(Ansi.Color.CYAN).a("💱 Native:").reset(),
+        symbol);
+    System.out.printf(
+        "%s %s%n",
+        Ansi.ansi().fg(Ansi.Color.CYAN).a("👛 Sending wallet:").reset(),
+        senderWallet);
+    System.out.printf(
+        "%s %s%n",
+        Ansi.ansi().fg(Ansi.Color.CYAN).a("🧾 Tx Hash:").reset(),
+        session.getTarget());
+    System.out.printf(
+        "%s %s%n",
+        Ansi.ansi().fg(Ansi.Color.CYAN).a("📅 Created:").reset(),
+        formatInstant(session.getCreatedAt()));
+    System.out.println();
+  }
+
+  static void printMonitorSessionDynamic(MonitorSession session, String spinnerFrame, boolean updateInPlace) {
+    boolean complete = confirmationsReached(session);
+    Ansi.Color statusColor = complete ? Ansi.Color.GREEN : Ansi.Color.YELLOW;
+    String statusLine =
+        (complete ? "✅ Confirmations reached" : spinnerFrame + " Waiting for confirmations")
+            + " | status="
+            + session.getStatus();
+    String progressLine =
+        "✅ Confirmations: "
+            + formatConfirmations(session)
+            + " | 🔁 Checks: "
+            + session.getCheckCount()
+            + " | ⏱️ Poll: "
+            + session.getPollIntervalSeconds()
+            + "s";
+    String timeLine =
+        "🕒 Last check: "
+            + formatInstant(session.getLastCheckedAt())
+            + " | 🕰️ Now: "
+            + formatInstant(Instant.now());
+
+    if (updateInPlace) {
+      System.out.print("\u001b[3A");
+    }
+    System.out.print("\u001b[2K\r" + Ansi.ansi().fg(statusColor).bold().a(statusLine).reset() + "\n");
+    System.out.print("\u001b[2K\r" + Ansi.ansi().fg(Ansi.Color.CYAN).a(progressLine).reset() + "\n");
+    System.out.print("\u001b[2K\r" + Ansi.ansi().fg(Ansi.Color.CYAN).a(timeLine).reset() + "\n");
+    System.out.flush();
+  }
+
+  static void monitorSessionTui(UUID sessionId) {
+    String[] spinnerFrames = {"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"};
+    int spinnerIndex = 0;
+    boolean dynamicPrinted = false;
+    while (true) {
+      MonitorSession session =
+          ctx.monitorManager()
+              .find(sessionId)
+              .orElseThrow(() -> new IllegalArgumentException("Monitor session not found: " + sessionId));
+      ChainProfile chainProfile = resolveChainProfileByRef(session.getChainRef()).orElse(null);
+      if (!dynamicPrinted) {
+        printMonitorSessionHeader(session, chainProfile);
+      }
+      printMonitorSessionDynamic(
+          session, spinnerFrames[spinnerIndex % spinnerFrames.length], dynamicPrinted);
+      dynamicPrinted = true;
+      spinnerIndex++;
+
+      if (confirmationsReached(session) || session.getStatus() != MonitorSession.Status.ACTIVE) {
+        System.out.println();
+        if (confirmationsReached(session)) {
+          System.out.println(
+              Ansi.ansi()
+                  .fg(Ansi.Color.GREEN)
+                  .bold()
+                  .a("🎉 Monitoring complete. Confirmations requirement satisfied.")
+                  .reset());
+        }
+        return;
+      }
+      try {
+        Thread.sleep(500);
+      } catch (InterruptedException ex) {
+        Thread.currentThread().interrupt();
+        return;
+      }
+    }
   }
 
   static class NetworkSelector {
@@ -830,6 +1003,9 @@ public class EvmCliCommand implements Callable<Integer> {
 
   @Command(name = "monitor", description = "Monitor sessions")
   static class MonitorCommand extends HelpCommand implements Callable<Integer> {
+    @Parameters(index = "0", arity = "0..1", description = "Session id to open monitor viewer")
+    UUID sessionId;
+
     @Option(names = "--list")
     boolean list;
 
@@ -851,8 +1027,14 @@ public class EvmCliCommand implements Callable<Integer> {
     @Option(names = "--confirmations", defaultValue = "1")
     int confirmations;
 
+    @picocli.CommandLine.Mixin NetworkOptions networkOptions;
+
     @Override
     public Integer call() {
+      if (sessionId != null) {
+        monitorSessionTui(sessionId);
+        return 0;
+      }
       if (list) {
         ctx.monitorManager()
             .list()
@@ -866,11 +1048,13 @@ public class EvmCliCommand implements Callable<Integer> {
         return 0;
       }
       if (tx != null) {
-        MonitorSession session = ctx.monitorManager().startTxConfirmations("mainnet", tx, 10, confirmations);
+        ChainProfile chainProfile = resolveChain(networkOptions);
+        MonitorSession session =
+            ctx.monitorManager().startTxConfirmations(chainProfile.name(), tx, 10, confirmations);
         System.out.println("Started tx monitor session " + session.getId());
         return 0;
       }
-      System.out.println("Use --list, --stop, or --tx.");
+      System.out.println("Use --list, --stop, --tx, or provide <session-id>.");
       return 0;
     }
   }
