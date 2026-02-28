@@ -25,6 +25,12 @@ public final class EvmCliMain {
             String message = ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage();
             cmd.getErr()
                 .println(Ansi.ansi().fg(Ansi.Color.RED).bold().a("Error: ").a(message).reset());
+            cmd.getErr().println();
+            CommandLine.ParseResult target = parseResult;
+            while (target.hasSubcommand()) {
+              target = target.subcommand();
+            }
+            target.commandSpec().commandLine().usage(cmd.getErr());
             return cmd.getCommandSpec().exitCodeOnExecutionException();
           });
       int exitCode = args.length == 0 ? runInteractive(commandLine) : commandLine.execute(args);
@@ -87,7 +93,7 @@ public final class EvmCliMain {
     System.out.println(Ansi.ansi().fgRgb(255, 183, 77).a("Type a command or use --help").reset());
     System.out.println();
     printMenuItem("\uD83D\uDC5B wallet      ", "Wallet management");
-    printMenuItem("\u2699\uFE0F  config      ", "Config TUI");
+    printMenuItem("\u2699\uFE0F  config      ", "Config UI");
     printMenuItem("\uD83D\uDCB0 balance     ", "Check native balance");
     printMenuItem("\uD83D\uDE80 transfer    ", "Send native transfer");
     printMenuItem("\uD83E\uDDFE tx          ", "Transaction status");
@@ -105,7 +111,7 @@ public final class EvmCliMain {
     System.out.println(
         Ansi.ansi()
             .fgRgb(255, 183, 77)
-            .a("Tips: type 'clear' to redraw, 'exit' to quit.")
+            .a("Type 'clear' to start over, 'exit' to quit.")
             .reset());
   }
 

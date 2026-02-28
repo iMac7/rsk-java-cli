@@ -27,7 +27,7 @@ public class CliContext {
     JsonWalletRepository walletRepository = new JsonWalletRepository(homeDir);
     RpcPort rpcPort = new Web3jRpcGateway();
     this.configPort = new JsonConfigRepository(homeDir);
-    this.walletService = new WalletService(walletRepository);
+    this.walletService = new WalletService(walletRepository, walletRepository);
     this.balanceService = new BalanceService(rpcPort);
     this.transferService = new TransferService(rpcPort, (WalletUnlockPort) walletRepository);
     this.txService = new TxService(rpcPort);

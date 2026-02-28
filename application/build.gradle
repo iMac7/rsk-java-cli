@@ -4,5 +4,6 @@ plugins {
 
 dependencies {
     api project(':domain')
+    implementation 'org.web3j:core:4.12.3'
     implementation 'org.slf4j:slf4j-api:2.0.17'
 }

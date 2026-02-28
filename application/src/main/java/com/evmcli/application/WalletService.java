@@ -2,13 +2,17 @@ package com.evmcli.application;
 
 import com.evmcli.domain.model.WalletMetadata;
 import com.evmcli.domain.port.WalletPort;
+import com.evmcli.domain.port.WalletUnlockPort;
 import java.util.List;
+import java.util.Optional;
 
 public class WalletService {
   private final WalletPort walletPort;
+  private final WalletUnlockPort walletUnlockPort;
 
-  public WalletService(WalletPort walletPort) {
+  public WalletService(WalletPort walletPort, WalletUnlockPort walletUnlockPort) {
     this.walletPort = walletPort;
+    this.walletUnlockPort = walletUnlockPort;
   }
 
   public WalletMetadata create(String name, char[] password) {
@@ -23,6 +27,10 @@ public class WalletService {
     return walletPort.listWallets();
   }
 
+  public Optional<WalletMetadata> active() {
+    return walletPort.getActiveWallet();
+  }
+
   public void switchActive(String name) {
     walletPort.switchActiveWallet(name);
   }
@@ -33,5 +41,9 @@ public class WalletService {
 
   public void delete(String name) {
     walletPort.deleteWallet(name);
+  }
+
+  public String dumpPrivateKey(String name, char[] password) {
+    return walletUnlockPort.unlockPrivateKeyHex(name, password);
   }
 }

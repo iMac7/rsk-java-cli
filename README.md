@@ -1,3 +1,20 @@
+CMD support
+balance
+
+
+TODO
+check custom chain support
+wallet with rns
+rns?
+//peter.rsk resolves
+
+TODO?
+wallet - address book
+
+
+
+
+
 # java cli for evm compatible chains
 
 
@@ -74,6 +91,21 @@ List wallets.
 evm-cli wallet list
 ```
 
+`wallet active`  
+Show active wallet name and address.
+
+```powershell
+evm-cli wallet active
+```
+
+`wallet dump`  
+Reveal wallet private key (prompts for password). If wallet name is omitted, active wallet is used.
+
+```powershell
+evm-cli wallet dump alice
+evm-cli wallet dump
+```
+
 `wallet switch`  
 Switch active wallet.
 Example:
@@ -122,22 +154,28 @@ evm-cli config
 
 `balance`  
 Get native balance by wallet name or address.  
-Requires one of `--wallet` or `--address`.  
-Optional network selector: `--mainnet` or `--testnet` or `--chain <name>`.
+Uses active wallet by default when no target is provided.  
+`--address` accepts either a hex address or an RNS name.  
+Optional network selector: `--mainnet` or `--testnet` or `--chain <name>`.  
+If not specified, defaults to RSK testnet.
 Examples:
 
 ```powershell
+evm-cli balance
 evm-cli balance --wallet alice --mainnet
 evm-cli balance --address 0x1234... --chain rskTestnet
 ```
 
 `transfer`  
 Send native transfer.  
-Requires `--wallet`, `--value`, and one of `--address` or `--rns`.  
+Requires `--value` and one of `--address` or `--rns`.  
+If `--wallet` is omitted, active wallet is used.  
+`--address` (and `--rns`) supports RNS resolution; missing names fail with an error.  
 Optional: `--token`, `--gas-limit`, `--gas-price`, `--data`, `--interactive`, network selector.
 Example:
 
 ```powershell
+evm-cli transfer --address 0x1234... --value 10000000000000000
 evm-cli transfer --wallet alice --address 0x1234... --value 10000000000000000 --mainnet
 ```
 
@@ -161,11 +199,12 @@ evm-cli monitor --tx 0xdeadbeef... --confirmations 2
 ```
 
 `resolve`  
-Resolve a name (placeholder behavior currently).
+Resolve RNS names and reverse-resolve addresses.
 Example:
 
 ```powershell
 evm-cli resolve alice.rsk
+evm-cli resolve 0x1234... --reverse
 ```
 
 `deploy`  

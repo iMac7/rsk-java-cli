@@ -2,6 +2,7 @@ package com.evmcli.cli;
 
 import com.evmcli.application.ChainSelection;
 import com.evmcli.application.ChainSelector;
+import com.evmcli.application.utils.rns.lookup;
 import com.evmcli.domain.model.ChainFeatures;
 import com.evmcli.domain.model.ChainProfile;
 import com.evmcli.domain.model.CliConfig;
@@ -99,7 +100,9 @@ public class EvmCliCommand implements Callable<Integer> {
     return ChainSelector.resolve(
         ctx.configPort().load(),
         new ChainSelection(
-            options.selector.mainnet, options.selector.testnet, chainOption));
+            options.selector.mainnet,
+            options.selector.testnet || (!options.selector.mainnet && chainOption == null),
+            chainOption));
   }
 
   static String normalizeChainOption(String chainOption) {
@@ -253,7 +256,7 @@ public class EvmCliCommand implements Callable<Integer> {
 
   static void printConfigSummary(CliConfig config, boolean dirty) {
     System.out.println();
-    System.out.println(Ansi.ansi().fgRgb(255, 153, 51).bold().a("=== Config TUI ===").reset());
+    System.out.println(Ansi.ansi().fgRgb(255, 153, 51).bold().a("=== Config UI ===").reset());
     if (dirty) {
       System.out.println(Ansi.ansi().fgRgb(255, 183, 77).a("* Unsaved changes").reset());
     }
@@ -310,6 +313,52 @@ public class EvmCliCommand implements Callable<Integer> {
         Ansi.ansi().fg(Ansi.Color.WHITE).a(text).reset());
   }
 
+  static boolean isHexAddress(String value) {
+    return value != null && value.matches("(?i)^0x[a-f0-9]{40}$");
+  }
+
+  static boolean isValidRnsName(String value) {
+    if (value == null) {
+      return false;
+    }
+    String normalized = value.trim().toLowerCase();
+    if (normalized.length() < 3 || normalized.length() > 255 || !normalized.contains(".")) {
+      return false;
+    }
+    if (normalized.startsWith(".") || normalized.endsWith(".")) {
+      return false;
+    }
+    String[] labels = normalized.split("\\.");
+    for (String label : labels) {
+      if (label.isEmpty() || label.length() > 63) {
+        return false;
+      }
+      if (!label.matches("^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$")) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  static String resolveAddressInput(ChainProfile chainProfile, String value) {
+    if (value == null || value.isBlank()) {
+      throw new IllegalArgumentException("Address value is required.");
+    }
+    String trimmed = value.trim();
+    if (isHexAddress(trimmed)) {
+      return trimmed;
+    }
+    if (!isValidRnsName(trimmed)) {
+      throw new IllegalArgumentException(
+          "Invalid RNS format: "
+              + trimmed
+              + ". Expected domain-like format, e.g. alice.rsk");
+    }
+    return lookup
+        .lookup(chainProfile.rpcUrl(), trimmed)
+        .orElseThrow(() -> new IllegalArgumentException("RNS name not found: " + trimmed));
+  }
+
   static class NetworkSelector {
     @Option(names = "--mainnet", description = "Use chains.mainnet")
     boolean mainnet;
@@ -355,6 +404,8 @@ public class EvmCliCommand implements Callable<Integer> {
         WalletCreate.class,
         WalletImport.class,
         WalletList.class,
+        WalletActive.class,
+        WalletDump.class,
         WalletSwitch.class,
         WalletRename.class,
         WalletDelete.class,
@@ -364,8 +415,8 @@ public class EvmCliCommand implements Callable<Integer> {
   static class WalletCommand extends HelpCommand implements Callable<Integer> {
     @Override
     public Integer call() {
-      System.out.println("Use a wallet subcommand or add --help for a list of available commands.");
-      return 0;
+      throw new IllegalArgumentException(
+          "Missing wallet subcommand. Use --help for available wallet commands.");
     }
   }
 
@@ -417,6 +468,44 @@ public class EvmCliCommand implements Callable<Integer> {
                   "- %s %s%n",
                   Ansi.ansi().fg(Ansi.Color.GREEN).a(w.name()).reset(),
                   w.address()));
+      return 0;
+    }
+  }
+
+  @Command(name = "active", description = "Show active wallet")
+  static class WalletActive extends HelpCommand implements Callable<Integer> {
+    @Override
+    public Integer call() {
+      ctx.walletService()
+          .active()
+          .ifPresentOrElse(
+              w -> System.out.printf("%s %s%n", w.name(), w.address()),
+              () -> System.out.println("No active wallet."));
+      return 0;
+    }
+  }
+
+  @Command(name = "dump", description = "Reveal wallet private key")
+  static class WalletDump extends HelpCommand implements Callable<Integer> {
+    @Parameters(index = "0", arity = "0..1", description = "Wallet name (defaults to active wallet)")
+    String name;
+
+    @Override
+    public Integer call() {
+      String walletName = name;
+      if (walletName == null || walletName.isBlank()) {
+        walletName =
+            ctx.walletService()
+                .active()
+                .map(WalletMetadata::name)
+                .orElseThrow(
+                    () ->
+                        new IllegalArgumentException(
+                            "No active wallet found. Provide a wallet name."));
+      }
+      char[] password = readPassword("Wallet password: ");
+      String privateKey = ctx.walletService().dumpPrivateKey(walletName, password);
+      System.out.println(privateKey);
       return 0;
     }
   }
@@ -482,7 +571,7 @@ public class EvmCliCommand implements Callable<Integer> {
     }
   }
 
-  @Command(name = "config", description = "Config TUI")
+  @Command(name = "config", description = "Config UI")
   static class ConfigCommand extends HelpCommand implements Callable<Integer> {
     @Override
     public Integer call() {
@@ -563,7 +652,7 @@ public class EvmCliCommand implements Callable<Integer> {
     @ArgGroup(exclusive = true, multiplicity = "0..1")
     Target target;
 
-    @Option(names = "--rns", description = "RNS target (currently uses first wallet address)")
+    @Option(names = "--rns", description = "RNS target")
     String rns;
 
     @picocli.CommandLine.Mixin NetworkOptions networkOptions;
@@ -572,7 +661,7 @@ public class EvmCliCommand implements Callable<Integer> {
       @Option(names = "--wallet")
       String wallet;
 
-      @Option(names = "--address")
+      @Option(names = "--address", description = "Address or RNS name")
       String address;
     }
 
@@ -581,26 +670,37 @@ public class EvmCliCommand implements Callable<Integer> {
       ChainProfile chainProfile = resolveChain(networkOptions);
       String address;
       if (rns != null) {
-        List<WalletMetadata> wallets = ctx.walletService().list();
-        if (wallets.isEmpty()) {
-          throw new IllegalStateException(
-              "No wallets found. --rns currently requires at least one wallet.");
-        }
-        address = wallets.get(0).address();
+        address = resolveAddressInput(chainProfile, rns);
       } else {
         if (target == null) {
-          throw new IllegalArgumentException("Provide one of --wallet, --address, or --rns.");
+          WalletMetadata activeWallet =
+              ctx.walletService()
+                  .active()
+                  .orElseThrow(
+                      () ->
+                          new IllegalArgumentException(
+                              "Provide --wallet, --address, or --rns, or set an active wallet."));
+          address = activeWallet.address();
+        } else if (target.address != null) {
+          address = resolveAddressInput(chainProfile, target.address);
+        } else if (target.wallet != null) {
+          WalletMetadata wallet =
+              ctx.walletService().list().stream()
+                  .filter(w -> w.name().equals(target.wallet))
+                  .findFirst()
+                  .orElseThrow(
+                      () -> new IllegalArgumentException("Wallet not found: " + target.wallet));
+          address = wallet.address();
+        } else {
+          WalletMetadata activeWallet =
+              ctx.walletService()
+                  .active()
+                  .orElseThrow(
+                      () ->
+                          new IllegalArgumentException(
+                              "Provide --wallet, --address, or --rns, or set an active wallet."));
+          address = activeWallet.address();
         }
-        address = target.address;
-      }
-      if (rns == null && address == null) {
-        WalletMetadata wallet =
-            ctx.walletService().list().stream()
-                .filter(w -> w.name().equals(target.wallet))
-                .findFirst()
-                .orElseThrow(
-                    () -> new IllegalArgumentException("Wallet not found: " + target.wallet));
-        address = wallet.address();
       }
       BigInteger wei;
       try {
@@ -635,7 +735,7 @@ public class EvmCliCommand implements Callable<Integer> {
   @Command(
       name = "transfer", description = "Send native transfer")
   static class TransferCommand extends HelpCommand implements Callable<Integer> {
-    @Option(names = "--wallet", required = true)
+    @Option(names = "--wallet", description = "Wallet name (defaults to active wallet)")
     String wallet;
 
     @ArgGroup(exclusive = true, multiplicity = "1")
@@ -662,7 +762,7 @@ public class EvmCliCommand implements Callable<Integer> {
     @picocli.CommandLine.Mixin NetworkOptions networkOptions;
 
     static class ToTarget {
-      @Option(names = "--address")
+      @Option(names = "--address", description = "Address or RNS name")
       String address;
 
       @Option(names = "--rns")
@@ -676,11 +776,25 @@ public class EvmCliCommand implements Callable<Integer> {
         return 0;
       }
       ChainProfile chainProfile = resolveChain(networkOptions);
-      String to = toTarget.address != null ? toTarget.address : toTarget.rns;
+      String to =
+          toTarget.address != null
+              ? resolveAddressInput(chainProfile, toTarget.address)
+              : resolveAddressInput(chainProfile, toTarget.rns);
+      String walletName = wallet;
+      if (walletName == null || walletName.isBlank()) {
+        walletName =
+            ctx.walletService()
+                .active()
+                .map(WalletMetadata::name)
+                .orElseThrow(
+                    () ->
+                        new IllegalArgumentException(
+                            "No active wallet found. Provide --wallet."));
+      }
       char[] password = readPassword("Wallet password: ");
       String txHash =
           ctx.transferService()
-              .sendNative(chainProfile, wallet, password, to, value, gasLimit, gasPrice, data);
+              .sendNative(chainProfile, walletName, password, to, value, gasLimit, gasPrice, data);
       System.out.println("Submitted tx: " + txHash);
       return 0;
     }
@@ -769,9 +883,33 @@ public class EvmCliCommand implements Callable<Integer> {
     @Option(names = "--reverse")
     boolean reverse;
 
+    @picocli.CommandLine.Mixin NetworkOptions networkOptions;
+
     @Override
     public Integer call() {
-      System.out.println("Name resolution is chain-capability gated and pending adapter implementation.");
+      ChainProfile chainProfile = resolveChain(networkOptions);
+      if (reverse) {
+        if (!isHexAddress(name)) {
+          throw new IllegalArgumentException(
+              "Invalid address format for reverse resolution: " + name);
+        }
+        String resolved =
+            lookup
+                .reverseLookup(chainProfile.rpcUrl(), name)
+                .orElseThrow(() -> new IllegalArgumentException("No RNS name found for: " + name));
+        System.out.println(resolved);
+        return 0;
+      }
+
+      if (!isValidRnsName(name)) {
+        throw new IllegalArgumentException(
+            "Invalid RNS format: " + name + ". Expected domain-like format, e.g. alice.rsk");
+      }
+      String resolved =
+          lookup
+              .lookup(chainProfile.rpcUrl(), name)
+              .orElseThrow(() -> new IllegalArgumentException("RNS name not found: " + name));
+      System.out.println(resolved);
       return 0;
     }
   }
