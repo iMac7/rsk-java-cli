@@ -171,12 +171,16 @@ Send native transfer.
 Requires `--value` and one of `--address` or `--rns`.  
 If `--wallet` is omitted, active wallet is used.  
 `--address` (and `--rns`) supports RNS resolution; missing names fail with an error.  
-Optional: `--token`, `--gas-limit`, `--gas-price`, `--data`, `--interactive`, network selector.
+Optional: `--token`, `--gas-limit`, `--gas-price`, `--priority-fee`, `--data`, `-i|--interactive`, network selector.  
+Attestation options: `--attest-transfer`, `--attest-reason` (stores transfer metadata on-chain as a signed data transaction).
 Example:
 
 ```powershell
-evm-cli transfer --address 0x1234... --value 10000000000000000
-evm-cli transfer --wallet alice --address 0x1234... --value 10000000000000000 --mainnet
+evm-cli transfer --address 0x1234... --value 0.001
+evm-cli transfer --rns testing.rsk --value 0.001
+evm-cli transfer --testnet --token 0x32Cd6c5831531F96f57d1faf4DDdf0222c4Af8AB --address 0x8A0d290b2EE35eFde47810CA8fF057e109e4190B --value 0.1
+evm-cli transfer --testnet -i
+evm-cli transfer --address 0x1234... --value 0.001 --attest-transfer --attest-reason "Invoice #42"
 ```
 
 `tx`  
@@ -209,11 +213,13 @@ evm-cli resolve 0x1234... --reverse
 ```
 
 `deploy`  
-Deploy contract flow placeholder.
+Deploy a smart contract from ABI + bytecode, with optional constructor args.
 Example:
 
 ```powershell
-evm-cli deploy --abi .\My.abi.json --bytecode .\My.bin --wallet alice --args arg1 arg2
+evm-cli deploy --abi .\My.abi.json --bytecode .\My.bin --args arg1 arg2
+evm-cli deploy --testnet --abi .\My.abi.json --bytecode .\My.bin --args arg1 arg2
+evm-cli deploy --wallet alice --abi .\My.abi.json --bytecode .\My.bin --args arg1 arg2
 ```
 
 `verify`  

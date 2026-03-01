@@ -3,16 +3,23 @@ package com.evmcli.cli;
 import com.evmcli.application.ChainSelection;
 import com.evmcli.application.ChainSelector;
 import com.evmcli.application.utils.rns.lookup;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.evmcli.domain.model.ChainFeatures;
 import com.evmcli.domain.model.ChainProfile;
 import com.evmcli.domain.model.CliConfig;
 import com.evmcli.domain.model.MonitorSession;
 import com.evmcli.domain.model.WalletMetadata;
 import java.io.Console;
+import java.io.IOException;
+import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,6 +31,32 @@ import org.jline.reader.EndOfFileException;
 import org.jline.reader.LineReader;
 import org.jline.reader.LineReaderBuilder;
 import org.jline.reader.UserInterruptException;
+import org.web3j.abi.FunctionEncoder;
+import org.web3j.abi.FunctionReturnDecoder;
+import org.web3j.abi.TypeReference;
+import org.web3j.abi.datatypes.Address;
+import org.web3j.abi.datatypes.Bool;
+import org.web3j.abi.datatypes.Function;
+import org.web3j.abi.datatypes.DynamicBytes;
+import org.web3j.abi.datatypes.Type;
+import org.web3j.abi.datatypes.Utf8String;
+import org.web3j.abi.datatypes.generated.Bytes32;
+import org.web3j.abi.datatypes.generated.Int256;
+import org.web3j.abi.datatypes.generated.Uint256;
+import org.web3j.abi.datatypes.generated.Uint8;
+import org.web3j.crypto.Credentials;
+import org.web3j.crypto.RawTransaction;
+import org.web3j.crypto.TransactionEncoder;
+import org.web3j.protocol.Web3j;
+import org.web3j.protocol.core.DefaultBlockParameterName;
+import org.web3j.protocol.core.methods.request.Transaction;
+import org.web3j.protocol.core.methods.response.EthEstimateGas;
+import org.web3j.protocol.core.methods.response.EthGetTransactionCount;
+import org.web3j.protocol.core.methods.response.EthGetTransactionReceipt;
+import org.web3j.protocol.core.methods.response.EthSendTransaction;
+import org.web3j.protocol.core.methods.response.TransactionReceipt;
+import org.web3j.protocol.http.HttpService;
+import org.web3j.utils.Numeric;
 import picocli.CommandLine.ArgGroup;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -51,6 +84,7 @@ import picocli.CommandLine.Parameters;
       EvmCliCommand.SimulateCommand.class
     })
 public class EvmCliCommand implements Callable<Integer> {
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static CliContext ctx;
 
   @Option(names = {"-h", "--help"}, usageHelp = true, description = "Show this help message and exit.")
@@ -532,6 +566,164 @@ public class EvmCliCommand implements Callable<Integer> {
     }
   }
 
+  static String readRequiredFile(String path, String label) {
+    try {
+      String content = Files.readString(Path.of(path));
+      if (content == null || content.isBlank()) {
+        throw new IllegalArgumentException(label + " file is empty: " + path);
+      }
+      return content;
+    } catch (IOException ex) {
+      throw new IllegalArgumentException("Unable to read " + label + " file: " + path, ex);
+    }
+  }
+
+  static List<String> constructorTypesFromAbi(String abiJson) {
+    try {
+      JsonNode root = OBJECT_MAPPER.readTree(abiJson);
+      if (!root.isArray()) {
+        throw new IllegalArgumentException("ABI must be a JSON array.");
+      }
+      for (JsonNode item : root) {
+        if ("constructor".equals(item.path("type").asText())) {
+          JsonNode inputs = item.path("inputs");
+          if (!inputs.isArray()) {
+            return List.of();
+          }
+          List<String> types = new ArrayList<>();
+          for (JsonNode input : inputs) {
+            String type = input.path("type").asText();
+            if (type == null || type.isBlank()) {
+              throw new IllegalArgumentException("Constructor input is missing type.");
+            }
+            types.add(type);
+          }
+          return types;
+        }
+      }
+      return List.of();
+    } catch (IOException ex) {
+      throw new IllegalArgumentException("Invalid ABI JSON.", ex);
+    }
+  }
+
+  static Type<?> toAbiType(String solidityType, String value) {
+    return switch (solidityType) {
+      case "address" -> new Address(value);
+      case "bool" -> new Bool(Boolean.parseBoolean(value));
+      case "string" -> new Utf8String(value);
+      case "bytes" -> new DynamicBytes(Numeric.hexStringToByteArray(value));
+      case "bytes32" -> new Bytes32(Numeric.toBytesPadded(Numeric.toBigInt(value), 32));
+      case "uint256" -> new Uint256(new BigInteger(value));
+      case "int256" -> new Int256(new BigInteger(value));
+      default ->
+          throw new IllegalArgumentException(
+              "Unsupported constructor type: " + solidityType + ". Supported: address,bool,string,bytes,bytes32,uint256,int256");
+    };
+  }
+
+  static String buildDeploymentData(String bytecodeRaw, String abiJson, List<String> args) {
+    String bytecode = bytecodeRaw.trim();
+    if (!Numeric.containsHexPrefix(bytecode)) {
+      bytecode = Numeric.prependHexPrefix(bytecode);
+    }
+    List<String> constructorTypes = constructorTypesFromAbi(abiJson);
+    List<String> providedArgs = args == null ? List.of() : args;
+    if (constructorTypes.size() != providedArgs.size()) {
+      throw new IllegalArgumentException(
+          "Constructor argument count mismatch. Expected "
+              + constructorTypes.size()
+              + " but got "
+              + providedArgs.size()
+              + ".");
+    }
+    if (constructorTypes.isEmpty()) {
+      return bytecode;
+    }
+
+    List<Type> constructorArgs = new ArrayList<>();
+    for (int i = 0; i < constructorTypes.size(); i++) {
+      constructorArgs.add(toAbiType(constructorTypes.get(i), providedArgs.get(i)));
+    }
+    String encoded = FunctionEncoder.encodeConstructor(constructorArgs);
+    return bytecode + Numeric.cleanHexPrefix(encoded);
+  }
+
+  static BigInteger estimateDeployGas(Web3j web3j, String from, String data) {
+    try {
+      EthEstimateGas estimate =
+          web3j
+              .ethEstimateGas(Transaction.createContractTransaction(from, null, null, null, BigInteger.ZERO, data))
+              .send();
+      if (estimate.hasError() || estimate.getAmountUsed() == null) {
+        return BigInteger.valueOf(3_000_000L);
+      }
+      return estimate.getAmountUsed().multiply(BigInteger.valueOf(12)).divide(BigInteger.TEN);
+    } catch (Exception ex) {
+      return BigInteger.valueOf(3_000_000L);
+    }
+  }
+
+  static String explorerAddressUrl(ChainProfile chainProfile, String address) {
+    String template = chainProfile.explorerAddressUrlTemplate();
+    if (template == null || template.isBlank()) {
+      return "(explorer URL not configured)";
+    }
+    if (template.contains("%s")) {
+      return String.format(template, address);
+    }
+    return template.endsWith("/") ? template + address : template + "/" + address;
+  }
+
+  static String explorerTxUrl(ChainProfile chainProfile, String txHash) {
+    String template = chainProfile.explorerTxUrlTemplate();
+    if (template == null || template.isBlank()) {
+      return "(explorer URL not configured)";
+    }
+    if (template.contains("%s")) {
+      return String.format(template, txHash);
+    }
+    return template.endsWith("/") ? template + txHash : template + "/" + txHash;
+  }
+
+  static BigInteger decimalToUnits(BigDecimal value, int decimals) {
+    try {
+      return value.movePointRight(decimals).toBigIntegerExact();
+    } catch (ArithmeticException ex) {
+      throw new IllegalArgumentException(
+          "Too many decimal places for token decimals=" + decimals + ": " + value, ex);
+    }
+  }
+
+  static BigDecimal unitsToDecimal(BigInteger units, int decimals) {
+    return new BigDecimal(units).movePointLeft(decimals);
+  }
+
+  static TransactionReceipt waitForReceipt(Web3j web3j, String txHash, int maxPolls, long sleepMs)
+      throws Exception {
+    for (int i = 0; i < maxPolls; i++) {
+      EthGetTransactionReceipt receiptResponse = web3j.ethGetTransactionReceipt(txHash).send();
+      if (receiptResponse.getTransactionReceipt().isPresent()) {
+        return receiptResponse.getTransactionReceipt().get();
+      }
+      Thread.sleep(sleepMs);
+    }
+    throw new IllegalStateException("Timed out waiting for transaction receipt: " + txHash);
+  }
+
+  static List<Type> ethCall(Web3j web3j, String from, String to, Function function) throws Exception {
+    String encoded = FunctionEncoder.encode(function);
+    var response =
+        web3j.ethCall(
+                Transaction.createEthCallTransaction(from, to, encoded),
+                DefaultBlockParameterName.LATEST)
+            .send();
+    if (response.hasError()) {
+      throw new IllegalStateException(response.getError().getMessage());
+    }
+    return FunctionReturnDecoder.decode(response.getValue(), function.getOutputParameters());
+  }
+
   static class NetworkSelector {
     @Option(names = "--mainnet", description = "Use chains.mainnet")
     boolean mainnet;
@@ -911,26 +1103,35 @@ public class EvmCliCommand implements Callable<Integer> {
     @Option(names = "--wallet", description = "Wallet name (defaults to active wallet)")
     String wallet;
 
-    @ArgGroup(exclusive = true, multiplicity = "1")
+    @ArgGroup(exclusive = true, multiplicity = "0..1")
     ToTarget toTarget;
 
     @Option(names = "--token", description = "ERC-20 token address")
     String token;
 
-    @Option(names = "--value", required = true, description = "Value in wei")
-    BigInteger value;
+    @Option(names = "--value", description = "Amount to transfer (RBTC or token units)")
+    BigDecimal value;
 
-    @Option(names = "--gas-limit", defaultValue = "21000")
+    @Option(names = "--gas-limit", description = "Gas limit override")
     BigInteger gasLimit;
 
-    @Option(names = "--gas-price", defaultValue = "50000000")
+    @Option(names = "--gas-price", description = "Gas price in wei override")
     BigInteger gasPrice;
+
+    @Option(names = "--priority-fee", description = "Extra gwei added to gas price")
+    BigDecimal priorityFeeGwei;
 
     @Option(names = "--data", defaultValue = "")
     String data;
 
-    @Option(names = "--interactive")
+    @Option(names = {"-i", "--interactive"})
     boolean interactive;
+
+    @Option(names = "--attest-transfer", description = "Create transfer attestation (placeholder)")
+    boolean attestTransfer;
+
+    @Option(names = "--attest-reason", description = "Attestation reason (placeholder)")
+    String attestReason;
 
     @picocli.CommandLine.Mixin NetworkOptions networkOptions;
 
@@ -942,34 +1143,344 @@ public class EvmCliCommand implements Callable<Integer> {
       String rns;
     }
 
+    private String resolveWalletName() {
+      if (wallet != null && !wallet.isBlank()) {
+        return wallet;
+      }
+      return ctx.walletService()
+          .active()
+          .map(WalletMetadata::name)
+          .orElseThrow(() -> new IllegalArgumentException("No active wallet found. Provide --wallet."));
+    }
+
+    private String resolveRecipient(ChainProfile chainProfile, LineReader reader) {
+      if (interactive && toTarget == null) {
+        String recipientRaw =
+            promptRequiredText(reader, "Recipient address or RNS", "");
+        return resolveAddressInput(chainProfile, recipientRaw);
+      }
+      if (toTarget == null) {
+        throw new IllegalArgumentException("Provide one of --address or --rns.");
+      }
+      return toTarget.address != null
+          ? resolveAddressInput(chainProfile, toTarget.address)
+          : resolveAddressInput(chainProfile, toTarget.rns);
+    }
+
+    private BigDecimal resolveAmount(LineReader reader, String unitLabel) {
+      if (value != null) {
+        return value;
+      }
+      if (!interactive) {
+        throw new IllegalArgumentException("Provide --value.");
+      }
+      while (true) {
+        String raw = promptRequiredText(reader, "Amount (" + unitLabel + ")", "");
+        try {
+          BigDecimal parsed = new BigDecimal(raw);
+          if (parsed.compareTo(BigDecimal.ZERO) <= 0) {
+            System.out.println("Amount must be greater than zero.");
+            continue;
+          }
+          return parsed;
+        } catch (NumberFormatException ex) {
+          System.out.println("Please enter a valid decimal amount.");
+        }
+      }
+    }
+
+    private BigInteger effectiveGasPrice(Web3j web3j) throws Exception {
+      BigInteger base = gasPrice != null ? gasPrice : web3j.ethGasPrice().send().getGasPrice();
+      if (priorityFeeGwei == null) {
+        return base;
+      }
+      BigInteger extra = decimalToUnits(priorityFeeGwei, 9);
+      return base.add(extra);
+    }
+
+    private String attestationPayloadJson(
+        ChainProfile chainProfile,
+        String transferTxHash,
+        String from,
+        String to,
+        String asset,
+        BigDecimal amount,
+        String reason) {
+      String safeReason = reason == null ? "" : reason.replace("\"", "\\\"");
+      return "{"
+          + "\"type\":\"transfer\","
+          + "\"version\":1,"
+          + "\"network\":\""
+          + chainProfile.name()
+          + "\","
+          + "\"transferTxHash\":\""
+          + transferTxHash
+          + "\","
+          + "\"from\":\""
+          + from
+          + "\","
+          + "\"to\":\""
+          + to
+          + "\","
+          + "\"asset\":\""
+          + asset
+          + "\","
+          + "\"amount\":\""
+          + amount.toPlainString()
+          + "\","
+          + "\"reason\":\""
+          + safeReason
+          + "\","
+          + "\"timestamp\":\""
+          + Instant.now()
+          + "\""
+          + "}";
+    }
+
+    private String submitAttestation(
+        Web3j web3j,
+        ChainProfile chainProfile,
+        Credentials credentials,
+        String transferTxHash,
+        String recipient,
+        String asset,
+        BigDecimal amount)
+        throws Exception {
+      String reason = attestReason == null ? "" : attestReason;
+      String jsonPayload =
+          attestationPayloadJson(
+              chainProfile,
+              transferTxHash,
+              credentials.getAddress(),
+              recipient,
+              asset,
+              amount,
+              reason);
+      String dataHex = Numeric.toHexString(jsonPayload.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+
+      EthGetTransactionCount nonceResponse =
+          web3j.ethGetTransactionCount(credentials.getAddress(), DefaultBlockParameterName.PENDING).send();
+      BigInteger nonce = nonceResponse.getTransactionCount();
+      BigInteger txGasPrice = effectiveGasPrice(web3j);
+      BigInteger txGasLimit = gasLimit != null ? gasLimit : BigInteger.valueOf(120_000L);
+
+      RawTransaction attestationTx =
+          RawTransaction.createTransaction(
+              nonce,
+              txGasPrice,
+              txGasLimit,
+              credentials.getAddress(),
+              BigInteger.ZERO,
+              dataHex);
+      byte[] signed = TransactionEncoder.signMessage(attestationTx, chainProfile.chainId(), credentials);
+      EthSendTransaction sent = web3j.ethSendRawTransaction(Numeric.toHexString(signed)).send();
+      if (sent.hasError()) {
+        throw new IllegalStateException("Attestation failed: " + sent.getError().getMessage());
+      }
+      String txHash = sent.getTransactionHash();
+      TransactionReceipt receipt = waitForReceipt(web3j, txHash, 120, 2000L);
+      if (!"0x1".equalsIgnoreCase(receipt.getStatus())) {
+        throw new IllegalStateException("Attestation failed. Receipt status: " + receipt.getStatus());
+      }
+      return txHash;
+    }
+
+    private void executeNativeTransfer(
+        ChainProfile chainProfile,
+        Credentials credentials,
+        String recipient,
+        BigDecimal amountRbtc)
+        throws Exception {
+      try (Web3j web3j = Web3j.build(new HttpService(chainProfile.rpcUrl()))) {
+        BigInteger amountWei = decimalToUnits(amountRbtc, 18);
+        BigInteger balanceWei =
+            web3j.ethGetBalance(credentials.getAddress(), DefaultBlockParameterName.LATEST).send().getBalance();
+        BigDecimal balanceRbtc = unitsToDecimal(balanceWei, 18);
+
+        System.out.println("📄 Wallet Address: " + credentials.getAddress());
+        System.out.println("🎯 Recipient Address: " + recipient);
+        System.out.println("💵 Amount to Transfer: " + amountRbtc.toPlainString() + " " + chainProfile.nativeSymbol());
+        System.out.println("💰 Current Balance: " + balanceRbtc.toPlainString() + " " + chainProfile.nativeSymbol());
+
+        EthGetTransactionCount nonceResponse =
+            web3j
+                .ethGetTransactionCount(credentials.getAddress(), DefaultBlockParameterName.PENDING)
+                .send();
+        BigInteger nonce = nonceResponse.getTransactionCount();
+        BigInteger txGasPrice = effectiveGasPrice(web3j);
+        BigInteger txGasLimit = gasLimit != null ? gasLimit : BigInteger.valueOf(21_000L);
+
+        RawTransaction tx =
+            RawTransaction.createTransaction(
+                nonce,
+                txGasPrice,
+                txGasLimit,
+                recipient,
+                amountWei,
+                data == null ? "" : data);
+        byte[] signed = TransactionEncoder.signMessage(tx, chainProfile.chainId(), credentials);
+        EthSendTransaction sent = web3j.ethSendRawTransaction(Numeric.toHexString(signed)).send();
+        if (sent.hasError()) {
+          throw new IllegalStateException(sent.getError().getMessage());
+        }
+
+        String txHash = sent.getTransactionHash();
+        System.out.println("🔄 Transaction initiated. TxHash: " + txHash);
+        TransactionReceipt receipt = waitForReceipt(web3j, txHash, 120, 2000L);
+        if (!"0x1".equalsIgnoreCase(receipt.getStatus())) {
+          throw new IllegalStateException("Transaction failed. Receipt status: " + receipt.getStatus());
+        }
+        System.out.println("✅ Transaction confirmed successfully!");
+        System.out.println("📦 Block Number: " + receipt.getBlockNumber());
+        System.out.println("⛽ Gas Used: " + receipt.getGasUsed());
+        System.out.println("🔗 View on Explorer: " + explorerTxUrl(chainProfile, txHash));
+
+        if (attestTransfer) {
+          System.out.println("📝 Creating on-chain attestation...");
+          String attestationTxHash =
+              submitAttestation(
+                  web3j,
+                  chainProfile,
+                  credentials,
+                  txHash,
+                  recipient,
+                  chainProfile.nativeSymbol(),
+                  amountRbtc);
+          System.out.println("✅ Attestation confirmed!");
+          System.out.println("🔑 Attestation TxHash: " + attestationTxHash);
+          System.out.println("🔗 View on Explorer: " + explorerTxUrl(chainProfile, attestationTxHash));
+        }
+      }
+    }
+
+    private void executeErc20Transfer(
+        ChainProfile chainProfile,
+        Credentials credentials,
+        String recipient,
+        BigDecimal amount)
+        throws Exception {
+      if (!isHexAddress(token)) {
+        throw new IllegalArgumentException("Invalid token address: " + token);
+      }
+      try (Web3j web3j = Web3j.build(new HttpService(chainProfile.rpcUrl()))) {
+        String walletAddress = credentials.getAddress();
+        Function nameFn =
+            new Function("name", List.of(), List.of(TypeReference.create(Utf8String.class)));
+        Function symbolFn =
+            new Function("symbol", List.of(), List.of(TypeReference.create(Utf8String.class)));
+        Function decimalsFn =
+            new Function("decimals", List.of(), List.of(TypeReference.create(Uint8.class)));
+
+        String tokenName = "Unknown";
+        String tokenSymbol = "TOKEN";
+        int decimals = 18;
+        try {
+          List<Type> outName = ethCall(web3j, walletAddress, token, nameFn);
+          if (!outName.isEmpty()) {
+            tokenName = ((Utf8String) outName.get(0)).getValue();
+          }
+          List<Type> outSymbol = ethCall(web3j, walletAddress, token, symbolFn);
+          if (!outSymbol.isEmpty()) {
+            tokenSymbol = ((Utf8String) outSymbol.get(0)).getValue();
+          }
+          List<Type> outDecimals = ethCall(web3j, walletAddress, token, decimalsFn);
+          if (!outDecimals.isEmpty()) {
+            decimals = ((Uint8) outDecimals.get(0)).getValue().intValue();
+          }
+        } catch (Exception ignored) {
+        }
+
+        BigInteger amountUnits = decimalToUnits(amount, decimals);
+        Function transferFn =
+            new Function(
+                "transfer",
+                List.of(new Address(recipient), new Uint256(amountUnits)),
+                List.of(TypeReference.create(Bool.class)));
+        String transferData =
+            (data != null && !data.isBlank()) ? data : FunctionEncoder.encode(transferFn);
+
+        // Simulate transfer call before sending.
+        try {
+          ethCall(web3j, walletAddress, token, transferFn);
+          System.out.println("✔ ✅ Simulation successful, proceeding with transfer...");
+        } catch (Exception ex) {
+          throw new IllegalStateException("Simulation failed: " + ex.getMessage(), ex);
+        }
+
+        EthGetTransactionCount nonceResponse =
+            web3j.ethGetTransactionCount(walletAddress, DefaultBlockParameterName.PENDING).send();
+        BigInteger nonce = nonceResponse.getTransactionCount();
+        BigInteger txGasPrice = effectiveGasPrice(web3j);
+        BigInteger txGasLimit = gasLimit != null ? gasLimit : BigInteger.valueOf(65_000L);
+
+        RawTransaction tx =
+            RawTransaction.createTransaction(
+                nonce, txGasPrice, txGasLimit, token, BigInteger.ZERO, transferData);
+        byte[] signed = TransactionEncoder.signMessage(tx, chainProfile.chainId(), credentials);
+        EthSendTransaction sent = web3j.ethSendRawTransaction(Numeric.toHexString(signed)).send();
+        if (sent.hasError()) {
+          throw new IllegalStateException(sent.getError().getMessage());
+        }
+        String txHash = sent.getTransactionHash();
+
+        System.out.println("🔑 Wallet account: " + walletAddress);
+        System.out.println("📄 Token Information:");
+        System.out.println("     Name: " + tokenName);
+        System.out.println("     Symbol: " + tokenSymbol);
+        System.out.println("     Contract: " + token);
+        System.out.println("🎯 To Address: " + recipient);
+        System.out.println("💵 Amount to Transfer: " + amount.toPlainString() + " " + tokenSymbol);
+        System.out.println("🔄 Transaction initiated. TxHash: " + txHash);
+
+        TransactionReceipt receipt = waitForReceipt(web3j, txHash, 120, 2000L);
+        if (!"0x1".equalsIgnoreCase(receipt.getStatus())) {
+          throw new IllegalStateException("Transfer failed. Receipt status: " + receipt.getStatus());
+        }
+        System.out.println("✅ Transfer completed successfully!");
+        System.out.println("📦 Block Number: " + receipt.getBlockNumber());
+        System.out.println("⛽ Gas Used: " + receipt.getGasUsed());
+        System.out.println("🔗 View on Explorer: " + explorerTxUrl(chainProfile, txHash));
+
+        if (attestTransfer) {
+          System.out.println("📝 Creating on-chain attestation...");
+          String attestationTxHash =
+              submitAttestation(web3j, chainProfile, credentials, txHash, recipient, token, amount);
+          System.out.println("✅ Attestation confirmed!");
+          System.out.println("🔑 Attestation TxHash: " + attestationTxHash);
+          System.out.println("🔗 View on Explorer: " + explorerTxUrl(chainProfile, attestationTxHash));
+        }
+      }
+    }
+
     @Override
     public Integer call() {
-      if (token != null) {
-        System.out.println("ERC-20 transfer builder is reserved for the next milestone.");
-        return 0;
+      if (!attestTransfer && attestReason != null && !attestReason.isBlank()) {
+        throw new IllegalArgumentException("--attest-reason requires --attest-transfer.");
       }
       ChainProfile chainProfile = resolveChain(networkOptions);
-      String to =
-          toTarget.address != null
-              ? resolveAddressInput(chainProfile, toTarget.address)
-              : resolveAddressInput(chainProfile, toTarget.rns);
-      String walletName = wallet;
-      if (walletName == null || walletName.isBlank()) {
-        walletName =
-            ctx.walletService()
-                .active()
-                .map(WalletMetadata::name)
-                .orElseThrow(
-                    () ->
-                        new IllegalArgumentException(
-                            "No active wallet found. Provide --wallet."));
+      LineReader reader = interactive ? LineReaderBuilder.builder().build() : null;
+      String recipient = resolveRecipient(chainProfile, reader);
+      String walletName = resolveWalletName();
+      if (interactive && (token == null || token.isBlank())) {
+        String raw = promptText(reader, "Token contract address (leave empty for RBTC)", "");
+        token = raw == null ? null : raw.trim();
       }
+      BigDecimal amount =
+          resolveAmount(reader, (token == null || token.isBlank()) ? chainProfile.nativeSymbol() : "token");
       char[] password = readPassword("Wallet password: ");
-      String txHash =
-          ctx.transferService()
-              .sendNative(chainProfile, walletName, password, to, value, gasLimit, gasPrice, data);
-      System.out.println("Submitted tx: " + txHash);
-      return 0;
+      String privateKeyHex = ctx.walletService().dumpPrivateKey(walletName, password);
+      Credentials credentials = Credentials.create(privateKeyHex);
+
+      try {
+        if (token == null || token.isBlank()) {
+          executeNativeTransfer(chainProfile, credentials, recipient, amount);
+        } else {
+          executeErc20Transfer(chainProfile, credentials, recipient, amount);
+        }
+        return 0;
+      } catch (Exception ex) {
+        throw new IllegalStateException("Unable to complete transfer.", ex);
+      }
     }
   }
 
@@ -1100,22 +1611,99 @@ public class EvmCliCommand implements Callable<Integer> {
 
   @Command(name = "deploy", description = "Deploy contract")
   static class DeployCommand extends HelpCommand implements Callable<Integer> {
-    @Option(names = "--abi")
+    @Option(names = "--abi", required = true, description = "Path to ABI JSON file")
     String abi;
 
-    @Option(names = "--bytecode")
+    @Option(names = "--bytecode", required = true, description = "Path to bytecode file (.bin)")
     String bytecode;
 
-    @Option(names = "--wallet")
+    @Option(names = "--wallet", description = "Wallet name (defaults to active wallet)")
     String wallet;
 
-    @Option(names = "--args")
+    @Option(names = "--args", arity = "0..*", description = "Constructor arguments")
     List<String> args;
+
+    @picocli.CommandLine.Mixin NetworkOptions networkOptions;
 
     @Override
     public Integer call() {
-      System.out.println("Contract deploy flow placeholder.");
-      return 0;
+      ChainProfile chainProfile = resolveChain(networkOptions);
+      System.out.printf("🔧 Initializing provider for %s...%n", chainProfile.name());
+
+      String walletName = wallet;
+      if (walletName == null || walletName.isBlank()) {
+        walletName =
+            ctx.walletService()
+                .active()
+                .map(WalletMetadata::name)
+                .orElseThrow(() -> new IllegalArgumentException("No active wallet found. Provide --wallet."));
+      }
+
+      char[] password = readPassword("? Enter your password to decrypt the wallet: ");
+      String privateKeyHex = ctx.walletService().dumpPrivateKey(walletName, password);
+      Credentials credentials = Credentials.create(privateKeyHex);
+      System.out.println("🔑 Wallet account: " + credentials.getAddress());
+
+      System.out.println("📄 Reading ABI from " + abi + "...");
+      String abiContent = readRequiredFile(abi, "ABI");
+      System.out.println("📄 Reading Bytecode from " + bytecode + "...");
+      String bytecodeContent = readRequiredFile(bytecode, "bytecode");
+      String deploymentData = buildDeploymentData(bytecodeContent, abiContent, args);
+
+      try (Web3j web3j = Web3j.build(new HttpService(chainProfile.rpcUrl()))) {
+        EthGetTransactionCount nonceResponse =
+            web3j
+                .ethGetTransactionCount(credentials.getAddress(), DefaultBlockParameterName.PENDING)
+                .send();
+        BigInteger nonce = nonceResponse.getTransactionCount();
+        BigInteger gasPrice = web3j.ethGasPrice().send().getGasPrice();
+        BigInteger gasLimit = estimateDeployGas(web3j, credentials.getAddress(), deploymentData);
+
+        RawTransaction tx =
+            RawTransaction.createContractTransaction(
+                nonce, gasPrice, gasLimit, BigInteger.ZERO, deploymentData);
+        byte[] signed = TransactionEncoder.signMessage(tx, chainProfile.chainId(), credentials);
+        String payload = Numeric.toHexString(signed);
+
+        EthSendTransaction sent = web3j.ethSendRawTransaction(payload).send();
+        if (sent.hasError()) {
+          throw new IllegalStateException(sent.getError().getMessage());
+        }
+
+        String txHash = sent.getTransactionHash();
+        System.out.println("✔ 🎉 Contract deployment transaction sent!");
+        System.out.println("🔑 Transaction Hash: " + txHash);
+
+        String contractAddress = null;
+        String status = null;
+        for (int i = 0; i < 120; i++) {
+          EthGetTransactionReceipt receiptResponse = web3j.ethGetTransactionReceipt(txHash).send();
+          if (receiptResponse.getTransactionReceipt().isPresent()) {
+            var receipt = receiptResponse.getTransactionReceipt().get();
+            status = receipt.getStatus();
+            contractAddress = receipt.getContractAddress();
+            break;
+          }
+          Thread.sleep(2000L);
+        }
+
+        if (contractAddress == null || status == null) {
+          throw new IllegalStateException("Timed out waiting for deployment receipt.");
+        }
+        if (!"0x1".equalsIgnoreCase(status)) {
+          throw new IllegalStateException("Deployment failed. Receipt status: " + status);
+        }
+
+        System.out.println("✔ 📜 Contract deployed successfully!");
+        System.out.println("📍 Contract Address: " + contractAddress);
+        System.out.println("🔗 View on Explorer: " + explorerAddressUrl(chainProfile, contractAddress));
+        return 0;
+      } catch (InterruptedException ex) {
+        Thread.currentThread().interrupt();
+        throw new IllegalStateException("Interrupted while waiting for deployment receipt.", ex);
+      } catch (Exception ex) {
+        throw new IllegalStateException("Unable to deploy contract.", ex);
+      }
     }
   }
 
