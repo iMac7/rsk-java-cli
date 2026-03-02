@@ -6,6 +6,7 @@ import java.util.Map;
 public class CliConfig {
   private Chains chains = new Chains();
   private WalletPreferences wallet = new WalletPreferences();
+  private ApiKeys apiKeys = new ApiKeys();
 
   public Chains getChains() {
     return chains;
@@ -21,6 +22,14 @@ public class CliConfig {
 
   public void setWallet(WalletPreferences wallet) {
     this.wallet = wallet;
+  }
+
+  public ApiKeys getApiKeys() {
+    return apiKeys;
+  }
+
+  public void setApiKeys(ApiKeys apiKeys) {
+    this.apiKeys = apiKeys;
   }
 
   public static class Chains {
@@ -62,6 +71,18 @@ public class CliConfig {
 
     public void setCachePasswordInMemory(boolean cachePasswordInMemory) {
       this.cachePasswordInMemory = cachePasswordInMemory;
+    }
+  }
+
+  public static class ApiKeys {
+    private String alchemyApiKey = "";
+
+    public String getAlchemyApiKey() {
+      return alchemyApiKey;
+    }
+
+    public void setAlchemyApiKey(String alchemyApiKey) {
+      this.alchemyApiKey = alchemyApiKey;
     }
   }
 }

@@ -223,35 +223,41 @@ evm-cli deploy --wallet alice --abi .\My.abi.json --bytecode .\My.bin --args arg
 ```
 
 `verify`  
-Contract verification placeholder.
+Verify contract via Blockscout Standard JSON Input API.
 Example:
 
 ```powershell
-evm-cli verify --json .\verify.json --name MyContract --address 0x1234...
+evm-cli verify --json .\standard-input.json --name MyContract --address 0x1234... --compiler-version v0.8.17+commit.8df45f5f
+evm-cli verify --testnet --json .\standard-input.json --name MyContract --address 0x1234... --compiler-version v0.8.17+commit.8df45f5f --autodetect-constructor-args false --constructor-args 0xabcdef
 ```
 
 `contract`  
-Interactive contract mode placeholder.
+Interactively call verified read-only contract functions.
 Example:
 
 ```powershell
 evm-cli contract --address 0x1234...
+evm-cli contract --address 0x1234... --testnet
 ```
 
 `bridge`  
-Bridge flow placeholder.
+Interact with the Rootstock bridge contract (`0x0000000000000000000000000000000001000006`) on mainnet/testnet.  
+Lists and allows calling both read and write functions from verified ABI.
 Example:
 
 ```powershell
-evm-cli bridge --wallet alice
+evm-cli bridge
+evm-cli bridge --testnet
+evm-cli bridge --wallet alice --testnet
 ```
 
 `history`  
-History API placeholder.
+Alchemy asset transfer history via `alchemy_getAssetTransfers`.
 Example:
 
 ```powershell
-evm-cli history --apiKey yourKey --number 10
+evm-cli history --apikey yourKey --to-address 0x5c43B1eD97e52d009611D89b74fA829FE4ac56b1 --category erc721,erc1155 --maxcount 0x64 --order desc
+evm-cli history --testnet --apikey yourKey --pagekey b48d6463-6903-4970-a3c1-630aaf4b3b53
 ```
 
 `batch-transfer`  

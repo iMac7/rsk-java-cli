@@ -12,8 +12,16 @@ import com.evmcli.domain.model.MonitorSession;
 import com.evmcli.domain.model.WalletMetadata;
 import java.io.Console;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.BufferedReader;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -84,6 +92,27 @@ import picocli.CommandLine.Parameters;
       EvmCliCommand.SimulateCommand.class
     })
 public class EvmCliCommand implements Callable<Integer> {
+  private static final String ALCHEMY_ROOTSTOCK_MAINNET_URL =
+      "https://rootstock-mainnet.g.alchemy.com/v2/%s";
+  private static final String ALCHEMY_ROOTSTOCK_TESTNET_URL =
+      "https://rootstock-testnet.g.alchemy.com/v2/%s";
+  private static final String BLOCKSCOUT_VERIFY_MAINNET_URL =
+      "https://rootstock.blockscout.com/api/v2/smart-contracts/%s/verification/via/standard-input";
+  private static final String BLOCKSCOUT_VERIFY_TESTNET_URL =
+      "https://rootstock-testnet.blockscout.com/api/v2/smart-contracts/%s/verification/via/standard-input";
+  private static final String BLOCKSCOUT_CONTRACT_MAINNET_URL =
+      "https://rootstock.blockscout.com/api/v2/smart-contracts/%s";
+  private static final String BLOCKSCOUT_CONTRACT_TESTNET_URL =
+      "https://rootstock-testnet.blockscout.com/api/v2/smart-contracts/%s";
+  private static final String BLOCKSCOUT_ADDRESS_API_MAINNET_URL =
+      "https://rootstock.blockscout.com/api/v2/addresses/%s";
+  private static final String BLOCKSCOUT_ADDRESS_API_TESTNET_URL =
+      "https://rootstock-testnet.blockscout.com/api/v2/addresses/%s";
+  private static final String BLOCKSCOUT_ADDRESS_MAINNET_URL =
+      "https://rootstock.blockscout.com/address/%s";
+  private static final String BLOCKSCOUT_ADDRESS_TESTNET_URL =
+      "https://rootstock-testnet.blockscout.com/address/%s";
+  private static final String RSK_BRIDGE_CONTRACT = "0x0000000000000000000000000000000001000006";
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static CliContext ctx;
 
@@ -169,6 +198,42 @@ public class EvmCliCommand implements Callable<Integer> {
     return password.toCharArray();
   }
 
+  static String readTextPrompt(String label, String defaultValue) {
+    String prompt =
+        (defaultValue == null || defaultValue.isBlank())
+            ? label + ": "
+            : label + " [" + defaultValue + "]: ";
+    Console console = System.console();
+    if (console != null) {
+      String value = console.readLine("%s", prompt);
+      if ((value == null || value.isBlank()) && defaultValue != null) {
+        return defaultValue;
+      }
+      return value == null ? "" : value.trim();
+    }
+    try {
+      System.out.print(prompt);
+      System.out.flush();
+      String value = new BufferedReader(new InputStreamReader(System.in)).readLine();
+      if ((value == null || value.isBlank()) && defaultValue != null) {
+        return defaultValue;
+      }
+      return value == null ? "" : value.trim();
+    } catch (IOException ex) {
+      throw new IllegalStateException("Unable to read interactive input", ex);
+    }
+  }
+
+  static String readRequiredTextPrompt(String label, String defaultValue) {
+    while (true) {
+      String value = readTextPrompt(label, defaultValue);
+      if (!value.isBlank()) {
+        return value;
+      }
+      System.out.println("Value is required.");
+    }
+  }
+
   static void ensureConfigShape(CliConfig config) {
     if (config.getChains() == null) {
       config.setChains(new CliConfig.Chains());
@@ -178,6 +243,9 @@ public class EvmCliCommand implements Callable<Integer> {
     }
     if (config.getWallet() == null) {
       config.setWallet(new CliConfig.WalletPreferences());
+    }
+    if (config.getApiKeys() == null) {
+      config.setApiKeys(new CliConfig.ApiKeys());
     }
   }
 
@@ -302,6 +370,11 @@ public class EvmCliCommand implements Callable<Integer> {
         "%s%s%n",
         Ansi.ansi().fg(Ansi.Color.GREEN).a("Wallet cache password in memory: ").reset(),
         config.getWallet().isCachePasswordInMemory() ? "enabled" : "disabled");
+    String alchemyKey = config.getApiKeys().getAlchemyApiKey();
+    System.out.printf(
+        "%s%s%n",
+        Ansi.ansi().fg(Ansi.Color.GREEN).a("Alchemy API key: ").reset(),
+        (alchemyKey == null || alchemyKey.isBlank()) ? "(not set)" : "(set)");
     printChainSlot("mainnet", config.getChains().getMainnet());
     printChainSlot("testnet", config.getChains().getTestnet());
     System.out.println(Ansi.ansi().fg(Ansi.Color.GREEN).a("Custom chains:").reset());
@@ -324,8 +397,9 @@ public class EvmCliCommand implements Callable<Integer> {
     printNumberedOption(3, "Add or update custom chain");
     printNumberedOption(4, "Remove custom chain");
     printNumberedOption(5, "Toggle wallet password cache");
-    printNumberedOption(6, "Save and exit");
-    printNumberedOption(7, "Exit without saving");
+    printNumberedOption(6, "Set Alchemy API key");
+    printNumberedOption(7, "Save and exit");
+    printNumberedOption(8, "Exit without saving");
     System.out.println();
   }
 
@@ -686,6 +760,281 @@ public class EvmCliCommand implements Callable<Integer> {
     return template.endsWith("/") ? template + txHash : template + "/" + txHash;
   }
 
+  static String normalizeHexCount(String value) {
+    if (value == null || value.isBlank()) {
+      return null;
+    }
+    String trimmed = value.trim();
+    if (trimmed.startsWith("0x") || trimmed.startsWith("0X")) {
+      return "0x" + trimmed.substring(2).toLowerCase();
+    }
+    try {
+      return "0x" + new BigInteger(trimmed).toString(16);
+    } catch (NumberFormatException ex) {
+      throw new IllegalArgumentException("Invalid maxCount/number value: " + value);
+    }
+  }
+
+  static List<String> splitCsv(String value) {
+    if (value == null || value.isBlank()) {
+      return List.of();
+    }
+    return List.of(value.split(",")).stream()
+        .map(String::trim)
+        .filter(s -> !s.isBlank())
+        .toList();
+  }
+
+  static String resolveAlchemyUrl(ChainProfile chainProfile, String apiKey) {
+    if (chainProfile.chainId() == 30L) {
+      return String.format(ALCHEMY_ROOTSTOCK_MAINNET_URL, apiKey);
+    }
+    if (chainProfile.chainId() == 31L) {
+      return String.format(ALCHEMY_ROOTSTOCK_TESTNET_URL, apiKey);
+    }
+    throw new IllegalArgumentException(
+        "Alchemy asset history is only supported for Rootstock mainnet/testnet.");
+  }
+
+  static JsonNode alchemyAssetTransfersRequest(
+      String fromBlock,
+      String toBlock,
+      String fromAddress,
+      String toAddress,
+      String excludeZeroValue,
+      String categoryCsv,
+      String maxCountHex,
+      String order,
+      String contractAddressesCsv,
+      String pageKey) {
+    var root = OBJECT_MAPPER.createObjectNode();
+    root.put("jsonrpc", "2.0");
+    root.put("id", 1);
+    root.put("method", "alchemy_getAssetTransfers");
+    var paramsArray = root.putArray("params");
+    var params = paramsArray.addObject();
+
+    if (fromBlock != null && !fromBlock.isBlank()) {
+      params.put("fromBlock", fromBlock);
+    }
+    if (toBlock != null && !toBlock.isBlank()) {
+      params.put("toBlock", toBlock);
+    }
+    if (fromAddress != null && !fromAddress.isBlank()) {
+      params.put("fromAddress", fromAddress);
+    }
+    if (toAddress != null && !toAddress.isBlank()) {
+      params.put("toAddress", toAddress);
+    }
+    if (excludeZeroValue != null && !excludeZeroValue.isBlank()) {
+      params.put("excludeZeroValue", Boolean.parseBoolean(excludeZeroValue));
+    }
+    if (maxCountHex != null && !maxCountHex.isBlank()) {
+      params.put("maxCount", maxCountHex);
+    }
+    if (order != null && !order.isBlank()) {
+      params.put("order", order);
+    }
+    if (pageKey != null && !pageKey.isBlank()) {
+      params.put("pageKey", pageKey);
+    }
+
+    List<String> categories = splitCsv(categoryCsv);
+    if (!categories.isEmpty()) {
+      var arr = params.putArray("category");
+      categories.forEach(arr::add);
+    }
+
+    List<String> contracts = splitCsv(contractAddressesCsv);
+    if (!contracts.isEmpty()) {
+      var arr = params.putArray("contractAddresses");
+      contracts.forEach(arr::add);
+    }
+    return root;
+  }
+
+  static JsonNode postJson(String url, JsonNode body) {
+    try {
+      HttpClient client = HttpClient.newHttpClient();
+      String requestBody = OBJECT_MAPPER.writeValueAsString(body);
+      HttpRequest request =
+          HttpRequest.newBuilder()
+              .uri(URI.create(url))
+              .header("Content-Type", "application/json")
+              .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+              .build();
+      HttpResponse<String> response =
+          client.send(request, HttpResponse.BodyHandlers.ofString());
+      if (response.statusCode() < 200 || response.statusCode() >= 300) {
+        throw new IllegalStateException("Alchemy HTTP error " + response.statusCode() + ": " + response.body());
+      }
+      return OBJECT_MAPPER.readTree(response.body());
+    } catch (Exception ex) {
+      throw new IllegalStateException("Unable to call Alchemy asset history API.", ex);
+    }
+  }
+
+  static String blockscoutVerifyUrl(ChainProfile chainProfile, String address) {
+    if (chainProfile.chainId() == 30L) {
+      return String.format(BLOCKSCOUT_VERIFY_MAINNET_URL, address);
+    }
+    if (chainProfile.chainId() == 31L) {
+      return String.format(BLOCKSCOUT_VERIFY_TESTNET_URL, address);
+    }
+    throw new IllegalArgumentException("Contract verification is only supported on Rootstock mainnet/testnet.");
+  }
+
+  static String blockscoutAddressUrl(ChainProfile chainProfile, String address) {
+    if (chainProfile.chainId() == 30L) {
+      return String.format(BLOCKSCOUT_ADDRESS_MAINNET_URL, address);
+    }
+    if (chainProfile.chainId() == 31L) {
+      return String.format(BLOCKSCOUT_ADDRESS_TESTNET_URL, address);
+    }
+    return explorerAddressUrl(chainProfile, address);
+  }
+
+  static HttpRequest.BodyPublisher multipartBody(
+      String boundary, Map<String, String> fields, String fileField, String filename, byte[] fileBytes) {
+    List<byte[]> byteArrays = new ArrayList<>();
+    String separator = "--" + boundary + "\r\n";
+
+    fields.forEach(
+        (name, value) -> {
+          String part =
+              separator
+                  + "Content-Disposition: form-data; name=\""
+                  + name
+                  + "\"\r\n\r\n"
+                  + value
+                  + "\r\n";
+          byteArrays.add(part.getBytes(StandardCharsets.UTF_8));
+        });
+
+    String fileHeader =
+        separator
+            + "Content-Disposition: form-data; name=\""
+            + fileField
+            + "\"; filename=\""
+            + filename
+            + "\"\r\n"
+            + "Content-Type: application/json\r\n\r\n";
+    byteArrays.add(fileHeader.getBytes(StandardCharsets.UTF_8));
+    byteArrays.add(fileBytes);
+    byteArrays.add("\r\n".getBytes(StandardCharsets.UTF_8));
+
+    String ending = "--" + boundary + "--\r\n";
+    byteArrays.add(ending.getBytes(StandardCharsets.UTF_8));
+    return HttpRequest.BodyPublishers.ofByteArrays(byteArrays);
+  }
+
+  static String blockscoutContractUrl(ChainProfile chainProfile, String address) {
+    if (chainProfile.chainId() == 30L) {
+      return String.format(BLOCKSCOUT_CONTRACT_MAINNET_URL, address);
+    }
+    if (chainProfile.chainId() == 31L) {
+      return String.format(BLOCKSCOUT_CONTRACT_TESTNET_URL, address);
+    }
+    throw new IllegalArgumentException("Contract interaction is only supported on Rootstock mainnet/testnet.");
+  }
+
+  static JsonNode getJson(String url) {
+    try {
+      HttpClient client = HttpClient.newHttpClient();
+      HttpRequest request = HttpRequest.newBuilder().uri(URI.create(url)).GET().build();
+      HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+      if (response.statusCode() < 200 || response.statusCode() >= 300) {
+        throw new IllegalStateException("HTTP " + response.statusCode() + ": " + response.body());
+      }
+      return OBJECT_MAPPER.readTree(response.body());
+    } catch (Exception ex) {
+      throw new IllegalStateException("Unable to fetch contract metadata from Blockscout.", ex);
+    }
+  }
+
+  static String blockscoutAddressApiUrl(ChainProfile chainProfile, String address) {
+    if (chainProfile.chainId() == 30L) {
+      return String.format(BLOCKSCOUT_ADDRESS_API_MAINNET_URL, address);
+    }
+    if (chainProfile.chainId() == 31L) {
+      return String.format(BLOCKSCOUT_ADDRESS_API_TESTNET_URL, address);
+    }
+    throw new IllegalArgumentException("Blockscout API is only supported on Rootstock mainnet/testnet.");
+  }
+
+  static JsonNode fetchContractMetadataWithFallback(ChainProfile chainProfile, String address) {
+    try {
+      return getJson(blockscoutContractUrl(chainProfile, address));
+    } catch (Exception contractEndpointError) {
+      JsonNode addressPayload = getJson(blockscoutAddressApiUrl(chainProfile, address));
+      JsonNode smartContract = addressPayload.path("smart_contract");
+      if (smartContract.isMissingNode() || smartContract.isNull()) {
+        throw new IllegalStateException("Unable to fetch contract metadata from Blockscout.", contractEndpointError);
+      }
+      return smartContract;
+    }
+  }
+
+  static JsonNode extractAbiNode(JsonNode contractJson) {
+    JsonNode abiNode = contractJson.path("abi");
+    if (abiNode.isArray()) {
+      return abiNode;
+    }
+    if (abiNode.isTextual()) {
+      try {
+        return OBJECT_MAPPER.readTree(abiNode.asText());
+      } catch (Exception ex) {
+        throw new IllegalStateException("Invalid ABI payload from explorer.", ex);
+      }
+    }
+    throw new IllegalStateException("Explorer response does not contain contract ABI.");
+  }
+
+  static Type<?> toAbiInputType(String solidityType, String value) {
+    return switch (solidityType) {
+      case "address" -> new Address(value);
+      case "bool" -> new Bool(Boolean.parseBoolean(value));
+      case "string" -> new Utf8String(value);
+      case "bytes" -> new DynamicBytes(Numeric.hexStringToByteArray(value));
+      case "bytes32" -> new Bytes32(Numeric.toBytesPadded(Numeric.toBigInt(value), 32));
+      case "uint256" -> new Uint256(new BigInteger(value));
+      case "uint8" -> new Uint8(new BigInteger(value));
+      case "int256" -> new Int256(new BigInteger(value));
+      default ->
+          throw new IllegalArgumentException(
+              "Unsupported input type: " + solidityType + ". Supported: address,bool,string,bytes,bytes32,uint8,uint256,int256");
+    };
+  }
+
+  static TypeReference<?> outputTypeReference(String solidityType) {
+    return switch (solidityType) {
+      case "address" -> TypeReference.create(Address.class);
+      case "bool" -> TypeReference.create(Bool.class);
+      case "string" -> TypeReference.create(Utf8String.class);
+      case "bytes" -> TypeReference.create(DynamicBytes.class);
+      case "bytes32" -> TypeReference.create(Bytes32.class);
+      case "uint256" -> TypeReference.create(Uint256.class);
+      case "uint8" -> TypeReference.create(Uint8.class);
+      case "int256" -> TypeReference.create(Int256.class);
+      default ->
+          throw new IllegalArgumentException(
+              "Unsupported output type: " + solidityType + ". Supported: address,bool,string,bytes,bytes32,uint8,uint256,int256");
+    };
+  }
+
+  static String readableTypeValue(Type type) {
+    if (type instanceof Utf8String s) {
+      return s.getValue();
+    }
+    if (type instanceof Address a) {
+      return a.getValue();
+    }
+    if (type instanceof Bool b) {
+      return Boolean.toString(b.getValue());
+    }
+    return type.getValue() == null ? "null" : type.getValue().toString();
+  }
+
   static BigInteger decimalToUnits(BigDecimal value, int decimals) {
     try {
       return value.movePointRight(decimals).toBigIntegerExact();
@@ -994,11 +1343,21 @@ public class EvmCliCommand implements Callable<Integer> {
             dirty = true;
           }
           case "6" -> {
+            String currentKey = config.getApiKeys().getAlchemyApiKey();
+            String keyInput =
+                promptText(
+                    reader,
+                    "Alchemy API key (leave blank to clear)",
+                    currentKey == null ? "" : currentKey);
+            config.getApiKeys().setAlchemyApiKey(keyInput == null ? "" : keyInput.trim());
+            dirty = true;
+          }
+          case "7" -> {
             ctx.configPort().save(config);
             System.out.println("Config saved.");
             return 0;
           }
-          case "7" -> {
+          case "8" -> {
             if (dirty
                 && !promptBoolean(
                     reader, "Discard unsaved changes and exit", false)) {
@@ -1709,22 +2068,105 @@ public class EvmCliCommand implements Callable<Integer> {
 
   @Command(name = "verify", description = "Verify contract")
   static class VerifyCommand extends HelpCommand implements Callable<Integer> {
-    @Option(names = "--json")
+    @Option(names = "--json", required = true, description = "Path to Standard JSON Input file")
     String json;
 
-    @Option(names = "--name")
+    @Option(names = "--name", required = true, description = "Contract name")
     String name;
 
-    @Option(names = "--address")
+    @Option(names = "--address", required = true, description = "Deployed contract address")
     String address;
 
-    @Option(names = "--decodedArgs")
+    @Option(names = "--compiler-version", required = true, description = "Compiler version, e.g. v0.8.17+commit...")
+    String compilerVersion;
+
+    @Option(names = "--license-type", defaultValue = "mit")
+    String licenseType;
+
+    @Option(names = "--autodetect-constructor-args", defaultValue = "true")
+    boolean autodetectConstructorArgs;
+
+    @Option(names = "--constructor-args", description = "Hex-encoded constructor args if autodetect is false")
+    String constructorArgs;
+
+    @Option(names = "--decodedArgs", description = "Deprecated alias. Use --constructor-args hex value")
     List<String> decodedArgs;
+
+    @picocli.CommandLine.Mixin NetworkOptions networkOptions;
 
     @Override
     public Integer call() {
-      System.out.println("Contract verification feature placeholder.");
-      return 0;
+      if (!isHexAddress(address)) {
+        throw new IllegalArgumentException("Invalid contract address: " + address);
+      }
+      if (!autodetectConstructorArgs) {
+        boolean hasConstructorArgs = constructorArgs != null && !constructorArgs.isBlank();
+        boolean hasDecodedArgs = decodedArgs != null && !decodedArgs.isEmpty();
+        if (!hasConstructorArgs && hasDecodedArgs) {
+          throw new IllegalArgumentException(
+              "--decodedArgs is not supported by Blockscout standard-input verify. Provide --constructor-args (hex).");
+        }
+        if (!hasConstructorArgs) {
+          throw new IllegalArgumentException(
+              "When --autodetect-constructor-args=false, --constructor-args is required.");
+        }
+      }
+
+      ChainProfile chainProfile = resolveChain(networkOptions);
+      String endpoint = blockscoutVerifyUrl(chainProfile, address);
+      byte[] jsonFile;
+      try {
+        jsonFile = Files.readAllBytes(Path.of(json));
+      } catch (IOException ex) {
+        throw new IllegalArgumentException("Unable to read JSON file: " + json, ex);
+      }
+
+      System.out.printf("🔧 Initializing verification on %s...%n", chainProfile.name());
+      System.out.println("📄 Reading JSON Standard Input from " + json + "...");
+      System.out.println("🔎 Verifying contract " + name + " deployed at " + address + "...");
+      if (!autodetectConstructorArgs) {
+        System.out.println("📄 Using constructor arguments: " + constructorArgs);
+      }
+
+      Map<String, String> fields = new LinkedHashMap<>();
+      fields.put("compiler_version", compilerVersion);
+      fields.put("contract_name", name);
+      fields.put("license_type", licenseType);
+      fields.put("autodetect_constructor_args", Boolean.toString(autodetectConstructorArgs));
+      if (!autodetectConstructorArgs && constructorArgs != null && !constructorArgs.isBlank()) {
+        fields.put("constructor_args", constructorArgs);
+      }
+
+      String boundary = "----evmcli-" + UUID.randomUUID();
+      HttpRequest.BodyPublisher body =
+          multipartBody(
+              boundary,
+              fields,
+              "files[0]",
+              Path.of(json).getFileName().toString(),
+              jsonFile);
+
+      try {
+        HttpClient client = HttpClient.newHttpClient();
+        HttpRequest request =
+            HttpRequest.newBuilder()
+                .uri(URI.create(endpoint))
+                .header("Content-Type", "multipart/form-data; boundary=" + boundary)
+                .POST(body)
+                .build();
+        HttpResponse<String> response =
+            client.send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+          throw new IllegalStateException(
+              "Verification API error " + response.statusCode() + ": " + response.body());
+        }
+        System.out.println("✔ 🎉 Contract verification request sent!");
+        System.out.println("✔ 📜 Verification submitted successfully!");
+        System.out.println("🔗 View on Explorer: " + blockscoutAddressUrl(chainProfile, address));
+        return 0;
+      } catch (Exception ex) {
+        throw new IllegalStateException("Unable to verify contract.", ex);
+      }
     }
   }
 
@@ -1732,39 +2174,422 @@ public class EvmCliCommand implements Callable<Integer> {
       name = "contract",
       description = "Interactive contract mode")
   static class ContractCommand extends HelpCommand implements Callable<Integer> {
-    @Option(names = "--address")
+    @Option(names = "--address", required = true)
     String address;
+
+    @picocli.CommandLine.Mixin NetworkOptions networkOptions;
 
     @Override
     public Integer call() {
-      System.out.println("Interactive contract TUI placeholder.");
-      return 0;
+      if (!isHexAddress(address)) {
+        throw new IllegalArgumentException("Invalid contract address: " + address);
+      }
+
+      ChainProfile chainProfile = resolveChain(networkOptions);
+      System.out.printf("🔧 Initializing interaction on %s...%n", chainProfile.name());
+      System.out.println("🔎 Checking if contract " + address + " is verified...");
+
+      JsonNode contractJson = fetchContractMetadataWithFallback(chainProfile, address);
+      boolean verified =
+          contractJson.path("is_verified").asBoolean(false)
+              || contractJson.path("verified").asBoolean(false)
+              || contractJson.path("isVerified").asBoolean(false);
+      if (!verified) {
+        throw new IllegalStateException("Contract is not verified on explorer.");
+      }
+
+      JsonNode abiArray = extractAbiNode(contractJson);
+      List<JsonNode> readFunctions =
+          new ArrayList<>();
+      for (JsonNode entry : abiArray) {
+        if (!"function".equals(entry.path("type").asText())) {
+          continue;
+        }
+        String mutability = entry.path("stateMutability").asText();
+        if ("view".equals(mutability) || "pure".equals(mutability)) {
+          readFunctions.add(entry);
+        }
+      }
+      if (readFunctions.isEmpty()) {
+        throw new IllegalStateException("No read functions found in verified ABI.");
+      }
+
+      System.out.println("Available read functions:");
+      for (int i = 0; i < readFunctions.size(); i++) {
+        JsonNode fn = readFunctions.get(i);
+        String name = fn.path("name").asText();
+        int inputCount = fn.path("inputs").isArray() ? fn.path("inputs").size() : 0;
+        System.out.printf("%d) %s (%d args)%n", i + 1, name, inputCount);
+      }
+
+      int selectedIndex;
+      while (true) {
+        String raw = readRequiredTextPrompt("Select function number", "1");
+        try {
+          selectedIndex = Integer.parseInt(raw) - 1;
+          if (selectedIndex >= 0 && selectedIndex < readFunctions.size()) {
+            break;
+          }
+        } catch (NumberFormatException ignored) {
+        }
+        System.out.println("Please select a valid function number.");
+      }
+
+      JsonNode selectedFunction = readFunctions.get(selectedIndex);
+      String functionName = selectedFunction.path("name").asText();
+      System.out.println("📜 You selected: " + functionName);
+
+      List<Type> inputs = new ArrayList<>();
+      JsonNode inputNodes = selectedFunction.path("inputs");
+      if (inputNodes.isArray()) {
+        for (int i = 0; i < inputNodes.size(); i++) {
+          JsonNode input = inputNodes.get(i);
+          String type = input.path("type").asText();
+          String argName = input.path("name").asText();
+          String label = (argName == null || argName.isBlank()) ? ("arg" + i) : argName;
+          String raw = readRequiredTextPrompt("Enter " + label + " (" + type + ")", "");
+          inputs.add(toAbiInputType(type, raw));
+        }
+      }
+
+      List<TypeReference<?>> outputRefs = new ArrayList<>();
+      JsonNode outputNodes = selectedFunction.path("outputs");
+      if (outputNodes.isArray()) {
+        for (JsonNode output : outputNodes) {
+          outputRefs.add(outputTypeReference(output.path("type").asText()));
+        }
+      }
+
+      Function function = new Function(functionName, inputs, outputRefs);
+      try (Web3j web3j = Web3j.build(new HttpService(chainProfile.rpcUrl()))) {
+        List<Type> results = ethCall(web3j, null, address, function);
+        System.out.println();
+        System.out.println("✅ Function " + functionName + " called successfully!");
+        if (results.isEmpty()) {
+          System.out.println("✔ 🔧 Result: (no return value)");
+        } else if (results.size() == 1) {
+          System.out.println("✔ 🔧 Result: " + readableTypeValue(results.get(0)));
+        } else {
+          for (int i = 0; i < results.size(); i++) {
+            System.out.println("✔ 🔧 Result[" + i + "]: " + readableTypeValue(results.get(i)));
+          }
+        }
+        System.out.println("🔗 View on Explorer: " + blockscoutAddressUrl(chainProfile, address));
+        return 0;
+      } catch (Exception ex) {
+        throw new IllegalStateException("Failed to call read function.", ex);
+      }
     }
   }
 
   @Command(name = "bridge", description = "Bridge flow")
   static class BridgeCommand extends HelpCommand implements Callable<Integer> {
-    @Option(names = "--wallet")
+    @Option(names = "--wallet", description = "Wallet name for write calls (defaults to active wallet)")
     String wallet;
+
+    @Option(names = "--value", description = "RBTC value for payable write calls")
+    BigDecimal value;
+
+    @Option(names = "--gas-limit", description = "Gas limit override for write calls")
+    BigInteger gasLimit;
+
+    @Option(names = "--gas-price", description = "Gas price in wei override for write calls")
+    BigInteger gasPrice;
+
+    @picocli.CommandLine.Mixin NetworkOptions networkOptions;
+
+    private String resolveWalletName() {
+      if (wallet != null && !wallet.isBlank()) {
+        return wallet;
+      }
+      return ctx.walletService()
+          .active()
+          .map(WalletMetadata::name)
+          .orElseThrow(() -> new IllegalArgumentException("No active wallet found. Provide --wallet."));
+    }
+
+    private List<Type> parseFunctionInputs(JsonNode functionNode) {
+      List<Type> inputs = new ArrayList<>();
+      JsonNode inputNodes = functionNode.path("inputs");
+      if (!inputNodes.isArray()) {
+        return inputs;
+      }
+      for (int i = 0; i < inputNodes.size(); i++) {
+        JsonNode input = inputNodes.get(i);
+        String type = input.path("type").asText();
+        String argName = input.path("name").asText();
+        String label = (argName == null || argName.isBlank()) ? ("arg" + i) : argName;
+        String raw = readRequiredTextPrompt("Enter " + label + " (" + type + ")", "");
+        inputs.add(toAbiInputType(type, raw));
+      }
+      return inputs;
+    }
+
+    private List<TypeReference<?>> parseFunctionOutputs(JsonNode functionNode) {
+      List<TypeReference<?>> outputRefs = new ArrayList<>();
+      JsonNode outputNodes = functionNode.path("outputs");
+      if (!outputNodes.isArray()) {
+        return outputRefs;
+      }
+      for (JsonNode output : outputNodes) {
+        outputRefs.add(outputTypeReference(output.path("type").asText()));
+      }
+      return outputRefs;
+    }
+
+    private void executeRead(
+        Web3j web3j,
+        String contractAddress,
+        JsonNode functionNode)
+        throws Exception {
+      String functionName = functionNode.path("name").asText();
+      List<Type> inputs = parseFunctionInputs(functionNode);
+      List<TypeReference<?>> outputRefs;
+      try {
+        outputRefs = parseFunctionOutputs(functionNode);
+      } catch (Exception ex) {
+        // If output decoding type is unsupported, still perform eth_call and print raw result.
+        outputRefs = List.of();
+      }
+
+      Function function = new Function(functionName, inputs, outputRefs);
+      String encoded = FunctionEncoder.encode(function);
+      var response =
+          web3j.ethCall(
+                  Transaction.createEthCallTransaction(null, contractAddress, encoded),
+                  DefaultBlockParameterName.LATEST)
+              .send();
+      if (response.hasError()) {
+        throw new IllegalStateException(response.getError().getMessage());
+      }
+      if (outputRefs.isEmpty()) {
+        System.out.println("✅ Function " + functionName + " called successfully!");
+        System.out.println("✔ 🔧 Result (raw): " + response.getValue());
+        return;
+      }
+      @SuppressWarnings("unchecked")
+      List<TypeReference<Type>> typedOutputRefs = (List<TypeReference<Type>>) (List<?>) outputRefs;
+      List<Type> results = FunctionReturnDecoder.decode(response.getValue(), typedOutputRefs);
+      System.out.println("✅ Function " + functionName + " called successfully!");
+      if (results.isEmpty()) {
+        System.out.println("✔ 🔧 Result: (no return value)");
+      } else if (results.size() == 1) {
+        System.out.println("✔ 🔧 Result: " + readableTypeValue(results.get(0)));
+      } else {
+        for (int i = 0; i < results.size(); i++) {
+          System.out.println("✔ 🔧 Result[" + i + "]: " + readableTypeValue(results.get(i)));
+        }
+      }
+    }
+
+    private void executeWrite(
+        ChainProfile chainProfile,
+        Web3j web3j,
+        String contractAddress,
+        JsonNode functionNode)
+        throws Exception {
+      String functionName = functionNode.path("name").asText();
+      String walletName = resolveWalletName();
+      char[] password = readPassword("? Enter your password to decrypt the wallet: ");
+      String privateKeyHex = ctx.walletService().dumpPrivateKey(walletName, password);
+      Credentials credentials = Credentials.create(privateKeyHex);
+      System.out.println("🔑 Wallet account: " + credentials.getAddress());
+
+      List<Type> inputs = parseFunctionInputs(functionNode);
+      Function function = new Function(functionName, inputs, List.of());
+      String dataHex = FunctionEncoder.encode(function);
+
+      BigInteger txValue = value == null ? BigInteger.ZERO : decimalToUnits(value, 18);
+      EthGetTransactionCount nonceResponse =
+          web3j
+              .ethGetTransactionCount(credentials.getAddress(), DefaultBlockParameterName.PENDING)
+              .send();
+      BigInteger nonce = nonceResponse.getTransactionCount();
+
+      BigInteger txGasPrice = gasPrice != null ? gasPrice : web3j.ethGasPrice().send().getGasPrice();
+      BigInteger txGasLimit;
+      if (gasLimit != null) {
+        txGasLimit = gasLimit;
+      } else {
+        EthEstimateGas estimate =
+            web3j
+                .ethEstimateGas(
+                    Transaction.createFunctionCallTransaction(
+                        credentials.getAddress(),
+                        nonce,
+                        txGasPrice,
+                        null,
+                        contractAddress,
+                        txValue,
+                        dataHex))
+                .send();
+        if (estimate.hasError() || estimate.getAmountUsed() == null) {
+          txGasLimit = BigInteger.valueOf(300_000L);
+        } else {
+          txGasLimit = estimate.getAmountUsed().multiply(BigInteger.valueOf(12)).divide(BigInteger.TEN);
+        }
+      }
+
+      RawTransaction tx =
+          RawTransaction.createTransaction(
+              nonce,
+              txGasPrice,
+              txGasLimit,
+              contractAddress,
+              txValue,
+              dataHex);
+      byte[] signed = TransactionEncoder.signMessage(tx, chainProfile.chainId(), credentials);
+      EthSendTransaction sent = web3j.ethSendRawTransaction(Numeric.toHexString(signed)).send();
+      if (sent.hasError()) {
+        throw new IllegalStateException(sent.getError().getMessage());
+      }
+      String txHash = sent.getTransactionHash();
+      System.out.println("🔄 Transaction initiated. TxHash: " + txHash);
+      TransactionReceipt receipt = waitForReceipt(web3j, txHash, 120, 2000L);
+      if (!"0x1".equalsIgnoreCase(receipt.getStatus())) {
+        throw new IllegalStateException("Transaction failed. Receipt status: " + receipt.getStatus());
+      }
+      System.out.println("✅ Transaction confirmed successfully!");
+      System.out.println("📦 Block Number: " + receipt.getBlockNumber());
+      System.out.println("⛽ Gas Used: " + receipt.getGasUsed());
+      System.out.println("🔗 View on Explorer: " + explorerTxUrl(chainProfile, txHash));
+    }
 
     @Override
     public Integer call() {
-      System.out.println("Bridge capability placeholder.");
-      return 0;
+      ChainProfile chainProfile = resolveChain(networkOptions);
+      System.out.printf("🔧 Initializing bridge interaction on %s...%n", chainProfile.name());
+      String contractAddress = RSK_BRIDGE_CONTRACT;
+      JsonNode contractJson = fetchContractMetadataWithFallback(chainProfile, contractAddress);
+      JsonNode abiArray = extractAbiNode(contractJson);
+
+      List<JsonNode> functions = new ArrayList<>();
+      for (JsonNode entry : abiArray) {
+        if ("function".equals(entry.path("type").asText())) {
+          functions.add(entry);
+        }
+      }
+      if (functions.isEmpty()) {
+        throw new IllegalStateException("No bridge functions available in ABI.");
+      }
+
+      System.out.println("Bridge contract: " + contractAddress);
+      System.out.println("Available functions:");
+      for (int i = 0; i < functions.size(); i++) {
+        JsonNode fn = functions.get(i);
+        String name = fn.path("name").asText();
+        String mutability = fn.path("stateMutability").asText();
+        int inputCount = fn.path("inputs").isArray() ? fn.path("inputs").size() : 0;
+        System.out.printf("%d) %s [%s] (%d args)%n", i + 1, name, mutability, inputCount);
+      }
+
+      int selectedIndex;
+      while (true) {
+        String raw = readRequiredTextPrompt("Select function number", "1");
+        try {
+          selectedIndex = Integer.parseInt(raw) - 1;
+          if (selectedIndex >= 0 && selectedIndex < functions.size()) {
+            break;
+          }
+        } catch (NumberFormatException ignored) {
+        }
+        System.out.println("Please select a valid function number.");
+      }
+      JsonNode selected = functions.get(selectedIndex);
+      String functionName = selected.path("name").asText();
+      String mutability = selected.path("stateMutability").asText();
+      System.out.println("📜 You selected: " + functionName + " [" + mutability + "]");
+
+      try (Web3j web3j = Web3j.build(new HttpService(chainProfile.rpcUrl()))) {
+        boolean readOnly = "view".equals(mutability) || "pure".equals(mutability);
+        if (readOnly) {
+          executeRead(web3j, contractAddress, selected);
+        } else {
+          executeWrite(chainProfile, web3j, contractAddress, selected);
+        }
+        System.out.println("🔗 View on Explorer: " + blockscoutAddressUrl(chainProfile, contractAddress));
+        return 0;
+      } catch (Exception ex) {
+        throw new IllegalStateException("Bridge interaction failed.", ex);
+      }
     }
   }
 
   @Command(name = "history", description = "History API")
   static class HistoryCommand extends HelpCommand implements Callable<Integer> {
-    @Option(names = "--apiKey")
+    @Option(names = "--apikey", description = "Alchemy API key")
     String apiKey;
 
-    @Option(names = "--number")
-    Integer number;
+    @Option(names = "--from-block")
+    String fromBlock;
+
+    @Option(names = "--to-block")
+    String toBlock;
+
+    @Option(names = "--from-address")
+    String fromAddress;
+
+    @Option(names = "--to-address")
+    String toAddress;
+
+    @Option(names = "--exclude-zero-value")
+    String excludeZeroValue;
+
+    @Option(names = "--category", description = "Comma-separated categories, e.g. erc721,erc1155")
+    String category;
+
+    @Option(names = "--maxcount", description = "Hex maxCount (or decimal, auto-converted)")
+    String maxCount;
+
+    @Option(names = "--number", description = "Alias for maxCount")
+    String number;
+
+    @Option(names = "--order", description = "asc or desc")
+    String order;
+
+    @Option(names = "--contract-addresses", description = "Comma-separated contract addresses")
+    String contractAddresses;
+
+    @Option(names = "--pagekey")
+    String pageKey;
+
+    @picocli.CommandLine.Mixin NetworkOptions networkOptions;
 
     @Override
     public Integer call() {
-      System.out.println("History capability placeholder.");
+      ChainProfile chainProfile = resolveChain(networkOptions);
+      CliConfig config = ctx.configPort().load();
+      ensureConfigShape(config);
+
+      String resolvedApiKey = apiKey;
+      if (resolvedApiKey == null || resolvedApiKey.isBlank()) {
+        resolvedApiKey = config.getApiKeys().getAlchemyApiKey();
+      }
+      if (resolvedApiKey == null || resolvedApiKey.isBlank()) {
+        throw new IllegalArgumentException(
+            "Alchemy API key is required. Provide --apikey or set config.apiKeys.alchemyApiKey.");
+      }
+
+      String maxCountHex = normalizeHexCount(maxCount != null ? maxCount : number);
+      JsonNode body =
+          alchemyAssetTransfersRequest(
+              fromBlock,
+              toBlock,
+              fromAddress,
+              toAddress,
+              excludeZeroValue,
+              category,
+              maxCountHex,
+              order,
+              contractAddresses,
+              pageKey);
+      String url = resolveAlchemyUrl(chainProfile, resolvedApiKey);
+      JsonNode response = postJson(url, body);
+      try {
+        System.out.println(OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(response));
+      } catch (Exception ex) {
+        throw new IllegalStateException("Unable to print Alchemy response.", ex);
+      }
       return 0;
     }
   }
