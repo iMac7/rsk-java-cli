@@ -87,6 +87,7 @@ import picocli.CommandLine.Parameters;
       EvmCliCommand.VerifyCommand.class,
       EvmCliCommand.ContractCommand.class,
       EvmCliCommand.BridgeCommand.class,
+      EvmCliCommand.GasCommand.class,
       EvmCliCommand.HistoryCommand.class,
       EvmCliCommand.BatchTransferCommand.class,
       EvmCliCommand.TransactionCommand.class,
@@ -756,6 +757,51 @@ public class EvmCliCommand implements Callable<Integer> {
     }
     String encoded = FunctionEncoder.encodeConstructor(constructorArgs);
     return bytecode + Numeric.cleanHexPrefix(encoded);
+  }
+
+  static JsonNode findFunctionAbiNode(String abiJson, String functionName, int argCount) {
+    try {
+      JsonNode root = OBJECT_MAPPER.readTree(abiJson);
+      if (!root.isArray()) {
+        throw new IllegalArgumentException("ABI must be a JSON array.");
+      }
+      for (JsonNode item : root) {
+        if (!"function".equals(item.path("type").asText())) {
+          continue;
+        }
+        if (!functionName.equals(item.path("name").asText())) {
+          continue;
+        }
+        JsonNode inputs = item.path("inputs");
+        int count = inputs.isArray() ? inputs.size() : 0;
+        if (count == argCount) {
+          return item;
+        }
+      }
+      throw new IllegalArgumentException(
+          "Function not found in ABI: " + functionName + " with " + argCount + " args.");
+    } catch (IOException ex) {
+      throw new IllegalArgumentException("Invalid ABI JSON.", ex);
+    }
+  }
+
+  static List<String> parseJsonStringArray(String raw) {
+    if (raw == null || raw.isBlank()) {
+      return List.of();
+    }
+    try {
+      JsonNode node = OBJECT_MAPPER.readTree(raw);
+      if (!node.isArray()) {
+        throw new IllegalArgumentException("--args must be a JSON array, e.g. '[\"arg1\",123]'.");
+      }
+      List<String> values = new ArrayList<>();
+      for (JsonNode item : node) {
+        values.add(item.isTextual() ? item.asText() : item.toString());
+      }
+      return values;
+    } catch (IOException ex) {
+      throw new IllegalArgumentException("Invalid --args JSON array.", ex);
+    }
   }
 
   static BigInteger estimateDeployGas(Web3j web3j, String from, String data) {
@@ -2912,6 +2958,348 @@ public class EvmCliCommand implements Callable<Integer> {
     @Override
     public Integer call() {
       System.out.println("Transaction builder placeholder.");
+      return 0;
+    }
+  }
+
+  @Command(name = "gas", description = "Estimate gas costs for transactions and contract interactions")
+  static class GasCommand extends HelpCommand implements Callable<Integer> {
+    @Option(names = {"-i", "--interactive"}, description = "Interactive gas estimator")
+    boolean interactive;
+
+    @Option(names = {"--to", "-a", "--address"}, description = "Recipient address or RNS")
+    String to;
+
+    @Option(names = "--value", description = "Amount in RBTC (for transfer estimation)")
+    BigDecimal value;
+
+    @Option(names = "--contract", description = "Contract address")
+    String contract;
+
+    @Option(names = "--abi", description = "Path to ABI JSON (for contract function estimation)")
+    String abi;
+
+    @Option(names = "--function", description = "Function name (for contract function estimation)")
+    String function;
+
+    @Option(names = "--args", description = "Function args as JSON array, e.g. '[\"arg1\",123]'")
+    String args;
+
+    @Option(names = "--bytecode", description = "Path to bytecode/bin (for deployment estimation)")
+    String bytecode;
+
+    @Option(
+        names = "--constructor-args",
+        description = "Constructor args as JSON array (used with --bytecode and --abi)")
+    String constructorArgs;
+
+    @Option(names = {"-w", "--wallet"}, description = "Wallet name (optional sender)")
+    String wallet;
+
+    @picocli.CommandLine.Mixin NetworkOptions networkOptions;
+
+    enum EstimationMode {
+      QUICK,
+      TRANSFER,
+      CONTRACT_CALL,
+      DEPLOYMENT
+    }
+
+    private WalletMetadata resolveWalletOptional() {
+      if (wallet != null && !wallet.isBlank()) {
+        return ctx.walletService()
+            .list()
+            .stream()
+            .filter(w -> w.name().equals(wallet))
+            .findFirst()
+            .orElseThrow(() -> new IllegalArgumentException("Wallet not found: " + wallet));
+      }
+      return ctx.walletService().active().orElse(null);
+    }
+
+    private EstimationMode resolveMode() {
+      boolean hasTransferInputs = to != null && !to.isBlank();
+      boolean hasContractInputs = contract != null && !contract.isBlank();
+      boolean hasDeployInputs = bytecode != null && !bytecode.isBlank();
+      int selected = (hasTransferInputs ? 1 : 0) + (hasContractInputs ? 1 : 0) + (hasDeployInputs ? 1 : 0);
+      if (selected > 1) {
+        throw new IllegalArgumentException(
+            "Choose one estimation mode at a time: transfer (--to), contract (--contract), or deployment (--bytecode).");
+      }
+      if (hasTransferInputs) {
+        if (value == null || value.compareTo(BigDecimal.ZERO) <= 0) {
+          throw new IllegalArgumentException("--value must be greater than zero for transfer estimation.");
+        }
+        return EstimationMode.TRANSFER;
+      }
+      if (hasContractInputs) {
+        if (!isHexAddress(contract)) {
+          throw new IllegalArgumentException("Invalid contract address: " + contract);
+        }
+        if (abi == null || abi.isBlank()) {
+          throw new IllegalArgumentException("--abi is required with --contract.");
+        }
+        if (function == null || function.isBlank()) {
+          throw new IllegalArgumentException("--function is required with --contract.");
+        }
+        return EstimationMode.CONTRACT_CALL;
+      }
+      if (hasDeployInputs) {
+        return EstimationMode.DEPLOYMENT;
+      }
+      return EstimationMode.QUICK;
+    }
+
+    private void printQuickGasCheck(ChainProfile chainProfile, Web3j web3j) throws Exception {
+      BigInteger gasPriceWei = web3j.ethGasPrice().send().getGasPrice();
+      BigInteger latestBlock = web3j.ethBlockNumber().send().getBlockNumber();
+      BigDecimal gasPriceGwei = new BigDecimal(gasPriceWei).movePointLeft(9);
+
+      System.out.println(cEmph("⛽ Gas Estimator"));
+      System.out.println(cInfo("Network: ") + chainProfile.name());
+      System.out.println(cInfo("RPC: ") + chainProfile.rpcUrl());
+      System.out.println(cInfo("Latest Block: ") + latestBlock);
+      System.out.println(
+          cInfo("Current Gas Price: ") + gasPriceWei + " wei (" + gasPriceGwei.stripTrailingZeros().toPlainString() + " Gwei)");
+      System.out.println();
+      System.out.println(cWarn("Optimization tips:"));
+      System.out.println("- Use off-peak periods for lower gas prices.");
+      System.out.println("- Add a small gas-limit buffer (~20%) over estimate.");
+    }
+
+    private void printTransferEstimate(
+        ChainProfile chainProfile, Web3j web3j, WalletMetadata walletMeta, String rawTo, BigDecimal amount)
+        throws Exception {
+      String toAddress = resolveAddressInput(chainProfile, rawTo);
+      BigInteger gasPriceWei = web3j.ethGasPrice().send().getGasPrice();
+      BigInteger valueWei = decimalToUnits(amount, 18);
+      String fromAddress = walletMeta == null ? null : walletMeta.address();
+
+      EthEstimateGas estimate =
+          web3j
+              .ethEstimateGas(
+                  Transaction.createFunctionCallTransaction(
+                      fromAddress, null, gasPriceWei, null, toAddress, valueWei, ""))
+              .send();
+      if (estimate.hasError() || estimate.getAmountUsed() == null) {
+        throw new IllegalStateException(
+            "Gas estimation failed: "
+                + (estimate.getError() == null ? "unknown error" : estimate.getError().getMessage()));
+      }
+
+      BigInteger estimatedGas = estimate.getAmountUsed();
+      BigInteger bufferedGas = estimatedGas.multiply(BigInteger.valueOf(12)).divide(BigInteger.TEN);
+      BigInteger gasCostWei = estimatedGas.multiply(gasPriceWei);
+      BigInteger gasCostBufferedWei = bufferedGas.multiply(gasPriceWei);
+
+      System.out.println(cEmph("⛽ Transfer Gas Estimation"));
+      System.out.println(cInfo("Network: ") + chainProfile.name());
+      System.out.println(cInfo("From: ") + (fromAddress == null ? "(not set)" : fromAddress));
+      System.out.println(cInfo("To: ") + toAddress);
+      System.out.println(cInfo("Value: ") + amount.stripTrailingZeros().toPlainString() + " " + chainProfile.nativeSymbol());
+      System.out.println(cInfo("Gas Price: ") + gasPriceWei + " wei");
+      System.out.println(cInfo("Estimated Gas: ") + estimatedGas);
+      System.out.println(cInfo("Estimated Cost: ") + gasCostWei + " wei (" + unitsToDecimal(gasCostWei, 18).toPlainString() + " " + chainProfile.nativeSymbol() + ")");
+      System.out.println(cInfo("Recommended Gas Limit: ") + bufferedGas + " (20% buffer)");
+      System.out.println(cInfo("Buffered Cost: ") + gasCostBufferedWei + " wei (" + unitsToDecimal(gasCostBufferedWei, 18).toPlainString() + " " + chainProfile.nativeSymbol() + ")");
+      System.out.println();
+      System.out.println(cWarn("Optimization tips:"));
+      System.out.println("- Keep `data` empty for plain transfers.");
+      System.out.println("- Re-check right before sending if network conditions change.");
+    }
+
+    private void printContractEstimate(
+        ChainProfile chainProfile,
+        Web3j web3j,
+        WalletMetadata walletMeta,
+        String contractAddress,
+        String abiPath,
+        String functionName,
+        String argsJson)
+        throws Exception {
+      String abiJson = readRequiredFile(abiPath, "ABI");
+      List<String> providedArgs = parseJsonStringArray(argsJson);
+      JsonNode functionNode = findFunctionAbiNode(abiJson, functionName, providedArgs.size());
+
+      List<Type> inputs = new ArrayList<>();
+      JsonNode inputsNode = functionNode.path("inputs");
+      for (int i = 0; i < inputsNode.size(); i++) {
+        String type = inputsNode.get(i).path("type").asText();
+        inputs.add(toAbiInputType(type, providedArgs.get(i)));
+      }
+      Function fn = new Function(functionName, inputs, List.of());
+      String encodedData = FunctionEncoder.encode(fn);
+
+      BigInteger gasPriceWei = web3j.ethGasPrice().send().getGasPrice();
+      String fromAddress = walletMeta == null ? null : walletMeta.address();
+      EthEstimateGas estimate =
+          web3j
+              .ethEstimateGas(
+                  Transaction.createFunctionCallTransaction(
+                      fromAddress, null, gasPriceWei, null, contractAddress, BigInteger.ZERO, encodedData))
+              .send();
+      if (estimate.hasError() || estimate.getAmountUsed() == null) {
+        throw new IllegalStateException(
+            "Gas estimation failed: "
+                + (estimate.getError() == null ? "unknown error" : estimate.getError().getMessage()));
+      }
+
+      BigInteger estimatedGas = estimate.getAmountUsed();
+      BigInteger bufferedGas = estimatedGas.multiply(BigInteger.valueOf(12)).divide(BigInteger.TEN);
+      BigInteger gasCostWei = estimatedGas.multiply(gasPriceWei);
+      BigInteger gasCostBufferedWei = bufferedGas.multiply(gasPriceWei);
+
+      System.out.println(cEmph("⛽ Contract Gas Estimation"));
+      System.out.println(cInfo("Network: ") + chainProfile.name());
+      System.out.println(cInfo("From: ") + (fromAddress == null ? "(not set)" : fromAddress));
+      System.out.println(cInfo("Contract: ") + contractAddress);
+      System.out.println(cInfo("Function: ") + functionName);
+      System.out.println(cInfo("Args: ") + (providedArgs.isEmpty() ? "[]" : providedArgs));
+      System.out.println(cInfo("Gas Price: ") + gasPriceWei + " wei");
+      System.out.println(cInfo("Estimated Gas: ") + estimatedGas);
+      System.out.println(cInfo("Estimated Cost: ") + gasCostWei + " wei (" + unitsToDecimal(gasCostWei, 18).toPlainString() + " " + chainProfile.nativeSymbol() + ")");
+      System.out.println(cInfo("Recommended Gas Limit: ") + bufferedGas + " (20% buffer)");
+      System.out.println(cInfo("Buffered Cost: ") + gasCostBufferedWei + " wei (" + unitsToDecimal(gasCostBufferedWei, 18).toPlainString() + " " + chainProfile.nativeSymbol() + ")");
+      System.out.println();
+      System.out.println(cWarn("Optimization tips:"));
+      if (estimatedGas.compareTo(BigInteger.valueOf(300_000L)) > 0) {
+        System.out.println("- This call is relatively expensive. Consider splitting work if possible.");
+      } else {
+        System.out.println("- Gas usage is within a typical range for a contract call.");
+      }
+      System.out.println("- Use exact input types to avoid failed estimation due to encoding mismatches.");
+    }
+
+    private void printDeploymentEstimate(
+        ChainProfile chainProfile,
+        Web3j web3j,
+        WalletMetadata walletMeta,
+        String bytecodePath,
+        String abiPath,
+        String constructorArgsJson)
+        throws Exception {
+      String bytecodeRaw = readRequiredFile(bytecodePath, "bytecode");
+      String deploymentData;
+      if (abiPath != null && !abiPath.isBlank()) {
+        String abiJson = readRequiredFile(abiPath, "ABI");
+        List<String> ctorArgs = parseJsonStringArray(constructorArgsJson);
+        deploymentData = buildDeploymentData(bytecodeRaw, abiJson, ctorArgs);
+      } else {
+        String cleaned = bytecodeRaw.trim();
+        deploymentData = Numeric.containsHexPrefix(cleaned) ? cleaned : Numeric.prependHexPrefix(cleaned);
+      }
+
+      String fromAddress = walletMeta == null ? null : walletMeta.address();
+      BigInteger gasPriceWei = web3j.ethGasPrice().send().getGasPrice();
+      EthEstimateGas estimate =
+          web3j
+              .ethEstimateGas(
+                  Transaction.createContractTransaction(
+                      fromAddress, null, gasPriceWei, null, BigInteger.ZERO, deploymentData))
+              .send();
+      if (estimate.hasError() || estimate.getAmountUsed() == null) {
+        throw new IllegalStateException(
+            "Gas estimation failed: "
+                + (estimate.getError() == null ? "unknown error" : estimate.getError().getMessage()));
+      }
+
+      BigInteger estimatedGas = estimate.getAmountUsed();
+      BigInteger bufferedGas = estimatedGas.multiply(BigInteger.valueOf(12)).divide(BigInteger.TEN);
+      BigInteger gasCostWei = estimatedGas.multiply(gasPriceWei);
+      BigInteger gasCostBufferedWei = bufferedGas.multiply(gasPriceWei);
+
+      System.out.println(cEmph("⛽ Deployment Gas Estimation"));
+      System.out.println(cInfo("Network: ") + chainProfile.name());
+      System.out.println(cInfo("From: ") + (fromAddress == null ? "(not set)" : fromAddress));
+      System.out.println(cInfo("Bytecode: ") + bytecodePath);
+      if (abiPath != null && !abiPath.isBlank()) {
+        System.out.println(cInfo("ABI: ") + abiPath);
+      }
+      System.out.println(cInfo("Gas Price: ") + gasPriceWei + " wei");
+      System.out.println(cInfo("Estimated Gas: ") + estimatedGas);
+      System.out.println(cInfo("Estimated Cost: ") + gasCostWei + " wei (" + unitsToDecimal(gasCostWei, 18).toPlainString() + " " + chainProfile.nativeSymbol() + ")");
+      System.out.println(cInfo("Recommended Gas Limit: ") + bufferedGas + " (20% buffer)");
+      System.out.println(cInfo("Buffered Cost: ") + gasCostBufferedWei + " wei (" + unitsToDecimal(gasCostBufferedWei, 18).toPlainString() + " " + chainProfile.nativeSymbol() + ")");
+      System.out.println();
+      System.out.println(cWarn("Optimization tips:"));
+      System.out.println("- Enable optimizer in compiler settings to reduce deployment gas.");
+      System.out.println("- Remove dead code and unused storage writes from constructors.");
+    }
+
+    private void runInteractive(ChainProfile chainProfile, Web3j web3j, WalletMetadata walletMeta)
+        throws Exception {
+      while (true) {
+        System.out.println();
+        System.out.println(cEmph("⛽ Interactive Gas Estimator"));
+        System.out.println("1) Quick gas check");
+        System.out.println("2) Estimate transfer");
+        System.out.println("3) Estimate contract function call");
+        System.out.println("4) Estimate contract deployment");
+        System.out.println("5) Exit");
+
+        String choice = readTextPrompt("Select option", "1");
+        switch (choice) {
+          case "1" -> printQuickGasCheck(chainProfile, web3j);
+          case "2" -> {
+            String toInput = readRequiredTextPrompt("Recipient address or RNS", "");
+            BigDecimal amount =
+                new BigDecimal(readRequiredTextPrompt("Amount (" + chainProfile.nativeSymbol() + ")", ""));
+            if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+              throw new IllegalArgumentException("Amount must be greater than zero.");
+            }
+            printTransferEstimate(chainProfile, web3j, walletMeta, toInput, amount);
+          }
+          case "3" -> {
+            String contractInput = readRequiredTextPrompt("Contract address", "");
+            if (!isHexAddress(contractInput)) {
+              throw new IllegalArgumentException("Invalid contract address: " + contractInput);
+            }
+            String abiInput = readRequiredTextPrompt("ABI path", "");
+            String functionInput = readRequiredTextPrompt("Function name", "");
+            String argsInput = readTextPrompt("Args JSON array", "[]");
+            printContractEstimate(
+                chainProfile, web3j, walletMeta, contractInput, abiInput, functionInput, argsInput);
+          }
+          case "4" -> {
+            String bytecodeInput = readRequiredTextPrompt("Bytecode path", "");
+            String abiInput = readTextPrompt("ABI path (optional)", "");
+            String ctorArgsInput =
+                (abiInput == null || abiInput.isBlank())
+                    ? "[]"
+                    : readTextPrompt("Constructor args JSON array", "[]");
+            printDeploymentEstimate(
+                chainProfile, web3j, walletMeta, bytecodeInput, abiInput, ctorArgsInput);
+          }
+          case "5" -> {
+            return;
+          }
+          default -> System.out.println("Please choose 1-5.");
+        }
+      }
+    }
+
+    @Override
+    public Integer call() {
+      ChainProfile chainProfile = resolveChain(networkOptions);
+      WalletMetadata walletMeta = resolveWalletOptional();
+      try (Web3j web3j = Web3j.build(new HttpService(chainProfile.rpcUrl()))) {
+        if (interactive) {
+          runInteractive(chainProfile, web3j, walletMeta);
+          return 0;
+        }
+
+        EstimationMode mode = resolveMode();
+        switch (mode) {
+          case QUICK -> printQuickGasCheck(chainProfile, web3j);
+          case TRANSFER -> printTransferEstimate(chainProfile, web3j, walletMeta, to, value);
+          case CONTRACT_CALL ->
+              printContractEstimate(chainProfile, web3j, walletMeta, contract, abi, function, args);
+          case DEPLOYMENT ->
+              printDeploymentEstimate(chainProfile, web3j, walletMeta, bytecode, abi, constructorArgs);
+        }
+      } catch (Exception ex) {
+        throw new IllegalStateException("Unable to estimate gas.", ex);
+      }
       return 0;
     }
   }

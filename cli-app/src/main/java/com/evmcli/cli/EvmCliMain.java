@@ -104,6 +104,7 @@ public final class EvmCliMain {
     printMenuItem("\u2705 verify      ", "Verify contract");
     printMenuItem("\uD83D\uDCDC contract    ", "Contract mode");
     printMenuItem("\uD83C\uDF09 bridge      ", "Bridge flow");
+    printMenuItem("\u26FD gas         ", "Gas estimator");
     printMenuItem("\uD83D\uDD58 history     ", "History API");
     printMenuItem("\uD83D\uDCE6 batch-transfer  ", "Batch transfer");
     printMenuItem("\uD83E\uDDF1 transaction ", "Transaction builder");

@@ -280,8 +280,21 @@ Example:
 evm-cli transaction
 ```
 
+`gas`  
+Estimate gas price, transfer gas, contract call gas, and deployment gas.
+Example:
+
+```powershell
+evm-cli gas
+evm-cli gas --testnet
+evm-cli gas --to 0xRecipientAddress --value 0.1
+evm-cli gas --contract 0xContractAddress --abi .\abi.json --function myMethod --args "[\"arg1\",123]"
+evm-cli gas --bytecode .\bytecode.bin --abi .\abi.json --constructor-args "[\"owner\",1]"
+evm-cli gas --testnet -i
+```
+
 `simulate`  
-Sinulation for RBTC or ERC20 transfers.
+Simulation for RBTC or ERC20 transfers.
 Example:
 
 ```powershell
