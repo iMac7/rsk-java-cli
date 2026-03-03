@@ -44,6 +44,7 @@ import org.web3j.abi.FunctionReturnDecoder;
 import org.web3j.abi.TypeReference;
 import org.web3j.abi.datatypes.Address;
 import org.web3j.abi.datatypes.Bool;
+import org.web3j.abi.datatypes.DynamicArray;
 import org.web3j.abi.datatypes.Function;
 import org.web3j.abi.datatypes.DynamicBytes;
 import org.web3j.abi.datatypes.Type;
@@ -92,6 +93,7 @@ import picocli.CommandLine.Parameters;
       EvmCliCommand.SimulateCommand.class
     })
 public class EvmCliCommand implements Callable<Integer> {
+  private static final String INPUT_CANCELLED_MESSAGE = "Input cancelled. Please try again.";
   private static final String ALCHEMY_ROOTSTOCK_MAINNET_URL =
       "https://rootstock-mainnet.g.alchemy.com/v2/%s";
   private static final String ALCHEMY_ROOTSTOCK_TESTNET_URL =
@@ -113,6 +115,7 @@ public class EvmCliCommand implements Callable<Integer> {
   private static final String BLOCKSCOUT_ADDRESS_TESTNET_URL =
       "https://rootstock-testnet.blockscout.com/address/%s";
   private static final String RSK_BRIDGE_CONTRACT = "0x0000000000000000000000000000000001000006";
+  private static final String BRIDGE_ABI_RESOURCE = "bridge_abi.json";
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static CliContext ctx;
 
@@ -190,12 +193,34 @@ public class EvmCliCommand implements Callable<Integer> {
   }
 
   static char[] readPassword(String prompt) {
-    Console console = System.console();
-    if (console != null) {
-      return console.readPassword(prompt);
+    while (true) {
+      try {
+        Console console = System.console();
+        if (console != null) {
+          char[] password = console.readPassword(prompt);
+          if (password == null || password.length == 0) {
+            System.out.println("Password is required.");
+            continue;
+          }
+          return password;
+        }
+        String password = LineReaderBuilder.builder().build().readLine(prompt, '*');
+        if (password == null || password.isBlank()) {
+          System.out.println("Password is required.");
+          continue;
+        }
+        return password.toCharArray();
+      } catch (org.jline.reader.UserInterruptException ex) {
+        System.out.println(INPUT_CANCELLED_MESSAGE);
+      } catch (RuntimeException ex) {
+        if (Thread.currentThread().isInterrupted()) {
+          Thread.interrupted();
+          System.out.println(INPUT_CANCELLED_MESSAGE);
+          continue;
+        }
+        throw ex;
+      }
     }
-    String password = LineReaderBuilder.builder().build().readLine(prompt, '*');
-    return password.toCharArray();
   }
 
   static String readTextPrompt(String label, String defaultValue) {
@@ -203,24 +228,33 @@ public class EvmCliCommand implements Callable<Integer> {
         (defaultValue == null || defaultValue.isBlank())
             ? label + ": "
             : label + " [" + defaultValue + "]: ";
-    Console console = System.console();
-    if (console != null) {
-      String value = console.readLine("%s", prompt);
-      if ((value == null || value.isBlank()) && defaultValue != null) {
-        return defaultValue;
+    while (true) {
+      try {
+        Console console = System.console();
+        if (console != null) {
+          String value = console.readLine("%s", prompt);
+          if ((value == null || value.isBlank()) && defaultValue != null) {
+            return defaultValue;
+          }
+          return value == null ? "" : value.trim();
+        }
+        System.out.print(prompt);
+        System.out.flush();
+        String value = new BufferedReader(new InputStreamReader(System.in)).readLine();
+        if ((value == null || value.isBlank()) && defaultValue != null) {
+          return defaultValue;
+        }
+        return value == null ? "" : value.trim();
+      } catch (IOException ex) {
+        throw new IllegalStateException("Unable to read interactive input", ex);
+      } catch (RuntimeException ex) {
+        if (Thread.currentThread().isInterrupted()) {
+          Thread.interrupted();
+          System.out.println(INPUT_CANCELLED_MESSAGE);
+          continue;
+        }
+        throw ex;
       }
-      return value == null ? "" : value.trim();
-    }
-    try {
-      System.out.print(prompt);
-      System.out.flush();
-      String value = new BufferedReader(new InputStreamReader(System.in)).readLine();
-      if ((value == null || value.isBlank()) && defaultValue != null) {
-        return defaultValue;
-      }
-      return value == null ? "" : value.trim();
-    } catch (IOException ex) {
-      throw new IllegalStateException("Unable to read interactive input", ex);
     }
   }
 
@@ -271,6 +305,7 @@ public class EvmCliCommand implements Callable<Integer> {
         }
         return value == null ? "" : value.trim();
       } catch (UserInterruptException ignored) {
+        System.out.println(INPUT_CANCELLED_MESSAGE);
       }
     }
   }
@@ -969,10 +1004,66 @@ public class EvmCliCommand implements Callable<Integer> {
       JsonNode addressPayload = getJson(blockscoutAddressApiUrl(chainProfile, address));
       JsonNode smartContract = addressPayload.path("smart_contract");
       if (smartContract.isMissingNode() || smartContract.isNull()) {
-        throw new IllegalStateException("Unable to fetch contract metadata from Blockscout.", contractEndpointError);
+        if (addressPayload.path("abi").isMissingNode()) {
+          throw new IllegalStateException(
+              "Unable to fetch contract metadata from Blockscout.", contractEndpointError);
+        }
+        return addressPayload;
       }
       return smartContract;
     }
+  }
+
+  static JsonNode findAbiNodeInPayload(JsonNode payload) {
+    if (payload == null || payload.isMissingNode() || payload.isNull()) {
+      return null;
+    }
+    JsonNode directAbi = payload.path("abi");
+    if (!directAbi.isMissingNode() && !directAbi.isNull()) {
+      return directAbi;
+    }
+    JsonNode smartContractAbi = payload.path("smart_contract").path("abi");
+    if (!smartContractAbi.isMissingNode() && !smartContractAbi.isNull()) {
+      return smartContractAbi;
+    }
+    JsonNode contractAbi = payload.path("contract").path("abi");
+    if (!contractAbi.isMissingNode() && !contractAbi.isNull()) {
+      return contractAbi;
+    }
+    JsonNode resultAbi = payload.path("result").path("abi");
+    if (!resultAbi.isMissingNode() && !resultAbi.isNull()) {
+      return resultAbi;
+    }
+    return null;
+  }
+
+  static JsonNode resolveAbiArrayFromBlockscout(ChainProfile chainProfile, String address) {
+    List<String> urls =
+        List.of(
+            blockscoutContractUrl(chainProfile, address),
+            blockscoutAddressApiUrl(chainProfile, address));
+    Exception lastError = null;
+    for (String url : urls) {
+      try {
+        JsonNode payload = getJson(url);
+        JsonNode abiNode = findAbiNodeInPayload(payload);
+        if (abiNode == null) {
+          continue;
+        }
+        if (abiNode.isArray()) {
+          return abiNode;
+        }
+        if (abiNode.isTextual()) {
+          JsonNode parsed = OBJECT_MAPPER.readTree(abiNode.asText());
+          if (parsed.isArray()) {
+            return parsed;
+          }
+        }
+      } catch (Exception ex) {
+        lastError = ex;
+      }
+    }
+    throw new IllegalStateException("Unable to resolve contract ABI from Blockscout.", lastError);
   }
 
   static JsonNode extractAbiNode(JsonNode contractJson) {
@@ -991,18 +1082,35 @@ public class EvmCliCommand implements Callable<Integer> {
   }
 
   static Type<?> toAbiInputType(String solidityType, String value) {
+    if ("bytes[]".equals(solidityType)) {
+      List<DynamicBytes> items =
+          splitCsv(value).stream()
+              .map(Numeric::hexStringToByteArray)
+              .map(DynamicBytes::new)
+              .toList();
+      return new DynamicArray<>(DynamicBytes.class, items);
+    }
+    if ("bytes32[]".equals(solidityType)) {
+      List<Bytes32> items =
+          splitCsv(value).stream()
+              .map(v -> new Bytes32(Numeric.toBytesPadded(Numeric.toBigInt(v), 32)))
+              .toList();
+      return new DynamicArray<>(Bytes32.class, items);
+    }
     return switch (solidityType) {
       case "address" -> new Address(value);
       case "bool" -> new Bool(Boolean.parseBoolean(value));
       case "string" -> new Utf8String(value);
       case "bytes" -> new DynamicBytes(Numeric.hexStringToByteArray(value));
       case "bytes32" -> new Bytes32(Numeric.toBytesPadded(Numeric.toBigInt(value), 32));
-      case "uint256" -> new Uint256(new BigInteger(value));
+      case "uint256", "uint" -> new Uint256(new BigInteger(value));
       case "uint8" -> new Uint8(new BigInteger(value));
-      case "int256" -> new Int256(new BigInteger(value));
+      case "int256", "int", "int64" -> new Int256(new BigInteger(value));
       default ->
           throw new IllegalArgumentException(
-              "Unsupported input type: " + solidityType + ". Supported: address,bool,string,bytes,bytes32,uint8,uint256,int256");
+              "Unsupported input type: "
+                  + solidityType
+                  + ". Supported: address,bool,string,bytes,bytes32,bytes[],bytes32[],uint8,uint,uint256,int,int64,int256");
     };
   }
 
@@ -1013,13 +1121,30 @@ public class EvmCliCommand implements Callable<Integer> {
       case "string" -> TypeReference.create(Utf8String.class);
       case "bytes" -> TypeReference.create(DynamicBytes.class);
       case "bytes32" -> TypeReference.create(Bytes32.class);
-      case "uint256" -> TypeReference.create(Uint256.class);
+      case "uint256", "uint" -> TypeReference.create(Uint256.class);
       case "uint8" -> TypeReference.create(Uint8.class);
-      case "int256" -> TypeReference.create(Int256.class);
+      case "int256", "int", "int64" -> TypeReference.create(Int256.class);
       default ->
           throw new IllegalArgumentException(
-              "Unsupported output type: " + solidityType + ". Supported: address,bool,string,bytes,bytes32,uint8,uint256,int256");
+              "Unsupported output type: "
+                  + solidityType
+                  + ". Supported: address,bool,string,bytes,bytes32,uint8,uint,uint256,int,int64,int256");
     };
+  }
+
+  static JsonNode readAbiArrayResource(String resourceName) {
+    try (var in = EvmCliCommand.class.getClassLoader().getResourceAsStream(resourceName)) {
+      if (in == null) {
+        throw new IllegalStateException("ABI resource not found: " + resourceName);
+      }
+      JsonNode root = OBJECT_MAPPER.readTree(in);
+      if (!root.isArray()) {
+        throw new IllegalStateException("ABI resource must be a JSON array: " + resourceName);
+      }
+      return root;
+    } catch (IOException ex) {
+      throw new IllegalStateException("Unable to read ABI resource: " + resourceName, ex);
+    }
   }
 
   static String readableTypeValue(Type type) {
@@ -1033,6 +1158,22 @@ public class EvmCliCommand implements Callable<Integer> {
       return Boolean.toString(b.getValue());
     }
     return type.getValue() == null ? "null" : type.getValue().toString();
+  }
+
+  static String cInfo(String text) {
+    return Ansi.ansi().fg(Ansi.Color.CYAN).a(text).reset().toString();
+  }
+
+  static String cWarn(String text) {
+    return Ansi.ansi().fg(Ansi.Color.YELLOW).a(text).reset().toString();
+  }
+
+  static String cOk(String text) {
+    return Ansi.ansi().fg(Ansi.Color.GREEN).a(text).reset().toString();
+  }
+
+  static String cEmph(String text) {
+    return Ansi.ansi().fgRgb(255, 153, 51).bold().a(text).reset().toString();
   }
 
   static BigInteger decimalToUnits(BigDecimal value, int decimals) {
@@ -1512,10 +1653,9 @@ public class EvmCliCommand implements Callable<Integer> {
           .orElseThrow(() -> new IllegalArgumentException("No active wallet found. Provide --wallet."));
     }
 
-    private String resolveRecipient(ChainProfile chainProfile, LineReader reader) {
+    private String resolveRecipient(ChainProfile chainProfile) {
       if (interactive && toTarget == null) {
-        String recipientRaw =
-            promptRequiredText(reader, "Recipient address or RNS", "");
+        String recipientRaw = readRequiredTextPrompt(cInfo("Recipient address or RNS"), "");
         return resolveAddressInput(chainProfile, recipientRaw);
       }
       if (toTarget == null) {
@@ -1526,7 +1666,7 @@ public class EvmCliCommand implements Callable<Integer> {
           : resolveAddressInput(chainProfile, toTarget.rns);
     }
 
-    private BigDecimal resolveAmount(LineReader reader, String unitLabel) {
+    private BigDecimal resolveAmount(String unitLabel) {
       if (value != null) {
         return value;
       }
@@ -1534,7 +1674,7 @@ public class EvmCliCommand implements Callable<Integer> {
         throw new IllegalArgumentException("Provide --value.");
       }
       while (true) {
-        String raw = promptRequiredText(reader, "Amount (" + unitLabel + ")", "");
+        String raw = readRequiredTextPrompt(cInfo("Amount (" + unitLabel + ")"), "");
         try {
           BigDecimal parsed = new BigDecimal(raw);
           if (parsed.compareTo(BigDecimal.ZERO) <= 0) {
@@ -1656,10 +1796,18 @@ public class EvmCliCommand implements Callable<Integer> {
             web3j.ethGetBalance(credentials.getAddress(), DefaultBlockParameterName.LATEST).send().getBalance();
         BigDecimal balanceRbtc = unitsToDecimal(balanceWei, 18);
 
-        System.out.println("📄 Wallet Address: " + credentials.getAddress());
-        System.out.println("🎯 Recipient Address: " + recipient);
-        System.out.println("💵 Amount to Transfer: " + amountRbtc.toPlainString() + " " + chainProfile.nativeSymbol());
-        System.out.println("💰 Current Balance: " + balanceRbtc.toPlainString() + " " + chainProfile.nativeSymbol());
+        System.out.println(cInfo("📄 Wallet Address: ") + credentials.getAddress());
+        System.out.println(cInfo("🎯 Recipient Address: ") + recipient);
+        System.out.println(
+            cInfo("💵 Amount to Transfer: ")
+                + amountRbtc.toPlainString()
+                + " "
+                + chainProfile.nativeSymbol());
+        System.out.println(
+            cInfo("💰 Current Balance: ")
+                + balanceRbtc.toPlainString()
+                + " "
+                + chainProfile.nativeSymbol());
 
         EthGetTransactionCount nonceResponse =
             web3j
@@ -1684,18 +1832,18 @@ public class EvmCliCommand implements Callable<Integer> {
         }
 
         String txHash = sent.getTransactionHash();
-        System.out.println("🔄 Transaction initiated. TxHash: " + txHash);
+        System.out.println(cWarn("🔄 Transaction initiated. TxHash: ") + txHash);
         TransactionReceipt receipt = waitForReceipt(web3j, txHash, 120, 2000L);
         if (!"0x1".equalsIgnoreCase(receipt.getStatus())) {
           throw new IllegalStateException("Transaction failed. Receipt status: " + receipt.getStatus());
         }
-        System.out.println("✅ Transaction confirmed successfully!");
-        System.out.println("📦 Block Number: " + receipt.getBlockNumber());
-        System.out.println("⛽ Gas Used: " + receipt.getGasUsed());
-        System.out.println("🔗 View on Explorer: " + explorerTxUrl(chainProfile, txHash));
+        System.out.println(cOk("✅ Transaction confirmed successfully!"));
+        System.out.println(cInfo("📦 Block Number: ") + receipt.getBlockNumber());
+        System.out.println(cInfo("⛽ Gas Used: ") + receipt.getGasUsed());
+        System.out.println(cInfo("🔗 View on Explorer: ") + explorerTxUrl(chainProfile, txHash));
 
         if (attestTransfer) {
-          System.out.println("📝 Creating on-chain attestation...");
+          System.out.println(cWarn("📝 Creating on-chain attestation..."));
           String attestationTxHash =
               submitAttestation(
                   web3j,
@@ -1705,9 +1853,9 @@ public class EvmCliCommand implements Callable<Integer> {
                   recipient,
                   chainProfile.nativeSymbol(),
                   amountRbtc);
-          System.out.println("✅ Attestation confirmed!");
-          System.out.println("🔑 Attestation TxHash: " + attestationTxHash);
-          System.out.println("🔗 View on Explorer: " + explorerTxUrl(chainProfile, attestationTxHash));
+          System.out.println(cOk("✅ Attestation confirmed!"));
+          System.out.println(cInfo("🔑 Attestation TxHash: ") + attestationTxHash);
+          System.out.println(cInfo("🔗 View on Explorer: ") + explorerTxUrl(chainProfile, attestationTxHash));
         }
       }
     }
@@ -1761,7 +1909,7 @@ public class EvmCliCommand implements Callable<Integer> {
         // Simulate transfer call before sending.
         try {
           ethCall(web3j, walletAddress, token, transferFn);
-          System.out.println("✔ ✅ Simulation successful, proceeding with transfer...");
+          System.out.println(cOk("✔ ✅ Simulation successful, proceeding with transfer..."));
         } catch (Exception ex) {
           throw new IllegalStateException("Simulation failed: " + ex.getMessage(), ex);
         }
@@ -1782,31 +1930,31 @@ public class EvmCliCommand implements Callable<Integer> {
         }
         String txHash = sent.getTransactionHash();
 
-        System.out.println("🔑 Wallet account: " + walletAddress);
-        System.out.println("📄 Token Information:");
-        System.out.println("     Name: " + tokenName);
-        System.out.println("     Symbol: " + tokenSymbol);
-        System.out.println("     Contract: " + token);
-        System.out.println("🎯 To Address: " + recipient);
-        System.out.println("💵 Amount to Transfer: " + amount.toPlainString() + " " + tokenSymbol);
-        System.out.println("🔄 Transaction initiated. TxHash: " + txHash);
+        System.out.println(cInfo("🔑 Wallet account: ") + walletAddress);
+        System.out.println(cEmph("📄 Token Information:"));
+        System.out.println(cInfo("     Name: ") + tokenName);
+        System.out.println(cInfo("     Symbol: ") + tokenSymbol);
+        System.out.println(cInfo("     Contract: ") + token);
+        System.out.println(cInfo("🎯 To Address: ") + recipient);
+        System.out.println(cInfo("💵 Amount to Transfer: ") + amount.toPlainString() + " " + tokenSymbol);
+        System.out.println(cWarn("🔄 Transaction initiated. TxHash: ") + txHash);
 
         TransactionReceipt receipt = waitForReceipt(web3j, txHash, 120, 2000L);
         if (!"0x1".equalsIgnoreCase(receipt.getStatus())) {
           throw new IllegalStateException("Transfer failed. Receipt status: " + receipt.getStatus());
         }
-        System.out.println("✅ Transfer completed successfully!");
-        System.out.println("📦 Block Number: " + receipt.getBlockNumber());
-        System.out.println("⛽ Gas Used: " + receipt.getGasUsed());
-        System.out.println("🔗 View on Explorer: " + explorerTxUrl(chainProfile, txHash));
+        System.out.println(cOk("✅ Transfer completed successfully!"));
+        System.out.println(cInfo("📦 Block Number: ") + receipt.getBlockNumber());
+        System.out.println(cInfo("⛽ Gas Used: ") + receipt.getGasUsed());
+        System.out.println(cInfo("🔗 View on Explorer: ") + explorerTxUrl(chainProfile, txHash));
 
         if (attestTransfer) {
-          System.out.println("📝 Creating on-chain attestation...");
+          System.out.println(cWarn("📝 Creating on-chain attestation..."));
           String attestationTxHash =
               submitAttestation(web3j, chainProfile, credentials, txHash, recipient, token, amount);
-          System.out.println("✅ Attestation confirmed!");
-          System.out.println("🔑 Attestation TxHash: " + attestationTxHash);
-          System.out.println("🔗 View on Explorer: " + explorerTxUrl(chainProfile, attestationTxHash));
+          System.out.println(cOk("✅ Attestation confirmed!"));
+          System.out.println(cInfo("🔑 Attestation TxHash: ") + attestationTxHash);
+          System.out.println(cInfo("🔗 View on Explorer: ") + explorerTxUrl(chainProfile, attestationTxHash));
         }
       }
     }
@@ -1817,15 +1965,19 @@ public class EvmCliCommand implements Callable<Integer> {
         throw new IllegalArgumentException("--attest-reason requires --attest-transfer.");
       }
       ChainProfile chainProfile = resolveChain(networkOptions);
-      LineReader reader = interactive ? LineReaderBuilder.builder().build() : null;
-      String recipient = resolveRecipient(chainProfile, reader);
+      if (interactive) {
+        System.out.println(cEmph("🚀 Interactive Transfer"));
+        System.out.println(cWarn("Provide recipient as address or RNS, then amount."));
+      }
+      String recipient = resolveRecipient(chainProfile);
       String walletName = resolveWalletName();
       if (interactive && (token == null || token.isBlank())) {
-        String raw = promptText(reader, "Token contract address (leave empty for RBTC)", "");
+        String raw =
+            readTextPrompt(cInfo("Token contract address (leave empty for RBTC)"), "");
         token = raw == null ? null : raw.trim();
       }
       BigDecimal amount =
-          resolveAmount(reader, (token == null || token.isBlank()) ? chainProfile.nativeSymbol() : "token");
+          resolveAmount((token == null || token.isBlank()) ? chainProfile.nativeSymbol() : "token");
       char[] password = readPassword("Wallet password: ");
       String privateKeyHex = ctx.walletService().dumpPrivateKey(walletName, password);
       Credentials credentials = Credentials.create(privateKeyHex);
@@ -2189,16 +2341,7 @@ public class EvmCliCommand implements Callable<Integer> {
       System.out.printf("🔧 Initializing interaction on %s...%n", chainProfile.name());
       System.out.println("🔎 Checking if contract " + address + " is verified...");
 
-      JsonNode contractJson = fetchContractMetadataWithFallback(chainProfile, address);
-      boolean verified =
-          contractJson.path("is_verified").asBoolean(false)
-              || contractJson.path("verified").asBoolean(false)
-              || contractJson.path("isVerified").asBoolean(false);
-      if (!verified) {
-        throw new IllegalStateException("Contract is not verified on explorer.");
-      }
-
-      JsonNode abiArray = extractAbiNode(contractJson);
+      JsonNode abiArray = resolveAbiArrayFromBlockscout(chainProfile, address);
       List<JsonNode> readFunctions =
           new ArrayList<>();
       for (JsonNode entry : abiArray) {
@@ -2460,8 +2603,7 @@ public class EvmCliCommand implements Callable<Integer> {
       ChainProfile chainProfile = resolveChain(networkOptions);
       System.out.printf("🔧 Initializing bridge interaction on %s...%n", chainProfile.name());
       String contractAddress = RSK_BRIDGE_CONTRACT;
-      JsonNode contractJson = fetchContractMetadataWithFallback(chainProfile, contractAddress);
-      JsonNode abiArray = extractAbiNode(contractJson);
+      JsonNode abiArray = readAbiArrayResource(BRIDGE_ABI_RESOURCE);
 
       List<JsonNode> functions = new ArrayList<>();
       for (JsonNode entry : abiArray) {
@@ -2597,7 +2739,7 @@ public class EvmCliCommand implements Callable<Integer> {
   @Command(
       name = "batch-transfer", description = "Batch transfer")
   static class BatchTransferCommand extends HelpCommand implements Callable<Integer> {
-    @Option(names = "--interactive")
+    @Option(names = {"-i", "--interactive"})
     boolean interactive;
 
     @Option(names = "--file")
@@ -2606,10 +2748,160 @@ public class EvmCliCommand implements Callable<Integer> {
     @Option(names = "--rns")
     boolean rns;
 
+    @picocli.CommandLine.Mixin NetworkOptions networkOptions;
+
+    static class BatchItem {
+      final String to;
+      final BigDecimal value;
+
+      BatchItem(String to, BigDecimal value) {
+        this.to = to;
+        this.value = value;
+      }
+    }
+
+    private List<BatchItem> readInteractiveItems() {
+      List<BatchItem> items = new ArrayList<>();
+      System.out.println(cEmph("📦 Interactive Batch Transfer"));
+      System.out.println(cWarn("Enter each recipient as address or RNS."));
+      while (true) {
+        String to = readRequiredTextPrompt(cInfo("Enter address or RNS"), "");
+        BigDecimal amount;
+        while (true) {
+          String rawAmount = readRequiredTextPrompt(cInfo("Enter amount (RBTC)"), "");
+          try {
+            amount = new BigDecimal(rawAmount);
+            if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+              System.out.println("Amount must be greater than zero.");
+              continue;
+            }
+            break;
+          } catch (NumberFormatException ex) {
+            System.out.println("Please enter a valid decimal amount.");
+          }
+        }
+        items.add(new BatchItem(to, amount));
+
+        String addMore = readTextPrompt(cInfo("Add another transaction? (y/n)"), "n");
+        if (!"y".equalsIgnoreCase(addMore) && !"yes".equalsIgnoreCase(addMore)) {
+          break;
+        }
+      }
+      return items;
+    }
+
+    private List<BatchItem> readFileItems() {
+      if (file == null || file.isBlank()) {
+        return List.of();
+      }
+      try {
+        JsonNode root = OBJECT_MAPPER.readTree(Files.readString(Path.of(file)));
+        if (!root.isArray()) {
+          throw new IllegalArgumentException("Batch file must be a JSON array.");
+        }
+        List<BatchItem> items = new ArrayList<>();
+        for (JsonNode node : root) {
+          String to = node.path("to").asText();
+          if (to == null || to.isBlank()) {
+            throw new IllegalArgumentException("Each batch item must include a non-empty 'to' field.");
+          }
+          JsonNode valueNode = node.path("value");
+          if (valueNode.isMissingNode() || valueNode.isNull()) {
+            throw new IllegalArgumentException("Each batch item must include a 'value' field.");
+          }
+          BigDecimal amount = new BigDecimal(valueNode.asText());
+          if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Batch value must be greater than zero.");
+          }
+          items.add(new BatchItem(to, amount));
+        }
+        return items;
+      } catch (IOException ex) {
+        throw new IllegalArgumentException("Unable to read batch file: " + file, ex);
+      }
+    }
+
     @Override
     public Integer call() {
-      System.out.println("Batch transfer builder placeholder.");
-      return 0;
+      if (!interactive && (file == null || file.isBlank())) {
+        throw new IllegalArgumentException("Provide --interactive or --file.");
+      }
+      if (interactive && file != null && !file.isBlank()) {
+        throw new IllegalArgumentException("Use either --interactive or --file, not both.");
+      }
+
+      ChainProfile chainProfile = resolveChain(networkOptions);
+      String walletName =
+          ctx.walletService()
+              .active()
+              .map(WalletMetadata::name)
+              .orElseThrow(() -> new IllegalArgumentException("No active wallet found."));
+      char[] password = readPassword("✔ Enter your password to decrypt the wallet: ");
+      String privateKeyHex = ctx.walletService().dumpPrivateKey(walletName, password);
+      Credentials credentials = Credentials.create(privateKeyHex);
+
+      List<BatchItem> rawItems = interactive ? readInteractiveItems() : readFileItems();
+      if (rawItems.isEmpty()) {
+        throw new IllegalArgumentException("No batch transactions provided.");
+      }
+
+      List<BatchItem> resolvedItems = new ArrayList<>();
+      for (BatchItem item : rawItems) {
+        String resolvedTo = resolveAddressInput(chainProfile, item.to);
+        resolvedItems.add(new BatchItem(resolvedTo, item.value));
+      }
+
+      try (Web3j web3j = Web3j.build(new HttpService(chainProfile.rpcUrl()))) {
+        BigInteger balanceWei =
+            web3j
+                .ethGetBalance(credentials.getAddress(), DefaultBlockParameterName.LATEST)
+                .send()
+                .getBalance();
+        BigDecimal balance = unitsToDecimal(balanceWei, 18);
+        System.out.println("📄 Wallet Address: " + credentials.getAddress());
+        System.out.println("💰 Current Balance: " + balance.toPlainString() + " " + chainProfile.nativeSymbol());
+
+        BigInteger nonce =
+            web3j
+                .ethGetTransactionCount(credentials.getAddress(), DefaultBlockParameterName.PENDING)
+                .send()
+                .getTransactionCount();
+        BigInteger gasPrice = web3j.ethGasPrice().send().getGasPrice();
+        BigInteger gasLimit = BigInteger.valueOf(21_000L);
+
+        for (BatchItem item : resolvedItems) {
+          BigInteger valueWei = decimalToUnits(item.value, 18);
+          RawTransaction tx =
+              RawTransaction.createTransaction(
+                  nonce,
+                  gasPrice,
+                  gasLimit,
+                  item.to,
+                  valueWei,
+                  "");
+          byte[] signed = TransactionEncoder.signMessage(tx, chainProfile.chainId(), credentials);
+          EthSendTransaction sent = web3j.ethSendRawTransaction(Numeric.toHexString(signed)).send();
+          if (sent.hasError()) {
+            throw new IllegalStateException(
+                "Transfer to " + item.to + " failed: " + sent.getError().getMessage());
+          }
+
+          String txHash = sent.getTransactionHash();
+          System.out.println("🔄 Transaction initiated. TxHash: " + txHash);
+          TransactionReceipt receipt = waitForReceipt(web3j, txHash, 120, 2000L);
+          if (!"0x1".equalsIgnoreCase(receipt.getStatus())) {
+            throw new IllegalStateException(
+                "Transfer failed for " + item.to + ". Receipt status: " + receipt.getStatus());
+          }
+          System.out.println("✅ Transaction confirmed successfully!");
+          System.out.println("📦 Block Number: " + receipt.getBlockNumber());
+          System.out.println("⛽ Gas Used: " + receipt.getGasUsed());
+          nonce = nonce.add(BigInteger.ONE);
+        }
+        return 0;
+      } catch (Exception ex) {
+        throw new IllegalStateException("Batch transfer failed.", ex);
+      }
     }
   }
 

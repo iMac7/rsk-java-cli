@@ -60,6 +60,7 @@ public final class EvmCliMain {
       try {
         line = reader.readLine(prompt()).trim();
       } catch (UserInterruptException e) {
+        System.out.println(Ansi.ansi().fg(Ansi.Color.YELLOW).a("Input cancelled. Please try again.").reset());
         continue;
       } catch (EndOfFileException e) {
         System.out.println();

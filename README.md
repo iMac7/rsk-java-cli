@@ -261,11 +261,15 @@ evm-cli history --testnet --apikey yourKey --pagekey b48d6463-6903-4970-a3c1-630
 ```
 
 `batch-transfer`  
-Batch transfer builder placeholder.
+Send multiple RBTC transfers in one run (interactive or JSON file).  
+`to` supports either wallet addresses or RNS names.
 Example:
 
 ```powershell
-evm-cli batch-transfer --file .\batch.csv
+evm-cli batch-transfer --interactive
+evm-cli batch-transfer --testnet --interactive
+evm-cli batch-transfer --file .\batch.json
+evm-cli batch-transfer --testnet --file .\batch.json
 ```
 
 `transaction`  
