@@ -281,11 +281,15 @@ evm-cli transaction
 ```
 
 `simulate`  
-Simulation builder placeholder.
+Sinulation for RBTC or ERC20 transfers.
 Example:
 
 ```powershell
-evm-cli simulate
+evm-cli simulate --address 0xRecipientAddress --value 0.001
+evm-cli simulate --testnet --address 0xRecipientAddress --value 0.001
+evm-cli simulate --address 0xRecipientAddress --value 0.001 --gas-limit 21000 --gas-price 0.00000006
+evm-cli simulate --token 0xTokenAddress --address 0xRecipientAddress --value 10
+evm-cli simulate --testnet --wallet myWallet --token 0xTokenAddress --address 0xRecipientAddress --value 10
 ```
 
 ## Useful Help Commands

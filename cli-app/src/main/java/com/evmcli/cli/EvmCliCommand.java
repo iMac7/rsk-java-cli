@@ -2918,9 +2918,358 @@ public class EvmCliCommand implements Callable<Integer> {
 
   @Command(name = "simulate", description = "Simulation builder")
   static class SimulateCommand extends HelpCommand implements Callable<Integer> {
+    @Option(names = {"-a", "--address"}, required = true, description = "Recipient address or RNS")
+    String address;
+
+    @Option(names = "--value", required = true, description = "Transfer amount (RBTC or token units)")
+    BigDecimal value;
+
+    @Option(names = "--token", description = "ERC20 token contract address")
+    String token;
+
+    @Option(names = {"-w", "--wallet"}, description = "Wallet name (defaults to active wallet)")
+    String wallet;
+
+    @Option(names = "--gas-limit", description = "Custom gas limit override")
+    BigInteger gasLimit;
+
+    @Option(names = "--gas-price", description = "Custom gas price in RBTC")
+    BigDecimal gasPriceRbtc;
+
+    @Option(names = "--data", defaultValue = "", description = "Custom tx data (hex)")
+    String data;
+
+    @picocli.CommandLine.Mixin NetworkOptions networkOptions;
+
+    private WalletMetadata resolveWallet() {
+      if (wallet != null && !wallet.isBlank()) {
+        return ctx.walletService().list().stream()
+            .filter(w -> w.name().equals(wallet))
+            .findFirst()
+            .orElseThrow(() -> new IllegalArgumentException("Wallet not found: " + wallet));
+      }
+      return ctx.walletService()
+          .active()
+          .orElseThrow(() -> new IllegalArgumentException("No active wallet found. Provide --wallet."));
+    }
+
+    private BigInteger resolveGasPriceWei(Web3j web3j) throws Exception {
+      if (gasPriceRbtc != null) {
+        return decimalToUnits(gasPriceRbtc, 18);
+      }
+      return web3j.ethGasPrice().send().getGasPrice();
+    }
+
+    private void printValidation(String label, boolean ok, String okText, String failText) {
+      System.out.println(
+          cInfo(label + ": ")
+              + (ok ? cOk("✅ " + okText) : Ansi.ansi().fg(Ansi.Color.RED).a("❌ " + failText).reset()));
+    }
+
+    private void simulateRbtc(
+        ChainProfile chainProfile, Web3j web3j, WalletMetadata walletMeta, String toAddress)
+        throws Exception {
+      BigInteger valueWei = decimalToUnits(value, 18);
+      BigInteger balanceWei =
+          web3j
+              .ethGetBalance(walletMeta.address(), DefaultBlockParameterName.LATEST)
+              .send()
+              .getBalance();
+      BigInteger gasPriceWei = resolveGasPriceWei(web3j);
+
+      boolean txValid = true;
+      BigInteger estimatedGas;
+      try {
+        EthEstimateGas estimate =
+            web3j
+                .ethEstimateGas(
+                    Transaction.createFunctionCallTransaction(
+                        walletMeta.address(),
+                        null,
+                        gasPriceWei,
+                        null,
+                        toAddress,
+                        valueWei,
+                        data == null ? "" : data))
+                .send();
+        if (estimate.hasError() || estimate.getAmountUsed() == null) {
+          throw new IllegalStateException(
+              estimate.getError() == null ? "Gas estimation failed" : estimate.getError().getMessage());
+        }
+        estimatedGas = estimate.getAmountUsed();
+      } catch (Exception ex) {
+        estimatedGas = gasLimit != null ? gasLimit : BigInteger.valueOf(21_000L);
+        txValid = false;
+      }
+      if (gasLimit != null) {
+        estimatedGas = gasLimit;
+      }
+
+      BigInteger gasCostWei = estimatedGas.multiply(gasPriceWei);
+      BigInteger totalCostWei = valueWei.add(gasCostWei);
+      boolean sufficientBalance = balanceWei.compareTo(totalCostWei) >= 0;
+      BigInteger balanceAfterWei = balanceWei.subtract(totalCostWei);
+
+      System.out.println(cEmph("🔮 Simulating Transaction"));
+      System.out.println(cInfo("🔑 From Address: ") + walletMeta.address());
+      System.out.println(cInfo("🎯 To Address: ") + toAddress);
+      System.out.println(cInfo("💵 Amount: ") + value.toPlainString() + " " + chainProfile.nativeSymbol());
+      System.out.println();
+      System.out.println(cEmph("📊 SIMULATION RESULTS"));
+      System.out.println();
+      System.out.println(cInfo("Network: ") + chainProfile.name());
+      System.out.println(cInfo("Transaction Type: ") + "RBTC Transfer");
+      System.out.println(cInfo("Transfer Amount: ") + value.toPlainString() + " " + chainProfile.nativeSymbol());
+      System.out.println(
+          cInfo("Current Balance: ")
+              + unitsToDecimal(balanceWei, 18).toPlainString()
+              + " "
+              + chainProfile.nativeSymbol());
+      System.out.println(cInfo("Estimated Gas: ") + estimatedGas);
+      System.out.println(
+          cInfo("Gas Price: ")
+              + new BigDecimal(gasPriceWei).movePointLeft(9).stripTrailingZeros().toPlainString()
+              + " Gwei");
+      System.out.println(
+          cInfo("Total Gas Cost: ")
+              + unitsToDecimal(gasCostWei, 18).toPlainString()
+              + " "
+              + chainProfile.nativeSymbol());
+      System.out.println(
+          cInfo("Balance After: ")
+              + unitsToDecimal(balanceAfterWei.max(BigInteger.ZERO), 18).toPlainString()
+              + " "
+              + chainProfile.nativeSymbol());
+      System.out.println(
+          cInfo("Total Transaction Cost: ")
+              + unitsToDecimal(totalCostWei, 18).toPlainString()
+              + " "
+              + chainProfile.nativeSymbol());
+      System.out.println();
+      System.out.println(cEmph("✅ VALIDATION RESULTS"));
+      System.out.println();
+      printValidation(
+          "Sufficient Balance",
+          sufficientBalance,
+          "Enough RBTC for transfer + gas",
+          "Insufficient RBTC for transfer + gas");
+      printValidation(
+          "Transaction Validity",
+          txValid,
+          "Transaction simulation successful",
+          "Gas estimation failed; using fallback gas");
+      System.out.println();
+
+      if (sufficientBalance && txValid) {
+        System.out.println(cOk("✅ Transaction simulation successful! Transaction is ready to execute."));
+      } else {
+        System.out.println(
+            Ansi.ansi()
+                .fg(Ansi.Color.RED)
+                .a("❌ Simulation indicates this transaction may fail.")
+                .reset());
+      }
+    }
+
+    private void simulateErc20(
+        ChainProfile chainProfile, Web3j web3j, WalletMetadata walletMeta, String toAddress)
+        throws Exception {
+      if (!isHexAddress(token)) {
+        throw new IllegalArgumentException("Invalid token address: " + token);
+      }
+
+      BigInteger gasPriceWei = resolveGasPriceWei(web3j);
+      BigInteger rbtcBalanceWei =
+          web3j
+              .ethGetBalance(walletMeta.address(), DefaultBlockParameterName.LATEST)
+              .send()
+              .getBalance();
+
+      Function nameFn = new Function("name", List.of(), List.of(TypeReference.create(Utf8String.class)));
+      Function symbolFn = new Function("symbol", List.of(), List.of(TypeReference.create(Utf8String.class)));
+      Function decimalsFn = new Function("decimals", List.of(), List.of(TypeReference.create(Uint8.class)));
+      Function balanceOfFn =
+          new Function(
+              "balanceOf",
+              List.of(new Address(walletMeta.address())),
+              List.of(TypeReference.create(Uint256.class)));
+
+      String tokenName = "Unknown";
+      String tokenSymbol = "TOKEN";
+      int decimals = 18;
+      BigInteger tokenBalanceUnits = BigInteger.ZERO;
+      try {
+        List<Type> nameOut = ethCall(web3j, walletMeta.address(), token, nameFn);
+        if (!nameOut.isEmpty()) {
+          tokenName = ((Utf8String) nameOut.get(0)).getValue();
+        }
+      } catch (Exception ignored) {
+      }
+      try {
+        List<Type> symbolOut = ethCall(web3j, walletMeta.address(), token, symbolFn);
+        if (!symbolOut.isEmpty()) {
+          tokenSymbol = ((Utf8String) symbolOut.get(0)).getValue();
+        }
+      } catch (Exception ignored) {
+      }
+      try {
+        List<Type> decOut = ethCall(web3j, walletMeta.address(), token, decimalsFn);
+        if (!decOut.isEmpty()) {
+          decimals = ((Uint8) decOut.get(0)).getValue().intValue();
+        }
+      } catch (Exception ignored) {
+      }
+      try {
+        List<Type> balOut = ethCall(web3j, walletMeta.address(), token, balanceOfFn);
+        if (!balOut.isEmpty()) {
+          tokenBalanceUnits = ((Uint256) balOut.get(0)).getValue();
+        }
+      } catch (Exception ignored) {
+      }
+
+      BigInteger amountUnits = decimalToUnits(value, decimals);
+      Function transferFn =
+          new Function(
+              "transfer",
+              List.of(new Address(toAddress), new Uint256(amountUnits)),
+              List.of(TypeReference.create(Bool.class)));
+      String callData = (data != null && !data.isBlank()) ? data : FunctionEncoder.encode(transferFn);
+
+      boolean txValid = true;
+      try {
+        var callResp =
+            web3j
+                .ethCall(
+                    Transaction.createEthCallTransaction(walletMeta.address(), token, callData),
+                    DefaultBlockParameterName.LATEST)
+                .send();
+        if (callResp.hasError()) {
+          throw new IllegalStateException(callResp.getError().getMessage());
+        }
+      } catch (Exception ex) {
+        txValid = false;
+      }
+
+      BigInteger estimatedGas;
+      try {
+        EthEstimateGas estimate =
+            web3j
+                .ethEstimateGas(
+                    Transaction.createFunctionCallTransaction(
+                        walletMeta.address(),
+                        null,
+                        gasPriceWei,
+                        null,
+                        token,
+                        BigInteger.ZERO,
+                        callData))
+                .send();
+        if (estimate.hasError() || estimate.getAmountUsed() == null) {
+          throw new IllegalStateException(
+              estimate.getError() == null ? "Gas estimation failed" : estimate.getError().getMessage());
+        }
+        estimatedGas = estimate.getAmountUsed();
+      } catch (Exception ex) {
+        estimatedGas = gasLimit != null ? gasLimit : BigInteger.valueOf(100_000L);
+        txValid = false;
+      }
+      if (gasLimit != null) {
+        estimatedGas = gasLimit;
+      }
+
+      BigInteger gasCostWei = estimatedGas.multiply(gasPriceWei);
+      boolean sufficientToken = tokenBalanceUnits.compareTo(amountUnits) >= 0;
+      boolean sufficientGas = rbtcBalanceWei.compareTo(gasCostWei) >= 0;
+      BigInteger tokenAfter = tokenBalanceUnits.subtract(amountUnits);
+      BigInteger rbtcAfter = rbtcBalanceWei.subtract(gasCostWei);
+
+      System.out.println(cEmph("🔮 Simulating Transaction"));
+      System.out.println(cInfo("🔑 From Address: ") + walletMeta.address());
+      System.out.println(cInfo("🎯 To Address: ") + toAddress);
+      System.out.println(cInfo("💵 Amount: ") + value.toPlainString() + " tokens");
+      System.out.println();
+      System.out.println(cEmph("📊 SIMULATION RESULTS"));
+      System.out.println();
+      System.out.println(cInfo("Network: ") + chainProfile.name());
+      System.out.println(cInfo("Transaction Type: ") + "ERC20 Token Transfer");
+      System.out.println(
+          cInfo("Transfer Amount: ") + value.toPlainString() + " " + tokenSymbol);
+      System.out.println(
+          cInfo("Current Balance: ")
+              + unitsToDecimal(tokenBalanceUnits, decimals).toPlainString()
+              + " "
+              + tokenSymbol);
+      System.out.println(cInfo("Token Name: ") + tokenName);
+      System.out.println(cInfo("Token Contract: ") + token);
+      System.out.println(cInfo("Estimated Gas: ") + estimatedGas);
+      System.out.println(
+          cInfo("Gas Price: ")
+              + new BigDecimal(gasPriceWei).movePointLeft(9).stripTrailingZeros().toPlainString()
+              + " Gwei");
+      System.out.println(
+          cInfo("Total Gas Cost: ")
+              + unitsToDecimal(gasCostWei, 18).toPlainString()
+              + " "
+              + chainProfile.nativeSymbol());
+      System.out.println(
+          cInfo("RBTC Balance After Gas: ")
+              + unitsToDecimal(rbtcAfter.max(BigInteger.ZERO), 18).toPlainString()
+              + " "
+              + chainProfile.nativeSymbol());
+      System.out.println(
+          cInfo("Token Balance After Transfer: ")
+              + unitsToDecimal(tokenAfter.max(BigInteger.ZERO), decimals).toPlainString()
+              + " "
+              + tokenSymbol);
+      System.out.println();
+      System.out.println(cEmph("✅ VALIDATION RESULTS"));
+      System.out.println();
+      printValidation(
+          "Sufficient Token Balance",
+          sufficientToken,
+          "Enough tokens for transfer",
+          "Insufficient token balance");
+      printValidation(
+          "Sufficient Gas Balance",
+          sufficientGas,
+          "Enough RBTC for gas",
+          "Insufficient RBTC for gas");
+      printValidation(
+          "Transaction Validity",
+          txValid,
+          "Transaction simulation successful",
+          "Simulation call or gas estimation failed");
+      System.out.println();
+
+      if (sufficientToken && sufficientGas && txValid) {
+        System.out.println(cOk("✅ Transaction simulation successful! Transaction is ready to execute."));
+      } else {
+        System.out.println(
+            Ansi.ansi()
+                .fg(Ansi.Color.RED)
+                .a("❌ Simulation indicates this transaction may fail.")
+                .reset());
+      }
+    }
+
     @Override
     public Integer call() {
-      System.out.println("Simulation builder placeholder.");
+      if (value == null || value.compareTo(BigDecimal.ZERO) <= 0) {
+        throw new IllegalArgumentException("--value must be greater than zero.");
+      }
+      ChainProfile chainProfile = resolveChain(networkOptions);
+      WalletMetadata walletMeta = resolveWallet();
+      String toAddress = resolveAddressInput(chainProfile, address);
+
+      try (Web3j web3j = Web3j.build(new HttpService(chainProfile.rpcUrl()))) {
+        if (token == null || token.isBlank()) {
+          simulateRbtc(chainProfile, web3j, walletMeta, toAddress);
+        } else {
+          simulateErc20(chainProfile, web3j, walletMeta, toAddress);
+        }
+      } catch (Exception ex) {
+        throw new IllegalStateException("Simulation failed.", ex);
+      }
       return 0;
     }
   }
