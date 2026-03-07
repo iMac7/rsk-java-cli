@@ -1,9 +1,33 @@
 plugins {
     id 'java-library'
+    id 'com.gradleup.shadow' version '8.3.6'
 }
 
 dependencies {
     api project(':domain')
+    implementation project(':infrastructure')
     implementation 'org.web3j:core:4.12.3'
     implementation 'org.slf4j:slf4j-api:2.0.17'
+    implementation 'info.picocli:picocli:4.7.7'
+    annotationProcessor 'info.picocli:picocli-codegen:4.7.7'
+    implementation 'org.jline:jline:3.30.6'
+    implementation 'org.fusesource.jansi:jansi:2.4.2'
+}
+
+tasks.named('shadowJar') {
+    archiveBaseName.set('rsk-java-cli')
+    archiveClassifier.set('all')
+    archiveVersion.set('')
+    mergeServiceFiles()
+    manifest {
+        attributes 'Main-Class': 'com.rsk.java_cli.Cli'
+    }
+}
+
+tasks.register('runCli', JavaExec) {
+    group = 'application'
+    description = 'Run the RSK Java CLI from source without packaging a jar.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass.set('com.rsk.java_cli.Cli')
 }

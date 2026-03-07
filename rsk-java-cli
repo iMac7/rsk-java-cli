@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+JAR_PATH="$SCRIPT_DIR/application/build/libs/rsk-java-cli-all.jar"
+JAVA_EXE="${JAVA_HOME:-}/bin/java"
+
+"$SCRIPT_DIR/gradlew" :application:shadowJar >/dev/null 2>/dev/null
+
+if [[ ! -x "$JAVA_EXE" ]]; then
+  JAVA_EXE="java"
+fi
+
+exec "$JAVA_EXE" \
+  --enable-native-access=ALL-UNNAMED \
+  -Dfile.encoding=UTF-8 \
+  -Dorg.jline.terminal.encoding=UTF-8 \
+  -jar "$JAR_PATH" \
+  "$@"
