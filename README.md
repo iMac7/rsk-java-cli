@@ -131,19 +131,20 @@ evm-cli wallet delete alice-main
 ```
 
 `wallet backup`  
-Wallet backup TUI placeholder.
+Back up wallet json file.
+`Note` : Use / slashes even on windows for requested path
 Example:
 
 ```powershell
-evm-cli wallet backup
+rsk-java-cli wallet backup
 ```
 
 `wallet address-book`  
-Address book TUI placeholder.
+Store addresses.
 Example:
 
 ```powershell
-evm-cli wallet address-book
+rsk-java-cli wallet address-book
 ```
 
 `config`

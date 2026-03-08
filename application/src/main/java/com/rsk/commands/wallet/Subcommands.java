@@ -1,8 +1,10 @@
 package com.rsk.commands.wallet;
 
 import com.evmcli.domain.model.WalletMetadata;
+import com.rsk.utils.TerminalText;
 import java.io.Console;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -57,22 +59,23 @@ public class Subcommands {
       })
   public static class WalletCommand implements Callable<Integer> {
     private static final String[] MENU_ITEMS = {
-      "🆕 Create a new wallet",
-      "🔑 Import existing wallet",
-      "🔍 List saved wallets",
-      "🔁 Switch wallet",
-      "📝 Update wallet name",
-      "📒 Address book",
-      "📂 Backup wallet data",
-      "❌ Delete wallet",
-      "🚪 Exit"
+      TerminalText.pick("\uD83C\uDD95 Create a new wallet", "[new] Create a new wallet"),
+      TerminalText.pick("\uD83D\uDD11 Import existing wallet", "[import] Import existing wallet"),
+      TerminalText.pick("\uD83D\uDD0D List saved wallets", "[list] List saved wallets"),
+      TerminalText.pick("\uD83D\uDD10 Show wallet private key", "[dump] Show wallet private key"),
+      TerminalText.pick("\uD83D\uDD01 Switch wallet", "[switch] Switch wallet"),
+      TerminalText.pick("\uD83D\uDCDD Update wallet name", "[rename] Update wallet name"),
+      TerminalText.pick("\uD83D\uDCD2 Address book", "[book] Address book"),
+      TerminalText.pick("\uD83D\uDCC2 Backup wallet data", "[backup] Backup wallet data"),
+      TerminalText.pick("\u274C Delete wallet", "[delete] Delete wallet"),
+      TerminalText.pick("\uD83D\uDEAA Exit", "[exit] Exit")
     };
     private static final String[] ADDRESS_BOOK_MENU_ITEMS = {
-      "➕ Add address",
-      "📖 View address book",
-      "✏️ Update address",
-      "🗑️ Delete address",
-      "↩️ Back"
+      TerminalText.pick("\u2795 Add address", "[add] Add address"),
+      TerminalText.pick("\uD83D\uDCD6 View address book", "[view] View address book"),
+      TerminalText.pick("\u270F\uFE0F Update address", "[update] Update address"),
+      TerminalText.pick("\uD83D\uDDD1\uFE0F Delete address", "[delete] Delete address"),
+      TerminalText.pick("\u21A9\uFE0F Back", "[back] Back")
     };
     private static final int EXIT_INDEX = MENU_ITEMS.length - 1;
     private static final int ADDRESS_BOOK_BACK_INDEX = ADDRESS_BOOK_MENU_ITEMS.length - 1;
@@ -255,12 +258,13 @@ public class Subcommands {
         case 0 -> runCreateFlow();
         case 1 -> runImportFlow();
         case 2 -> new ListCmd().call();
-        case 3 -> runSwitchFlow();
-        case 4 -> runRenameFlow();
-        case 5 -> runAddressBookFlow();
-        case 6 -> new Backup().call();
-        case 7 -> runDeleteFlow();
-        case 8 -> {
+        case 3 -> runDumpFlow();
+        case 4 -> runSwitchFlow();
+        case 5 -> runRenameFlow();
+        case 6 -> runAddressBookFlow();
+        case 7 -> runBackupFlow();
+        case 8 -> runDeleteFlow();
+        case 9 -> {
           return;
         }
         default -> throw new IllegalArgumentException("Invalid wallet menu selection.");
@@ -289,6 +293,15 @@ public class Subcommands {
       System.out.println("Active wallet switched to " + cEmph(walletName));
     }
 
+    private void runDumpFlow() {
+      printCurrentWallet();
+      printWalletChoices();
+      String selectedWallet = readRequiredText("Wallet name");
+      char[] password = readPassword("Wallet password: ");
+      String privateKey = HELPERS.dumpPrivateKey(selectedWallet, password);
+      System.out.println(privateKey);
+    }
+
     private void runRenameFlow() {
       String walletName = readRequiredText("Current wallet name");
       String newName = readRequiredText("New wallet name");
@@ -297,6 +310,7 @@ public class Subcommands {
     }
 
     private void runDeleteFlow() {
+      printWalletChoices();
       String walletName = readRequiredText("Wallet name");
       String confirm = readRequiredText("Type DELETE to confirm");
       if (!"DELETE".equals(confirm)) {
@@ -305,6 +319,18 @@ public class Subcommands {
       }
       HELPERS.deleteWallet(walletName);
       System.out.println("Deleted wallet " + cEmph(walletName));
+    }
+
+    private void runBackupFlow() {
+      printCurrentWallet();
+      printWalletChoices();
+      String walletName = readRequiredText("Wallet name");
+      String backupPathInput =
+          readRequiredText("Enter an absolute directory path where you want to save the backup");
+      Path savedPath = HELPERS.backupWallet(walletName, backupPathInput);
+      System.out.println("Changes saved at " + savedPath);
+      System.out.println("Wallet backup created successfully!");
+      System.out.println("Backup saved successfully at: " + savedPath);
     }
 
     private void runAddressBookFlow() {
@@ -400,13 +426,21 @@ public class Subcommands {
       }
 
       String active = HELPERS.activeWallet().map(WalletMetadata::name).orElse("");
+      String activeMarker = TerminalText.pick("\u2B50", "*");
+      String inactiveMarker = TerminalText.pick("\u2022", "-");
       System.out.println("Available wallets:");
       wallets.forEach(
           wallet -> {
-            String marker = wallet.name().equals(active) ? "⭐" : "•";
+            String marker = wallet.name().equals(active) ? activeMarker : inactiveMarker;
             System.out.printf("%s %s %s%n", marker, cEmph(wallet.name()), wallet.address());
           });
       System.out.println();
+    }
+
+    private void printCurrentWallet() {
+      HELPERS
+          .activeWallet()
+          .ifPresent(wallet -> System.out.println("Current wallet: " + cEmph(wallet.name())));
     }
   }
 
@@ -550,7 +584,8 @@ public class Subcommands {
   static class Backup implements Callable<Integer> {
     @Override
     public Integer call() {
-      System.out.println("Wallet backup TUI placeholder.");
+      WalletCommand walletCommand = new WalletCommand();
+      walletCommand.runBackupFlow();
       return 0;
     }
   }

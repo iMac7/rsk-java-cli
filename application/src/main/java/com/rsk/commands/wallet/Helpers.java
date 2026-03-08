@@ -3,7 +3,10 @@ package com.rsk.commands.wallet;
 import com.evmcli.application.WalletService;
 import com.evmcli.domain.model.WalletMetadata;
 import com.evmcli.infrastructure.storage.JsonWalletRepository;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -56,6 +59,43 @@ public class Helpers {
 
   public String dumpPrivateKey(String walletName, char[] password) {
     return withWalletRegistryAccess(() -> walletService.dumpPrivateKey(walletName, password));
+  }
+
+  public WalletMetadata requireWallet(String walletName) {
+    return listWallets().stream()
+        .filter(wallet -> wallet.name().equals(walletName))
+        .findFirst()
+        .orElseThrow(() -> new IllegalArgumentException("Wallet not found: " + walletName));
+  }
+
+  public Path backupWallet(String walletName, String targetPathInput) {
+    WalletMetadata wallet = requireWallet(walletName);
+    Path targetDirectory = resolveBackupDirectory(targetPathInput);
+    Path targetPath = targetDirectory.resolve(wallet.name() + "_backup.json");
+
+    try {
+      Files.copy(
+          Path.of(wallet.keystorePath()), targetPath, StandardCopyOption.REPLACE_EXISTING);
+      return targetPath.toAbsolutePath().normalize();
+    } catch (IOException ex) {
+      throw new IllegalStateException("Unable to back up wallet " + walletName, ex);
+    }
+  }
+
+  public Path resolveBackupDirectory(String targetPathInput) {
+    if (targetPathInput == null || targetPathInput.isBlank()) {
+      throw new IllegalArgumentException("Backup path is required.");
+    }
+
+    String sanitizedPath = stripWrappingQuotes(targetPathInput.trim());
+    if (!looksLikeWindowsAbsolutePath(sanitizedPath)) {
+      throw new IllegalArgumentException("Backup path must be an absolute directory path.");
+    }
+    Path resolvedPath = Path.of(sanitizedPath).normalize();
+    if (!Files.exists(resolvedPath) || !Files.isDirectory(resolvedPath)) {
+      throw new IllegalArgumentException("Backup path must point to an existing directory.");
+    }
+    return resolvedPath;
   }
 
   public Map<String, String> listAddressBook() {
@@ -120,5 +160,18 @@ public class Helpers {
         addressBookStore.overwrite(addressBook);
       }
     }
+  }
+
+  private static String stripWrappingQuotes(String value) {
+    if (value.length() >= 2
+        && ((value.startsWith("\"") && value.endsWith("\""))
+            || (value.startsWith("'") && value.endsWith("'")))) {
+      return value.substring(1, value.length() - 1).trim();
+    }
+    return value;
+  }
+
+  private static boolean looksLikeWindowsAbsolutePath(String value) {
+    return value.matches("^[A-Za-z]:[\\\\/].*") || value.startsWith("\\\\");
   }
 }
