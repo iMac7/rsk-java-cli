@@ -1,64 +1,118 @@
 package com.rsk.commands.wallet;
 
-import com.evmcli.application.WalletService;
-import com.evmcli.domain.model.WalletMetadata;
-import com.evmcli.infrastructure.storage.JsonWalletRepository;
+import com.rsk.utils.Storage.JsonWalletRepository;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.function.Supplier;
 
 public class Helpers {
-  private final AddressBookStore addressBookStore;
-  private final WalletService walletService;
+  public record WalletMetadata(
+      UUID walletId,
+      String name,
+      String address,
+      String keystorePath,
+      Instant createdAt,
+      Instant lastUsedAt) {}
 
-  public Helpers(WalletService walletService, AddressBookStore addressBookStore) {
-    this.walletService = walletService;
+  public interface WalletPort {
+    WalletMetadata createWallet(String name, char[] password);
+
+    WalletMetadata importWallet(String name, String privateKeyHex, char[] password);
+
+    List<WalletMetadata> listWallets();
+
+    Optional<WalletMetadata> findByName(String name);
+
+    Optional<WalletMetadata> getActiveWallet();
+
+    void switchActiveWallet(String name);
+
+    void renameWallet(String oldName, String newName);
+
+    void deleteWallet(String name);
+  }
+
+  public interface WalletUnlockPort {
+    String unlockPrivateKeyHex(String walletName, char[] password);
+  }
+
+  public static class WalletRegistry {
+    private UUID activeWalletId;
+    private List<WalletMetadata> wallets = new ArrayList<>();
+
+    public UUID getActiveWalletId() {
+      return activeWalletId;
+    }
+
+    public void setActiveWalletId(UUID activeWalletId) {
+      this.activeWalletId = activeWalletId;
+    }
+
+    public List<WalletMetadata> getWallets() {
+      return wallets;
+    }
+
+    public void setWallets(List<WalletMetadata> wallets) {
+      this.wallets = wallets;
+    }
+  }
+
+  private final AddressBookStore addressBookStore;
+  private final WalletPort walletPort;
+  private final WalletUnlockPort walletUnlockPort;
+
+  public Helpers(
+      WalletPort walletPort, WalletUnlockPort walletUnlockPort, AddressBookStore addressBookStore) {
+    this.walletPort = walletPort;
+    this.walletUnlockPort = walletUnlockPort;
     this.addressBookStore = addressBookStore;
   }
 
   public static Helpers defaultHelpers() {
     Path homeDir = Path.of(System.getProperty("user.home"), ".evm-cli");
     JsonWalletRepository walletRepository = new JsonWalletRepository(homeDir);
-    WalletService walletService = new WalletService(walletRepository, walletRepository);
     AddressBookStore addressBookStore = new AddressBookStore(homeDir.resolve("wallets.json"));
-    return new Helpers(walletService, addressBookStore);
+    return new Helpers(walletRepository, walletRepository, addressBookStore);
   }
 
   public WalletMetadata createWallet(String walletName, char[] password) {
-    return preserveAddressBook(() -> walletService.create(walletName, password));
+    return preserveAddressBook(() -> walletPort.createWallet(walletName, password));
   }
 
   public WalletMetadata importWallet(String walletName, String privateKeyHex, char[] password) {
-    return preserveAddressBook(() -> walletService.importPrivateKey(walletName, privateKeyHex, password));
+    return preserveAddressBook(() -> walletPort.importWallet(walletName, privateKeyHex, password));
   }
 
   public List<WalletMetadata> listWallets() {
-    return withWalletRegistryAccess(walletService::list);
+    return withWalletRegistryAccess(walletPort::listWallets);
   }
 
   public Optional<WalletMetadata> activeWallet() {
-    return withWalletRegistryAccess(walletService::active);
+    return withWalletRegistryAccess(walletPort::getActiveWallet);
   }
 
   public void switchWallet(String walletName) {
-    preserveAddressBook(() -> walletService.switchActive(walletName));
+    preserveAddressBook(() -> walletPort.switchActiveWallet(walletName));
   }
 
   public void renameWallet(String walletName, String newName) {
-    preserveAddressBook(() -> walletService.rename(walletName, newName));
+    preserveAddressBook(() -> walletPort.renameWallet(walletName, newName));
   }
 
   public void deleteWallet(String walletName) {
-    preserveAddressBook(() -> walletService.delete(walletName));
+    preserveAddressBook(() -> walletPort.deleteWallet(walletName));
   }
 
   public String dumpPrivateKey(String walletName, char[] password) {
-    return withWalletRegistryAccess(() -> walletService.dumpPrivateKey(walletName, password));
+    return withWalletRegistryAccess(() -> walletUnlockPort.unlockPrivateKeyHex(walletName, password));
   }
 
   public WalletMetadata requireWallet(String walletName) {

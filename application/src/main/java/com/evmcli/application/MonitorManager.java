@@ -1,7 +1,6 @@
 package com.evmcli.application;
 
-import com.evmcli.domain.model.MonitorSession;
-import com.evmcli.domain.port.MonitorSessionPort;
+import com.rsk.utils.Monitorsession;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -9,31 +8,31 @@ import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 
 public class MonitorManager {
-  private final MonitorSessionPort sessionPort;
+  private final Monitorsession.MonitorSessionPort sessionPort;
   private final ExecutorService executorService;
 
-  public MonitorManager(MonitorSessionPort sessionPort) {
+  public MonitorManager(Monitorsession.MonitorSessionPort sessionPort) {
     this.sessionPort = sessionPort;
     this.executorService = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor();
   }
 
-  public List<MonitorSession> list() {
+  public List<Monitorsession.MonitorSession> list() {
     return sessionPort.list();
   }
 
-  public Optional<MonitorSession> find(UUID id) {
+  public Optional<Monitorsession.MonitorSession> find(UUID id) {
     return sessionPort.find(id);
   }
 
-  public MonitorSession startTxConfirmations(
+  public Monitorsession.MonitorSession startTxConfirmations(
       String chainRef, String txHash, int pollIntervalSeconds, int confirmationsRequired) {
-    MonitorSession session = new MonitorSession();
+    Monitorsession.MonitorSession session = new Monitorsession.MonitorSession();
     session.setId(UUID.randomUUID());
     session.setChainRef(chainRef);
-    session.setType(MonitorSession.Type.TX_CONFIRMATIONS);
+    session.setType(Monitorsession.MonitorSession.Type.TX_CONFIRMATIONS);
     session.setTarget(txHash);
     session.setCreatedAt(Instant.now());
-    session.setStatus(MonitorSession.Status.ACTIVE);
+    session.setStatus(Monitorsession.MonitorSession.Status.ACTIVE);
     session.setPollIntervalSeconds(pollIntervalSeconds);
     session.setConfirmationsRequired(confirmationsRequired);
     session.setCheckCount(0);
@@ -42,7 +41,7 @@ public class MonitorManager {
     executorService.submit(
         () -> {
           try {
-            while (session.getStatus() == MonitorSession.Status.ACTIVE) {
+            while (session.getStatus() == Monitorsession.MonitorSession.Status.ACTIVE) {
               session.setCheckCount(session.getCheckCount() + 1);
               session.setLastCheckedAt(Instant.now());
               sessionPort.save(session);
@@ -60,7 +59,7 @@ public class MonitorManager {
     sessionPort.find(id)
         .ifPresent(
             session -> {
-              session.setStatus(MonitorSession.Status.STOPPED);
+              session.setStatus(Monitorsession.MonitorSession.Status.STOPPED);
               sessionPort.save(session);
             });
   }

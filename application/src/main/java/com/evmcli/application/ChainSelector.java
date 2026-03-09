@@ -1,7 +1,7 @@
 package com.evmcli.application;
 
-import com.evmcli.domain.model.ChainProfile;
-import com.evmcli.domain.model.CliConfig;
+import com.rsk.commands.config.CliConfig;
+import com.rsk.utils.Chain.ChainProfile;
 
 public final class ChainSelector {
   private ChainSelector() {}

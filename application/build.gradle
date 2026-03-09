@@ -3,10 +3,26 @@ plugins {
     id 'com.gradleup.shadow' version '8.3.6'
 }
 
+sourceSets {
+    main {
+        java {
+            setSrcDirs(['src/main/java'])
+            include 'com/rsk/**'
+        }
+    }
+    test {
+        java {
+            setSrcDirs(['src/test/java'])
+            include 'com/rsk/**'
+        }
+    }
+}
+
 dependencies {
-    api project(':domain')
-    implementation project(':infrastructure')
     implementation 'org.web3j:core:4.12.3'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.20.0'
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.20.0'
+    implementation 'com.squareup.okhttp3:okhttp:5.1.0'
     implementation 'org.slf4j:slf4j-api:2.0.17'
     implementation 'info.picocli:picocli:4.7.7'
     annotationProcessor 'info.picocli:picocli-codegen:4.7.7'

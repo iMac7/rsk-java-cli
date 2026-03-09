@@ -1,8 +1,6 @@
 package com.rsk.commands.config;
 
-import com.evmcli.domain.model.CliConfig;
-import com.evmcli.domain.port.ConfigPort;
-import com.evmcli.infrastructure.storage.JsonConfigRepository;
+import com.rsk.utils.Storage.JsonConfigRepository;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 

@@ -1,8 +1,7 @@
 package com.rsk.commands.config;
 
-import com.evmcli.domain.model.ChainFeatures;
-import com.evmcli.domain.model.ChainProfile;
-import com.evmcli.domain.model.CliConfig;
+import com.rsk.utils.Chain.ChainFeatures;
+import com.rsk.utils.Chain.ChainProfile;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import org.fusesource.jansi.Ansi;

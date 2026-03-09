@@ -1,13 +1,13 @@
 package com.evmcli.application;
 
-import com.evmcli.domain.model.ChainProfile;
-import com.evmcli.domain.port.RpcPort;
+import com.rsk.utils.Chain.ChainProfile;
+import com.rsk.utils.Rpc;
 import java.util.Optional;
 
 public class TxService {
-  private final RpcPort rpcPort;
+  private final Rpc.RpcPort rpcPort;
 
-  public TxService(RpcPort rpcPort) {
+  public TxService(Rpc.RpcPort rpcPort) {
     this.rpcPort = rpcPort;
   }
 

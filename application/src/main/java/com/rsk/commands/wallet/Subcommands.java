@@ -1,6 +1,6 @@
 package com.rsk.commands.wallet;
 
-import com.evmcli.domain.model.WalletMetadata;
+import com.rsk.commands.wallet.Helpers.WalletMetadata;
 import com.rsk.utils.TerminalText;
 import java.io.Console;
 import java.nio.charset.StandardCharsets;

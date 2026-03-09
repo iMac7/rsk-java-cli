@@ -1,6 +1,9 @@
 package com.rsk.java_cli;
 
 import com.rsk.commands.config.Subcommands.ConfigCommand;
+import com.rsk.commands.balance.Subcommands.BalanceCommand;
+import com.rsk.commands.transfer.Subcommands.TransferCommand;
+import com.rsk.commands.tx.Subcommands.TxCommand;
 import com.rsk.commands.wallet.Subcommands;
 import java.util.concurrent.Callable;
 import picocli.CommandLine;
@@ -47,7 +50,13 @@ public class CliHelpers {
       name = "rsk-java-cli",
       description = "RSK Java CLI",
       mixinStandardHelpOptions = true,
-      subcommands = {Subcommands.WalletCommand.class, ConfigCommand.class})
+      subcommands = {
+        Subcommands.WalletCommand.class,
+        ConfigCommand.class,
+        BalanceCommand.class,
+        TransferCommand.class,
+        TxCommand.class
+      })
   static class RootCommand implements Callable<Integer> {
     @Spec CommandSpec spec;
 

@@ -2,9 +2,9 @@ package com.evmcli.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.evmcli.domain.model.ChainFeatures;
-import com.evmcli.domain.model.ChainProfile;
-import com.evmcli.domain.model.CliConfig;
+import com.rsk.commands.config.CliConfig;
+import com.rsk.utils.Chain.ChainFeatures;
+import com.rsk.utils.Chain.ChainProfile;
 import org.junit.jupiter.api.Test;
 
 class ChainSelectorTest {

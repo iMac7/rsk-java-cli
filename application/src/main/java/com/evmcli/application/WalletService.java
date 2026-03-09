@@ -1,8 +1,8 @@
 package com.evmcli.application;
 
-import com.evmcli.domain.model.WalletMetadata;
-import com.evmcli.domain.port.WalletPort;
-import com.evmcli.domain.port.WalletUnlockPort;
+import com.rsk.commands.wallet.Helpers.WalletMetadata;
+import com.rsk.commands.wallet.Helpers.WalletPort;
+import com.rsk.commands.wallet.Helpers.WalletUnlockPort;
 import java.util.List;
 import java.util.Optional;
 

@@ -1,15 +1,15 @@
 package com.evmcli.application;
 
-import com.evmcli.domain.model.ChainProfile;
-import com.evmcli.domain.port.RpcPort;
-import com.evmcli.domain.port.WalletUnlockPort;
+import com.rsk.commands.wallet.Helpers.WalletUnlockPort;
+import com.rsk.utils.Chain.ChainProfile;
+import com.rsk.utils.Rpc;
 import java.math.BigInteger;
 
 public class TransferService {
-  private final RpcPort rpcPort;
+  private final Rpc.RpcPort rpcPort;
   private final WalletUnlockPort walletUnlockPort;
 
-  public TransferService(RpcPort rpcPort, WalletUnlockPort walletUnlockPort) {
+  public TransferService(Rpc.RpcPort rpcPort, WalletUnlockPort walletUnlockPort) {
     this.rpcPort = rpcPort;
     this.walletUnlockPort = walletUnlockPort;
   }

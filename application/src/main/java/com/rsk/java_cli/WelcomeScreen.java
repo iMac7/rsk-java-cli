@@ -20,10 +20,21 @@ public class WelcomeScreen {
     System.out.println(ORANGE + "  -h, --help" + RESET + WHITE + "                display help for command" + RESET);
     System.out.println();
     printMenuItem(TerminalText.pick("\uD83D\uDD11 wallet    ", "wallet      "), "Wallet management");
-    printMenuItem(TerminalText.pick("\uD83D\uDCB0 balance   ", "balance     "), "Coming soon");
-    printMenuItem(TerminalText.pick("\uD83D\uDE80 transfer  ", "transfer    "), "Coming soon");
-    printMenuItem(TerminalText.pick("\uD83E\uDDFE tx        ", "tx          "), "Coming soon");
     printMenuItem(TerminalText.pick("\u2699\uFE0F config    ", "config      "), "Config UI");
+    printMenuItem(TerminalText.pick("\uD83D\uDCB0 balance   ", "balance     "), "Check native balance");
+    printMenuItem(TerminalText.pick("\uD83D\uDE80 transfer  ", "transfer    "), "Send native transfer");
+    printMenuItem(TerminalText.pick("\uD83E\uDDFE tx        ", "tx          "), "Transaction status");
+    printMenuItem(TerminalText.pick("\uD83D\uDCE1 monitor   ", "monitor     "), "Coming soon");
+    printMenuItem(TerminalText.pick("\uD83D\uDD0E resolve   ", "resolve     "), "Coming soon");
+    printMenuItem(TerminalText.pick("\uD83D\uDEE0\uFE0F deploy    ", "deploy      "), "Coming soon");
+    printMenuItem(TerminalText.pick("\u2705 verify    ", "verify      "), "Coming soon");
+    printMenuItem(TerminalText.pick("\uD83D\uDCDC contract  ", "contract    "), "Coming soon");
+    printMenuItem(TerminalText.pick("\uD83C\uDF09 bridge    ", "bridge      "), "Coming soon");
+    printMenuItem(TerminalText.pick("\u26FD gas       ", "gas         "), "Coming soon");
+    printMenuItem(TerminalText.pick("\uD83D\uDD58 history   ", "history     "), "Coming soon");
+    printMenuItem(TerminalText.pick("\uD83D\uDCE6 batch-transfer", "batch-transfer"), "Coming soon");
+    printMenuItem(TerminalText.pick("\uD83E\uDDF1 transaction", "transaction "), "Coming soon");
+    printMenuItem(TerminalText.pick("\uD83E\uDDEA simulate  ", "simulate    "), "Coming soon");
     System.out.println();
     System.out.println(SOFT_ORANGE + "Type 'clear' to start over, 'exit' to quit." + RESET);
   }

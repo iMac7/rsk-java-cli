@@ -12,5 +12,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = 'evm-cli'
-include 'domain', 'application', 'infrastructure', 'cli-app'
+rootProject.name = 'java-cli'
+include 'application'
