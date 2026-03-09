@@ -2,12 +2,16 @@ package com.rsk.java_cli;
 
 import com.rsk.commands.config.Subcommands.ConfigCommand;
 import com.rsk.commands.balance.Subcommands.BalanceCommand;
+import com.rsk.commands.bridge.Subcommands.BridgeCommand;
+import com.rsk.commands.contract.Subcommands.ContractCommand;
 import com.rsk.commands.deploy.Subcommands.DeployCommand;
+import com.rsk.commands.history.Subcommands.HistoryCommand;
 import com.rsk.commands.monitor.Subcommands.MonitorCommand;
 import com.rsk.commands.resolve.Subcommands.ResolveCommand;
 import com.rsk.commands.transfer.Subcommands.TransferCommand;
 import com.rsk.commands.tx.Subcommands.TxCommand;
-import com.rsk.commands.wallet.Subcommands;
+import com.rsk.commands.verify.Subcommands.VerifyCommand;
+import com.rsk.commands.wallet.Subcommands.WalletCommand;
 import java.util.concurrent.Callable;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -54,14 +58,18 @@ public class CliHelpers {
       description = "RSK Java CLI",
       mixinStandardHelpOptions = true,
       subcommands = {
-        Subcommands.WalletCommand.class,
+        WalletCommand.class,
         ConfigCommand.class,
         BalanceCommand.class,
+        BridgeCommand.class,
+        ContractCommand.class,
         DeployCommand.class,
+        HistoryCommand.class,
         MonitorCommand.class,
         ResolveCommand.class,
         TransferCommand.class,
-        TxCommand.class
+        TxCommand.class,
+        VerifyCommand.class
       })
   static class RootCommand implements Callable<Integer> {
     @Spec CommandSpec spec;

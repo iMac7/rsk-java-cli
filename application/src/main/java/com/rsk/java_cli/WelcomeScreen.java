@@ -27,11 +27,11 @@ public class WelcomeScreen {
     printMenuItem(TerminalText.pick("\uD83D\uDCE1 monitor   ", "monitor     "), "Session monitoring");
     printMenuItem(TerminalText.pick("\uD83D\uDD0E resolve   ", "resolve     "), "Resolve names");
     printMenuItem(TerminalText.pick("\uD83D\uDEE0\uFE0F deploy    ", "deploy      "), "Deploy contract");
-    printMenuItem(TerminalText.pick("\u2705 verify    ", "verify      "), "Coming soon");
-    printMenuItem(TerminalText.pick("\uD83D\uDCDC contract  ", "contract    "), "Coming soon");
-    printMenuItem(TerminalText.pick("\uD83C\uDF09 bridge    ", "bridge      "), "Coming soon");
+    printMenuItem(TerminalText.pick("\u2705 verify    ", "verify      "), "Verify contract");
+    printMenuItem(TerminalText.pick("\uD83D\uDCDC contract  ", "contract    "), "Interactive contract mode");
+    printMenuItem(TerminalText.pick("\uD83C\uDF09 bridge    ", "bridge      "), "Bridge flow");
     printMenuItem(TerminalText.pick("\u26FD gas       ", "gas         "), "Coming soon");
-    printMenuItem(TerminalText.pick("\uD83D\uDD58 history   ", "history     "), "Coming soon");
+    printMenuItem(TerminalText.pick("\uD83D\uDD58 history   ", "history     "), "History API");
     printMenuItem(TerminalText.pick("\uD83D\uDCE6 batch-transfer", "batch-transfer"), "Coming soon");
     printMenuItem(TerminalText.pick("\uD83E\uDDF1 transaction", "transaction "), "Coming soon");
     printMenuItem(TerminalText.pick("\uD83E\uDDEA simulate  ", "simulate    "), "Coming soon");
