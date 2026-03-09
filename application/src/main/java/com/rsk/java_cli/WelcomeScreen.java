@@ -24,9 +24,9 @@ public class WelcomeScreen {
     printMenuItem(TerminalText.pick("\uD83D\uDCB0 balance   ", "balance     "), "Check native balance");
     printMenuItem(TerminalText.pick("\uD83D\uDE80 transfer  ", "transfer    "), "Send native transfer");
     printMenuItem(TerminalText.pick("\uD83E\uDDFE tx        ", "tx          "), "Transaction status");
-    printMenuItem(TerminalText.pick("\uD83D\uDCE1 monitor   ", "monitor     "), "Coming soon");
-    printMenuItem(TerminalText.pick("\uD83D\uDD0E resolve   ", "resolve     "), "Coming soon");
-    printMenuItem(TerminalText.pick("\uD83D\uDEE0\uFE0F deploy    ", "deploy      "), "Coming soon");
+    printMenuItem(TerminalText.pick("\uD83D\uDCE1 monitor   ", "monitor     "), "Session monitoring");
+    printMenuItem(TerminalText.pick("\uD83D\uDD0E resolve   ", "resolve     "), "Resolve names");
+    printMenuItem(TerminalText.pick("\uD83D\uDEE0\uFE0F deploy    ", "deploy      "), "Deploy contract");
     printMenuItem(TerminalText.pick("\u2705 verify    ", "verify      "), "Coming soon");
     printMenuItem(TerminalText.pick("\uD83D\uDCDC contract  ", "contract    "), "Coming soon");
     printMenuItem(TerminalText.pick("\uD83C\uDF09 bridge    ", "bridge      "), "Coming soon");

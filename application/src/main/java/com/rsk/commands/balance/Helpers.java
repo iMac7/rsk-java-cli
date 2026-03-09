@@ -82,10 +82,10 @@ public class Helpers {
       throw new IllegalArgumentException("Address value is required.");
     }
     String trimmed = value.trim();
-    if (isHexAddress(trimmed)) {
+    if (Rns.isHexAddress(trimmed)) {
       return trimmed;
     }
-    if (!isValidRnsName(trimmed)) {
+    if (!Rns.isValidRnsName(trimmed)) {
       throw new IllegalArgumentException(
           "Invalid RNS format: " + trimmed + ". Expected domain-like format, e.g. alice.rsk");
     }
@@ -116,32 +116,5 @@ public class Helpers {
       return "testnet";
     }
     return normalized;
-  }
-
-  private static boolean isHexAddress(String value) {
-    return value != null && value.matches("(?i)^0x[a-f0-9]{40}$");
-  }
-
-  private static boolean isValidRnsName(String value) {
-    if (value == null) {
-      return false;
-    }
-    String normalized = value.trim().toLowerCase();
-    if (normalized.length() < 3 || normalized.length() > 255 || !normalized.contains(".")) {
-      return false;
-    }
-    if (normalized.startsWith(".") || normalized.endsWith(".")) {
-      return false;
-    }
-    String[] labels = normalized.split("\\.");
-    for (String label : labels) {
-      if (label.isEmpty() || label.length() > 63) {
-        return false;
-      }
-      if (!label.matches("^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$")) {
-        return false;
-      }
-    }
-    return true;
   }
 }

@@ -2,6 +2,9 @@ package com.rsk.java_cli;
 
 import com.rsk.commands.config.Subcommands.ConfigCommand;
 import com.rsk.commands.balance.Subcommands.BalanceCommand;
+import com.rsk.commands.deploy.Subcommands.DeployCommand;
+import com.rsk.commands.monitor.Subcommands.MonitorCommand;
+import com.rsk.commands.resolve.Subcommands.ResolveCommand;
 import com.rsk.commands.transfer.Subcommands.TransferCommand;
 import com.rsk.commands.tx.Subcommands.TxCommand;
 import com.rsk.commands.wallet.Subcommands;
@@ -54,6 +57,9 @@ public class CliHelpers {
         Subcommands.WalletCommand.class,
         ConfigCommand.class,
         BalanceCommand.class,
+        DeployCommand.class,
+        MonitorCommand.class,
+        ResolveCommand.class,
         TransferCommand.class,
         TxCommand.class
       })

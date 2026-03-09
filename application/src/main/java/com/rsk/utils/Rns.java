@@ -53,6 +53,53 @@ public final class Rns {
     }
   }
 
+  public static Optional<String> reverseLookup(String rpcUrl, String address) {
+    try (Web3j web3j = Web3j.build(new HttpService(rpcUrl))) {
+      String registry = resolveRegistryAddress(web3j);
+      String normalized = normalizeAddress(address);
+      String reverseName = normalized.substring(2).toLowerCase(Locale.ROOT) + ".addr.reverse";
+      byte[] reverseNode = namehash(reverseName);
+      String resolver = registryResolver(web3j, registry, reverseNode);
+      if (isZeroAddress(resolver)) {
+        return Optional.empty();
+      }
+      String name = resolverName(web3j, resolver, reverseNode);
+      if (name == null || name.isBlank()) {
+        return Optional.empty();
+      }
+      return Optional.of(name);
+    } catch (Exception ex) {
+      throw new IllegalStateException("RNS reverse lookup failed for '" + address + "'", ex);
+    }
+  }
+
+  public static boolean isHexAddress(String value) {
+    return value != null && value.matches("(?i)^0x[a-f0-9]{40}$");
+  }
+
+  public static boolean isValidRnsName(String value) {
+    if (value == null) {
+      return false;
+    }
+    String normalized = value.trim().toLowerCase(Locale.ROOT);
+    if (normalized.length() < 3 || normalized.length() > 255 || !normalized.contains(".")) {
+      return false;
+    }
+    if (normalized.startsWith(".") || normalized.endsWith(".")) {
+      return false;
+    }
+    String[] labels = normalized.split("\\.");
+    for (String label : labels) {
+      if (label.isEmpty() || label.length() > 63) {
+        return false;
+      }
+      if (!label.matches("^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$")) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   private static String resolveRegistryAddress(Web3j web3j) throws Exception {
     long chainId = web3j.ethChainId().send().getChainId().longValueExact();
     if (chainId == CHAIN_ID_MAINNET) {
@@ -109,6 +156,19 @@ public final class Rns {
       return "0x" + Numeric.toHexStringNoPrefix(last20);
     }
     return ZERO_ADDRESS;
+  }
+
+  private static String resolverName(Web3j web3j, String resolver, byte[] node) throws Exception {
+    Function function =
+        new Function(
+            "name",
+            List.of(new Bytes32(node)),
+            List.of(TypeReference.create(Utf8String.class)));
+    List<Type> output = call(web3j, resolver, function);
+    if (output.isEmpty()) {
+      return null;
+    }
+    return ((Utf8String) output.get(0)).getValue();
   }
 
   private static List<Type> call(Web3j web3j, String to, Function function) throws Exception {

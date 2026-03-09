@@ -8,74 +8,34 @@ import com.rsk.utils.Rpc;
 import com.rsk.utils.Storage;
 import java.nio.file.Path;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.concurrent.Callable;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
 public class Subcommands {
   private static final Helpers HELPERS = defaultHelpers();
+  private static final com.rsk.commands.monitor.Helpers MONITOR_HELPERS =
+      com.rsk.commands.monitor.Helpers.defaultHelpers();
 
   private Subcommands() {}
 
   private static Helpers defaultHelpers() {
-    Path homeDir = Path.of(System.getProperty("user.home"), ".evm-cli");
-    return new Helpers(
-        new Rpc.Web3jRpcGateway(), new Storage.JsonMonitorSessionRepository(homeDir));
+    return new Helpers(new Rpc.Web3jRpcGateway());
   }
 
   @Command(
       name = "tx",
-      description = "Transaction tools",
-      mixinStandardHelpOptions = true,
-      subcommands = {Status.class, Monitor.class})
+      description = "Transaction status",
+      mixinStandardHelpOptions = true)
   public static class TxCommand implements Callable<Integer> {
-    @Override
-    public Integer call() {
-      throw new picocli.CommandLine.ParameterException(
-          new picocli.CommandLine(this), "Specify a tx subcommand.");
-    }
-  }
+    @Option(names = "--txid", required = true, paramLabel = "<hash>", description = "Transaction hash")
+    String txid;
 
-  @Command(name = "status", description = "Show transaction receipt status", mixinStandardHelpOptions = true)
-  static class Status implements Callable<Integer> {
-    @Option(names = "--tx", required = true, paramLabel = "<hash>", description = "Transaction hash")
-    String txHash;
-
-    @Option(names = "--mainnet", description = "Use chains.mainnet")
-    boolean mainnet;
-
-    @Option(names = "--testnet", description = "Use chains.testnet")
-    boolean testnet;
-
-    @Option(
-        names = "--chain",
-        paramLabel = "<name>",
-        description = "Use config chain key, e.g. chains.custom.<name> or <name>")
-    String chain;
-
-    @Option(names = "--chainurl", paramLabel = "<url>", description = "Use an explicit RPC URL")
-    String chainUrl;
-
-    @Override
-    public Integer call() {
-      ChainProfile chainProfile = resolveChain(mainnet, testnet, chain, chainUrl);
-      Optional<String> status = HELPERS.receiptStatus(chainProfile, txHash);
-      System.out.println(status.orElse("PENDING"));
-      return 0;
-    }
-  }
-
-  @Command(name = "monitor", description = "Start tx confirmation monitor", mixinStandardHelpOptions = true)
-  static class Monitor implements Callable<Integer> {
-    @Option(names = "--tx", required = true, paramLabel = "<hash>", description = "Transaction hash")
-    String txHash;
-
-    @Option(names = "--interval", defaultValue = "10", description = "Polling interval in seconds")
-    int pollIntervalSeconds;
+    @Option(names = "--monitor", description = "Start a confirmation monitor session")
+    boolean monitor;
 
     @Option(names = "--confirmations", defaultValue = "1", description = "Required confirmations")
-    int confirmationsRequired;
+    int confirmations;
 
     @Option(names = "--mainnet", description = "Use chains.mainnet")
     boolean mainnet;
@@ -95,10 +55,14 @@ public class Subcommands {
     @Override
     public Integer call() {
       ChainProfile chainProfile = resolveChain(mainnet, testnet, chain, chainUrl);
-      Monitorsession.MonitorSession session =
-          HELPERS.startTxConfirmations(
-              chainProfile.name(), txHash, pollIntervalSeconds, confirmationsRequired);
-      System.out.printf("Started monitor session %s for %s%n", session.getId(), txHash);
+      if (monitor) {
+        Monitorsession.MonitorSession session =
+            MONITOR_HELPERS.startTxConfirmations(chainProfile.name(), txid, 10, confirmations);
+        System.out.println("Monitor session started: " + session.getId());
+        return 0;
+      }
+      Optional<String> status = HELPERS.receiptStatus(chainProfile, txid);
+      System.out.println(status.map(s -> "Receipt status: " + s).orElse("Receipt not found yet."));
       return 0;
     }
   }

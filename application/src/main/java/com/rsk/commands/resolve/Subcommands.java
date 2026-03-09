@@ -1,0 +1,59 @@
+package com.rsk.commands.resolve;
+
+import com.rsk.utils.Chain.ChainProfile;
+import java.util.concurrent.Callable;
+import picocli.CommandLine.ArgGroup;
+import picocli.CommandLine.Command;
+import picocli.CommandLine.Option;
+import picocli.CommandLine.Parameters;
+
+public class Subcommands {
+  private static final Helpers HELPERS = Helpers.defaultHelpers();
+
+  private Subcommands() {}
+
+  @Command(name = "resolve", description = "Resolve names", mixinStandardHelpOptions = true)
+  public static class ResolveCommand implements Callable<Integer> {
+    @Parameters(index = "0", paramLabel = "<value>", description = "RNS name or address")
+    String value;
+
+    @Option(names = "--reverse", description = "Resolve address to RNS name")
+    boolean reverse;
+
+    @ArgGroup(exclusive = true, multiplicity = "0..1")
+    NetworkOptions networkOptions = new NetworkOptions();
+
+    static class NetworkOptions {
+      @Option(names = "--mainnet", description = "Use chains.mainnet")
+      boolean mainnet;
+
+      @Option(names = "--testnet", description = "Use chains.testnet")
+      boolean testnet;
+
+      @Option(
+          names = "--chain",
+          paramLabel = "<name>",
+          description = "Use config chain key, e.g. chains.custom.<name> or <name>")
+      String chain;
+
+      @Option(names = "--chainurl", paramLabel = "<url>", description = "Use an explicit RPC URL")
+      String chainUrl;
+    }
+
+    @Override
+    public Integer call() {
+      ChainProfile chainProfile =
+          HELPERS.resolveChain(
+              networkOptions.mainnet,
+              networkOptions.testnet,
+              networkOptions.chain,
+              networkOptions.chainUrl);
+      String resolved =
+          reverse
+              ? HELPERS.reverseResolve(chainProfile, value)
+              : HELPERS.resolveName(chainProfile, value);
+      System.out.println(resolved);
+      return 0;
+    }
+  }
+}
