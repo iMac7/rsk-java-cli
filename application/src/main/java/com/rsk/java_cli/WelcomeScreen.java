@@ -34,7 +34,7 @@ public class WelcomeScreen {
     printMenuItem(TerminalText.pick("\uD83D\uDD58 history   ", "history     "), "History API");
     printMenuItem(TerminalText.pick("\uD83D\uDCE6 batch-transfer", "batch-transfer"), "Coming soon");
     printMenuItem(TerminalText.pick("\uD83E\uDDF1 transaction", "transaction "), "Coming soon");
-    printMenuItem(TerminalText.pick("\uD83E\uDDEA simulate  ", "simulate    "), "Coming soon");
+    printMenuItem(TerminalText.pick("\uD83E\uDDEA simulate  ", "simulate    "), "Simulation builder");
     System.out.println();
     System.out.println(SOFT_ORANGE + "Type 'clear' to start over, 'exit' to quit." + RESET);
   }

@@ -8,6 +8,7 @@ import com.rsk.commands.deploy.Subcommands.DeployCommand;
 import com.rsk.commands.history.Subcommands.HistoryCommand;
 import com.rsk.commands.monitor.Subcommands.MonitorCommand;
 import com.rsk.commands.resolve.Subcommands.ResolveCommand;
+import com.rsk.commands.simulate.Subcommands.SimulateCommand;
 import com.rsk.commands.transfer.Subcommands.TransferCommand;
 import com.rsk.commands.tx.Subcommands.TxCommand;
 import com.rsk.commands.verify.Subcommands.VerifyCommand;
@@ -67,6 +68,7 @@ public class CliHelpers {
         HistoryCommand.class,
         MonitorCommand.class,
         ResolveCommand.class,
+        SimulateCommand.class,
         TransferCommand.class,
         TxCommand.class,
         VerifyCommand.class
