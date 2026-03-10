@@ -69,7 +69,7 @@ public class Subcommands {
 
   private static ChainProfile resolveChain(
       boolean mainnet, boolean testnet, String chain, String chainUrl) {
-    Path homeDir = Path.of(System.getProperty("user.home"), ".evm-cli");
+    Path homeDir = Path.of(System.getProperty("user.home"), ".rsk-java-cli");
     com.rsk.commands.config.CliConfig config =
         new com.rsk.commands.config.Helpers(new Storage.JsonConfigRepository(homeDir)).loadConfig();
     if (chainUrl != null && !chainUrl.isBlank()) {

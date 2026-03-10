@@ -77,7 +77,7 @@ public class Helpers {
   }
 
   public static Helpers defaultHelpers() {
-    Path homeDir = Path.of(System.getProperty("user.home"), ".evm-cli");
+    Path homeDir = Path.of(System.getProperty("user.home"), ".rsk-java-cli");
     JsonWalletRepository walletRepository = new JsonWalletRepository(homeDir);
     AddressBookStore addressBookStore = new AddressBookStore(homeDir.resolve("wallets.json"));
     return new Helpers(walletRepository, walletRepository, addressBookStore);

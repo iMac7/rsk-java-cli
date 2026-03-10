@@ -15,7 +15,7 @@ public class Helpers {
   }
 
   public static Helpers defaultHelpers() {
-    Path homeDir = Path.of(System.getProperty("user.home"), ".evm-cli");
+    Path homeDir = Path.of(System.getProperty("user.home"), ".rsk-java-cli");
     return new Helpers(new com.rsk.commands.config.Helpers(new Storage.JsonConfigRepository(homeDir)));
   }
 
