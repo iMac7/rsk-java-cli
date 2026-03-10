@@ -12,7 +12,7 @@ public class Subcommands {
 
   private Subcommands() {}
 
-  @Command(name = "resolve", description = "Resolve names", mixinStandardHelpOptions = true)
+  @Command(name = "resolve", description = "Resolve RNS names to and from addresses", mixinStandardHelpOptions = true)
   public static class ResolveCommand implements Callable<Integer> {
     @Parameters(index = "0", paramLabel = "<value>", description = "RNS name or address")
     String value;

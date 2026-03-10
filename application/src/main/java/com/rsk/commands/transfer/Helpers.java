@@ -21,18 +21,12 @@ import org.web3j.abi.datatypes.Type;
 import org.web3j.abi.datatypes.Utf8String;
 import org.web3j.abi.datatypes.generated.Uint256;
 import org.web3j.abi.datatypes.generated.Uint8;
-import org.web3j.crypto.Credentials;
-import org.web3j.crypto.RawTransaction;
-import org.web3j.crypto.TransactionEncoder;
 import org.web3j.protocol.Web3j;
 import org.web3j.protocol.core.DefaultBlockParameterName;
 import org.web3j.protocol.core.methods.request.Transaction;
 import org.web3j.protocol.core.methods.response.EthEstimateGas;
-import org.web3j.protocol.core.methods.response.EthGetTransactionCount;
-import org.web3j.protocol.core.methods.response.EthSendTransaction;
 import org.web3j.protocol.core.methods.response.TransactionReceipt;
 import org.web3j.protocol.http.HttpService;
-import org.web3j.utils.Numeric;
 
 public class Helpers {
   private static final BigDecimal WEI = new BigDecimal("1000000000000000000");
@@ -147,27 +141,13 @@ public class Helpers {
       BigInteger gasPriceWei,
       String data) {
     String privateKeyHex = walletUnlockPort.unlockPrivateKeyHex(walletName, password);
-
-    try (Web3j web3j = Web3j.build(new HttpService(chainProfile.rpcUrl()))) {
-      Credentials credentials = Credentials.create(privateKeyHex);
-      EthGetTransactionCount nonceResponse =
-          web3j
-              .ethGetTransactionCount(credentials.getAddress(), DefaultBlockParameterName.PENDING)
-              .send();
-      RawTransaction tx =
-          RawTransaction.createTransaction(
-              nonceResponse.getTransactionCount(),
-              gasPriceWei,
-              gasLimit,
-              to,
-              valueWei,
-              data == null ? "" : data);
-      byte[] signed = TransactionEncoder.signMessage(tx, chainProfile.chainId(), credentials);
-      EthSendTransaction sent = web3j.ethSendRawTransaction(Numeric.toHexString(signed)).send();
-      if (sent.hasError()) {
-        throw new IllegalStateException(sent.getError().getMessage());
-      }
-      return new PendingTransfer(credentials.getAddress(), sent.getTransactionHash());
+    try {
+      com.rsk.utils.Transaction.PendingTransaction pending =
+          com.rsk.utils.Transaction.submit(
+              chainProfile,
+              privateKeyHex,
+              new com.rsk.utils.Transaction.SendRequest(to, valueWei, gasLimit, gasPriceWei, data));
+      return new PendingTransfer(pending.fromAddress(), pending.txHash());
     } catch (Exception ex) {
       throw new IllegalStateException("Unable to send transfer", ex);
     }
@@ -186,7 +166,6 @@ public class Helpers {
     String privateKeyHex = walletUnlockPort.unlockPrivateKeyHex(walletName, password);
 
     try (Web3j web3j = Web3j.build(new HttpService(chainProfile.rpcUrl()))) {
-      Credentials credentials = Credentials.create(privateKeyHex);
       TokenMetadata metadata = readTokenMetadata(chainProfile, tokenAddress);
       BigInteger amountUnits = value.movePointRight(metadata.decimals()).toBigIntegerExact();
       Function function =
@@ -196,19 +175,15 @@ public class Helpers {
               List.of());
       String encodedData = data != null && !data.isBlank() ? data : FunctionEncoder.encode(function);
 
-      EthGetTransactionCount nonceResponse =
-          web3j
-              .ethGetTransactionCount(credentials.getAddress(), DefaultBlockParameterName.PENDING)
-              .send();
-      BigInteger nonce = nonceResponse.getTransactionCount();
       BigInteger resolvedGasLimit = gasLimit;
       if (resolvedGasLimit == null) {
+        String fromAddress = walletAddress(walletName);
         EthEstimateGas estimate =
             web3j
                 .ethEstimateGas(
                     Transaction.createFunctionCallTransaction(
-                        credentials.getAddress(),
-                        nonce,
+                        fromAddress,
+                        null,
                         gasPriceWei,
                         null,
                         tokenAddress,
@@ -221,16 +196,13 @@ public class Helpers {
           resolvedGasLimit = estimate.getAmountUsed().multiply(BigInteger.valueOf(12)).divide(BigInteger.TEN);
         }
       }
-
-      RawTransaction tx =
-          RawTransaction.createTransaction(
-              nonce, gasPriceWei, resolvedGasLimit, tokenAddress, BigInteger.ZERO, encodedData);
-      byte[] signed = TransactionEncoder.signMessage(tx, chainProfile.chainId(), credentials);
-      EthSendTransaction sent = web3j.ethSendRawTransaction(Numeric.toHexString(signed)).send();
-      if (sent.hasError()) {
-        throw new IllegalStateException(sent.getError().getMessage());
-      }
-      return new PendingTransfer(credentials.getAddress(), sent.getTransactionHash());
+      com.rsk.utils.Transaction.PendingTransaction pending =
+          com.rsk.utils.Transaction.submit(
+              chainProfile,
+              privateKeyHex,
+              new com.rsk.utils.Transaction.SendRequest(
+                  tokenAddress, BigInteger.ZERO, resolvedGasLimit, gasPriceWei, encodedData));
+      return new PendingTransfer(pending.fromAddress(), pending.txHash());
     } catch (ArithmeticException ex) {
       throw new IllegalArgumentException("Invalid token amount for token decimals.", ex);
     } catch (Exception ex) {
@@ -297,8 +269,9 @@ public class Helpers {
   public record TransferRequest(String recipient, BigDecimal amount) {}
 
   public TransferResult waitForConfirmation(ChainProfile chainProfile, PendingTransfer pendingTransfer) {
-    try (Web3j web3j = Web3j.build(new HttpService(chainProfile.rpcUrl()))) {
-      TransactionReceipt receipt = waitForReceipt(web3j, pendingTransfer.txHash(), 120, 2000L);
+    try {
+      TransactionReceipt receipt =
+          com.rsk.utils.Transaction.waitForReceipt(chainProfile, pendingTransfer.txHash(), 120, 2000L);
       if (!"0x1".equalsIgnoreCase(receipt.getStatus())) {
         throw new IllegalStateException("Transaction failed. Receipt status: " + receipt.getStatus());
       }
@@ -313,19 +286,6 @@ public class Helpers {
   public record TransferResult(String walletAddress, String txHash, TransactionReceipt receipt) {}
 
   public record TokenMetadata(String symbol, int decimals) {}
-
-  private static TransactionReceipt waitForReceipt(
-      Web3j web3j, String txHash, int maxPolls, long sleepMs) throws Exception {
-    for (int i = 0; i < maxPolls; i++) {
-      var receiptResponse = web3j.ethGetTransactionReceipt(txHash).send();
-      if (receiptResponse.getTransactionReceipt().isPresent()) {
-        return receiptResponse.getTransactionReceipt().get();
-      }
-      Thread.sleep(sleepMs);
-    }
-    throw new IllegalStateException("Timed out waiting for transaction receipt: " + txHash);
-  }
-
   private static String normalizeChainOption(String chainOption) {
     if (chainOption == null || chainOption.isBlank()) {
       return chainOption;

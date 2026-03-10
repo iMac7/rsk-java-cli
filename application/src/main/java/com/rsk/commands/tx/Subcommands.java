@@ -4,8 +4,8 @@ import com.rsk.utils.Chain;
 import com.rsk.utils.Chain.ChainFeatures;
 import com.rsk.utils.Chain.ChainProfile;
 import com.rsk.utils.Loader;
-import com.rsk.utils.Rpc;
 import com.rsk.utils.Storage;
+import com.rsk.utils.Transaction;
 import java.math.BigInteger;
 import java.nio.file.Path;
 import java.util.concurrent.Callable;
@@ -64,7 +64,7 @@ public class Subcommands {
     @Override
     public Integer call() {
       ChainProfile chainProfile = resolveChain(mainnet, testnet, chain, chainUrl);
-      Rpc.TxReceiptDetails details =
+      Transaction.TxReceiptDetails details =
           HELPERS
               .receiptDetails(chainProfile, txid)
               .orElseThrow(() -> new IllegalStateException("Transaction receipt not found yet."));
@@ -75,7 +75,7 @@ public class Subcommands {
       return 0;
     }
 
-    private void printReceipt(Rpc.TxReceiptDetails details) {
+    private void printReceipt(Transaction.TxReceiptDetails details) {
       System.out.println();
       System.out.println(cEmph("Transaction Details"));
       System.out.println(cInfo("🔑 Tx ID: ") + details.txHash());
@@ -101,7 +101,7 @@ public class Subcommands {
       return safe(status);
     }
 
-    private void monitorTransaction(ChainProfile chainProfile, Rpc.TxReceiptDetails details) {
+    private void monitorTransaction(ChainProfile chainProfile, Transaction.TxReceiptDetails details) {
       System.out.println();
       System.out.println(cEmph("Starting Transaction Monitoring"));
       System.out.println(cInfo("Network: ") + chainProfile.name());
@@ -125,7 +125,7 @@ public class Subcommands {
       long checkCount = 0L;
       try {
         while (true) {
-          Rpc.TxReceiptDetails currentDetails =
+          Transaction.TxReceiptDetails currentDetails =
               HELPERS
                   .receiptDetails(chainProfile, txid)
                   .orElseThrow(() -> new IllegalStateException("Transaction receipt not found yet."));

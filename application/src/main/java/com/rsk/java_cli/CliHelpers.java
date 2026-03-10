@@ -9,6 +9,7 @@ import com.rsk.commands.history.Subcommands.HistoryCommand;
 import com.rsk.commands.resolve.Subcommands.ResolveCommand;
 import com.rsk.commands.simulate.Subcommands.SimulateCommand;
 import com.rsk.commands.transfer.Subcommands.TransferCommand;
+import com.rsk.commands.transaction.Subcommands.TransactionCommand;
 import com.rsk.commands.tx.Subcommands.TxCommand;
 import com.rsk.commands.verify.Subcommands.VerifyCommand;
 import com.rsk.commands.wallet.Subcommands.WalletCommand;
@@ -78,6 +79,7 @@ public class CliHelpers {
         ResolveCommand.class,
         SimulateCommand.class,
         TransferCommand.class,
+        TransactionCommand.class,
         TxCommand.class,
         VerifyCommand.class
       })

@@ -25,14 +25,14 @@ public class WelcomeScreen {
     printMenuItem(TerminalText.pick("\uD83D\uDCB0 balance         ", "balance     "), "Check native balance");
     printMenuItem(TerminalText.pick("\uD83D\uDE80 transfer        ", "transfer    "), "Send native transfer");
     printMenuItem(TerminalText.pick("\uD83E\uDDFE tx              ", "tx          "), "Transaction status and monitoring");
-    printMenuItem(TerminalText.pick("\uD83D\uDD0E resolve         ", "resolve     "), "Resolve names");
+    printMenuItem(TerminalText.pick("\uD83D\uDD0E resolve         ", "resolve     "), "Resolve RNS names to and from addresses");
     printMenuItem(TerminalText.pick("\uD83D\uDEE0\uFE0F  deploy          ", "deploy      "), "Deploy contract");
     printMenuItem(TerminalText.pick("\u2705 verify          ", "verify      "), "Verify contract");
     printMenuItem(TerminalText.pick("\uD83D\uDCDC contract        ", "contract    "), "Interactive contract mode");
     printMenuItem(TerminalText.pick("\uD83C\uDF09 bridge          ", "bridge      "), "Bridge flow");
     printMenuItem(TerminalText.pick("\uD83D\uDD58 history         ", "history     "), "History API");
+    printMenuItem(TerminalText.pick("\uD83E\uDDF1 transaction     ", "transaction "), "Create and send transactions");
     printMenuItem(TerminalText.pick("\uD83D\uDCE6 batch-transfer  ", "batch-transfer  "), "Coming soon");
-    printMenuItem(TerminalText.pick("\uD83E\uDDF1 transaction     ", "transaction "), "Coming soon");
     printMenuItem(TerminalText.pick("\uD83E\uDDEA simulate        ", "simulate    "), "Simulate transactions");
     System.out.println();
     System.out.println(SOFT_ORANGE + "Type 'clear' to start over, 'exit' to quit." + RESET);
