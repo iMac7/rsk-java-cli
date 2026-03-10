@@ -2,6 +2,7 @@ package com.rsk.commands.transfer;
 
 import com.rsk.utils.Chain.ChainProfile;
 import com.rsk.utils.Loader;
+import com.rsk.utils.Transaction;
 import java.io.Console;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -91,7 +92,9 @@ public class Subcommands {
       String walletAddress = HELPERS.walletAddress(selectedWallet);
       String tokenContract = HELPERS.resolveTokenAddress(chainProfile, tokenAddress);
       BigInteger resolvedGasPrice =
-          gasPriceRbtc == null ? HELPERS.defaultGasPriceWei(chainProfile) : HELPERS.gasPriceRbtcToWei(gasPriceRbtc);
+          gasPriceRbtc == null
+              ? Transaction.defaultGasPriceWei(chainProfile)
+              : Transaction.gasPriceRbtcToWei(gasPriceRbtc);
 
       List<Helpers.TransferRequest> requests =
           interactive ? collectInteractiveRequests(chainProfile) : List.of(singleRequest(chainProfile));
@@ -112,8 +115,8 @@ public class Subcommands {
                         selectedWallet,
                         password,
                         request.recipient(),
-                        HELPERS.toWei(request.amount()),
-                        gasLimit == null ? HELPERS.defaultGasLimit() : gasLimit,
+                        Transaction.toWei(request.amount()),
+                        gasLimit == null ? Transaction.defaultGasLimit() : gasLimit,
                         resolvedGasPrice,
                         data)
                     : HELPERS.sendToken(
@@ -127,11 +130,13 @@ public class Subcommands {
                         resolvedGasPrice,
                         data);
             System.out.println(cInfo("🔄 Transaction initiated. TxHash: ") + pendingTransfer.txHash());
-            Helpers.TransferResult result =
+            var receipt =
                 Loader.runWithSpinner(
                     "Waiting for confirmation...",
-                    () -> HELPERS.waitForConfirmation(chainProfile, pendingTransfer));
-            printTransferResult(result);
+                    () ->
+                        Transaction.waitForSuccessfulReceipt(
+                            chainProfile, pendingTransfer.txHash(), 120, 2000L));
+            printTransferResult(receipt);
           }
           return 0;
         } catch (IllegalStateException | IllegalArgumentException ex) {
@@ -191,10 +196,10 @@ public class Subcommands {
               + chainProfile.nativeSymbol());
     }
 
-    private void printTransferResult(Helpers.TransferResult result) {
+    private void printTransferResult(org.web3j.protocol.core.methods.response.TransactionReceipt receipt) {
       System.out.println(cOk("✅ Transaction confirmed successfully!"));
-      System.out.println(cInfo("📦 Block Number: ") + result.receipt().getBlockNumber());
-      System.out.println(cInfo("⛽ Gas Used: ") + result.receipt().getGasUsed());
+      System.out.println(cInfo("📦 Block Number: ") + receipt.getBlockNumber());
+      System.out.println(cInfo("⛽ Gas Used: ") + receipt.getGasUsed());
     }
   }
 

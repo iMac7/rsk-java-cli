@@ -32,7 +32,7 @@ public class WelcomeScreen {
     printMenuItem(TerminalText.pick("\uD83C\uDF09 bridge          ", "bridge      "), "Bridge flow");
     printMenuItem(TerminalText.pick("\uD83D\uDD58 history         ", "history     "), "History API");
     printMenuItem(TerminalText.pick("\uD83E\uDDF1 transaction     ", "transaction "), "Create and send transactions");
-    printMenuItem(TerminalText.pick("\uD83D\uDCE6 batch-transfer  ", "batch-transfer  "), "Coming soon");
+    printMenuItem(TerminalText.pick("\uD83D\uDCE6 batch-transfer  ", "batch-transfer  "), "Execute batch transfers");
     printMenuItem(TerminalText.pick("\uD83E\uDDEA simulate        ", "simulate    "), "Simulate transactions");
     System.out.println();
     System.out.println(SOFT_ORANGE + "Type 'clear' to start over, 'exit' to quit." + RESET);

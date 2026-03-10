@@ -25,6 +25,32 @@ public final class Chain {
       String explorerAddressUrlTemplate,
       ChainFeatures features) {}
 
+  public static ChainProfile resolveChain(
+      com.rsk.commands.config.CliConfig config,
+      boolean mainnet,
+      boolean testnet,
+      String chain,
+      String chainUrl) {
+    if (chainUrl != null && !chainUrl.isBlank()) {
+      return new ChainProfile("custom-url", chainUrl, 0L, "NATIVE", "", "", ChainFeatures.defaults());
+    }
+
+    String chainOption = normalizeChainOption(chain);
+    boolean useMainnet = mainnet;
+    boolean useTestnet = testnet;
+    if ("mainnet".equals(chainOption)) {
+      useMainnet = true;
+      useTestnet = false;
+      chainOption = null;
+    } else if ("testnet".equals(chainOption)) {
+      useMainnet = false;
+      useTestnet = true;
+      chainOption = null;
+    }
+
+    return resolve(config, new ChainSelection(useMainnet, useTestnet, chainOption));
+  }
+
   public static ChainProfile resolve(
       com.rsk.commands.config.CliConfig config, ChainSelection selection) {
     if (selection.chain() != null && !selection.chain().isBlank()) {
@@ -59,5 +85,22 @@ public final class Chain {
       throw new IllegalArgumentException("Missing chains.mainnet in config");
     }
     return mainnet;
+  }
+
+  private static String normalizeChainOption(String chainOption) {
+    if (chainOption == null || chainOption.isBlank()) {
+      return chainOption;
+    }
+    String normalized = chainOption.trim();
+    if (normalized.startsWith("chains.custom.")) {
+      return normalized.substring("chains.custom.".length());
+    }
+    if ("chains.mainnet".equals(normalized)) {
+      return "mainnet";
+    }
+    if ("chains.testnet".equals(normalized)) {
+      return "testnet";
+    }
+    return normalized;
   }
 }

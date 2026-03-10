@@ -172,39 +172,7 @@ public class Subcommands {
     Path homeDir = Path.of(System.getProperty("user.home"), ".rsk-java-cli");
     com.rsk.commands.config.CliConfig config =
         new com.rsk.commands.config.Helpers(new Storage.JsonConfigRepository(homeDir)).loadConfig();
-    if (chainUrl != null && !chainUrl.isBlank()) {
-      return new ChainProfile("custom-url", chainUrl, 0L, "NATIVE", "", "", ChainFeatures.defaults());
-    }
-    String chainOption = normalizeChainOption(chain);
-    boolean useMainnet = mainnet;
-    boolean useTestnet = testnet;
-    if ("mainnet".equals(chainOption)) {
-      useMainnet = true;
-      useTestnet = false;
-      chainOption = null;
-    } else if ("testnet".equals(chainOption)) {
-      useMainnet = false;
-      useTestnet = true;
-      chainOption = null;
-    }
-    return Chain.resolve(config, new Chain.ChainSelection(useMainnet, useTestnet, chainOption));
-  }
-
-  private static String normalizeChainOption(String chainOption) {
-    if (chainOption == null || chainOption.isBlank()) {
-      return chainOption;
-    }
-    String normalized = chainOption.trim();
-    if (normalized.startsWith("chains.custom.")) {
-      return normalized.substring("chains.custom.".length());
-    }
-    if ("chains.mainnet".equals(normalized)) {
-      return "mainnet";
-    }
-    if ("chains.testnet".equals(normalized)) {
-      return "testnet";
-    }
-    return normalized;
+    return Chain.resolveChain(config, mainnet, testnet, chain, chainUrl);
   }
 
   private static String cInfo(String text) {

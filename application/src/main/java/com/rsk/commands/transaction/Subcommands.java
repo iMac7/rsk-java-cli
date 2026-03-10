@@ -3,7 +3,9 @@ package com.rsk.commands.transaction;
 import com.rsk.commands.transfer.Helpers;
 import com.rsk.java_cli.WelcomeScreen;
 import com.rsk.utils.Chain.ChainProfile;
+import com.rsk.utils.Contract;
 import com.rsk.utils.Loader;
+import com.rsk.utils.Transaction;
 import java.io.Console;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -89,41 +91,45 @@ public class Subcommands {
       String selectedWallet = HELPERS.resolveWalletName(walletName);
       String walletAddress = HELPERS.walletAddress(selectedWallet);
 
-      System.out.println(cInfo("📊 Network: ") + HELPERS.networkDisplayName(chainProfile));
+      System.out.println(cInfo("📊 Network: ") + Transaction.networkDisplayName(chainProfile));
 
       while (true) {
-        while (true) {
-          Integer selectedType = selectTransactionType();
-          if (selectedType == null || selectedType == TX_TYPES.length - 1) {
-            redrawWelcome();
-            return 0;
-          }
+        Integer selectedType = selectTransactionType();
+        if (selectedType == null || selectedType == TX_TYPES.length - 1) {
+          redrawWelcome();
+          return 0;
+        }
 
-          try {
-            TransactionInput input = collectTransactionInput(chainProfile, selectedType);
-            printTransactionPreview(chainProfile, walletAddress, input);
-            char[] password = promptPassword();
-            Helpers.PendingTransfer pendingTransfer =
-                Loader.runWithSpinner("⏳ Preparing transaction...", () -> submit(chainProfile, selectedWallet, password, input));
-            System.out.println(cOk("✔ ✅ Transaction sent"));
-            System.out.println(cInfo("📊 Transaction Hash: ") + pendingTransfer.txHash());
-            Helpers.TransferResult result =
-                Loader.runWithSpinner(
-                    "⏳ Waiting for confirmation...",
-                    () -> HELPERS.waitForConfirmation(chainProfile, pendingTransfer));
-            System.out.println(cOk("✅ Transaction confirmed successfully!"));
-            System.out.println(cInfo("📊 Block Number: ") + result.receipt().getBlockNumber());
-            System.out.println(cInfo("📊 Gas Used: ") + result.receipt().getGasUsed());
-            System.out.println(cInfo("📊 View on Explorer: ") + explorerTxUrl(chainProfile, result.txHash()));
-          } catch (PromptCancelledException ex) {
-            System.out.println(cError("❌ Error during transaction, please check the transaction details."));
-            System.out.println(cError("❌ Error details: User force closed the prompt with SIGINT"));
-          } catch (Exception ex) {
-            System.out.println(cError("❌ Error during transaction, please check the transaction details."));
-            System.out.println(cError("❌ Error details: " + rootMessage(ex)));
-            if (rootMessage(ex).toLowerCase().contains("gas")) {
-              System.out.println(cWarn("⚠️  Tip: Try increasing the gas limit or gas price."));
-            }
+        try {
+          TransactionInput input = collectTransactionInput(chainProfile, selectedType);
+          printTransactionPreview(chainProfile, walletAddress, input);
+          char[] password = promptPassword();
+          Helpers.PendingTransfer pendingTransfer =
+              Loader.runWithSpinner(
+                  "⏳ Preparing transaction...",
+                  () -> submit(chainProfile, selectedWallet, password, input));
+          System.out.println(cOk("✔ ✅ Transaction sent"));
+          System.out.println(cInfo("📊 Transaction Hash: ") + pendingTransfer.txHash());
+          var receipt =
+              Loader.runWithSpinner(
+                  "⏳ Waiting for confirmation...",
+                  () ->
+                      Transaction.waitForSuccessfulReceipt(
+                          chainProfile, pendingTransfer.txHash(), 120, 2000L));
+          System.out.println(cOk("✅ Transaction confirmed successfully!"));
+          System.out.println(cInfo("📊 Block Number: ") + receipt.getBlockNumber());
+          System.out.println(cInfo("📊 Gas Used: ") + receipt.getGasUsed());
+          System.out.println(
+              cInfo("📊 View on Explorer: ")
+                  + Transaction.explorerTxUrl(chainProfile, pendingTransfer.txHash()));
+        } catch (PromptCancelledException ex) {
+          System.out.println(cError("❌ Error during transaction, please check the transaction details."));
+          System.out.println(cError("❌ Error details: User force closed the prompt with SIGINT"));
+        } catch (Exception ex) {
+          System.out.println(cError("❌ Error during transaction, please check the transaction details."));
+          System.out.println(cError("❌ Error details: " + rootMessage(ex)));
+          if (rootMessage(ex).toLowerCase().contains("gas")) {
+            System.out.println(cWarn("⚠️  Tip: Try increasing the gas limit or gas price."));
           }
         }
       }
@@ -131,17 +137,18 @@ public class Subcommands {
 
     private Helpers.PendingTransfer submit(
         ChainProfile chainProfile, String walletName, char[] password, TransactionInput input) {
-      BigInteger gasPriceWei = input.gasPriceRbtc() == null
-          ? HELPERS.defaultGasPriceWei(chainProfile)
-          : HELPERS.gasPriceRbtcToWei(input.gasPriceRbtc());
+      BigInteger gasPriceWei =
+          input.gasPriceRbtc() == null
+              ? Transaction.defaultGasPriceWei(chainProfile)
+              : Transaction.gasPriceRbtcToWei(input.gasPriceRbtc());
       if (input.tokenAddress() == null) {
         return HELPERS.sendNative(
             chainProfile,
             walletName,
             password,
             input.recipient(),
-            HELPERS.toWei(input.amount()),
-            input.gasLimit() == null ? HELPERS.defaultGasLimit() : input.gasLimit(),
+            Transaction.toWei(input.amount()),
+            input.gasLimit() == null ? Transaction.defaultGasLimit() : input.gasLimit(),
             gasPriceWei,
             input.data());
       }
@@ -164,11 +171,13 @@ public class Subcommands {
       if (tokenTransfer) {
         while (true) {
           try {
-            tokenAddress = HELPERS.resolveTokenAddress(chainProfile, promptRequired("📝 Enter token contract address"));
+            tokenAddress =
+                HELPERS.resolveTokenAddress(
+                    chainProfile, promptRequired("📝 Enter token contract address"));
             if (tokenAddress == null) {
               throw new IllegalArgumentException("Invalid token contract address");
             }
-            HELPERS.readTokenMetadata(chainProfile, tokenAddress);
+            Contract.readTokenMetadata(chainProfile, tokenAddress);
             break;
           } catch (Exception ex) {
             System.out.println(cError("❌ " + rootMessage(ex)));
@@ -198,20 +207,25 @@ public class Subcommands {
     private void printTransactionPreview(
         ChainProfile chainProfile, String walletAddress, TransactionInput input) {
       BigDecimal currentGasPriceRbtc =
-          new BigDecimal(HELPERS.defaultGasPriceWei(chainProfile)).movePointLeft(18);
+          new BigDecimal(Transaction.defaultGasPriceWei(chainProfile)).movePointLeft(18);
       BigDecimal balance = HELPERS.nativeBalance(chainProfile, walletAddress);
-      BigInteger estimatedGas = input.gasLimit() == null
-          ? (input.tokenAddress() == null ? HELPERS.defaultGasLimit() : BigInteger.valueOf(100_000L))
-          : input.gasLimit();
-      BigDecimal gasPriceRbtc = input.gasPriceRbtc() == null ? currentGasPriceRbtc : input.gasPriceRbtc();
+      BigInteger estimatedGas =
+          input.gasLimit() == null
+              ? (input.tokenAddress() == null
+                  ? Transaction.defaultGasLimit()
+                  : BigInteger.valueOf(100_000L))
+              : input.gasLimit();
+      BigDecimal gasPriceRbtc =
+          input.gasPriceRbtc() == null ? currentGasPriceRbtc : input.gasPriceRbtc();
       BigDecimal gasCost = new BigDecimal(estimatedGas).multiply(gasPriceRbtc);
       BigDecimal value = input.amount();
       BigDecimal totalCost = input.tokenAddress() == null ? gasCost.add(value) : gasCost;
 
       System.out.println(cInfo("📊 Current Gas Price: ") + currentGasPriceRbtc.toPlainString() + " RBTC");
       System.out.println(cInfo("📊 Checking balance for address: ") + walletAddress);
-      System.out.println(cInfo("📊 Wallet Balance: ") + balance.toPlainString() + " " + chainProfile.nativeSymbol());
-      System.out.println(cInfo("📊 Network RPC: ") + HELPERS.networkDisplayName(chainProfile));
+      System.out.println(
+          cInfo("📊 Wallet Balance: ") + balance.toPlainString() + " " + chainProfile.nativeSymbol());
+      System.out.println(cInfo("📊 Network RPC: ") + Transaction.networkDisplayName(chainProfile));
       System.out.println(
           cInfo("📊 " + (input.tokenAddress() == null ? "RBTC Transfer Details:" : "Token Transfer Details:")));
       System.out.println(cInfo("📊 From: ") + walletAddress);
@@ -225,7 +239,11 @@ public class Subcommands {
       System.out.println(cInfo("📊 Gas Price: ") + gasPriceRbtc.toPlainString() + " RBTC");
       System.out.println(cInfo("📊 Total Transaction Cost: ") + totalCost.toPlainString() + " RBTC");
       System.out.println(cInfo("📊 Gas Cost: ") + gasCost.toPlainString() + " RBTC");
-      System.out.println(cInfo("📊 Value: ") + value.setScale(18, java.math.RoundingMode.DOWN).toPlainString() + " " + (input.tokenAddress() == null ? "RBTC" : "TOKEN"));
+      System.out.println(
+          cInfo("📊 Value: ")
+              + value.setScale(18, java.math.RoundingMode.DOWN).toPlainString()
+              + " "
+              + (input.tokenAddress() == null ? "RBTC" : "TOKEN"));
     }
 
     private Integer selectTransactionType() {
@@ -307,7 +325,8 @@ public class Subcommands {
       return selectedIndex;
     }
 
-    private Integer handleEscapeSequence(NonBlockingReader reader, int selectedIndex) throws Exception {
+    private Integer handleEscapeSequence(NonBlockingReader reader, int selectedIndex)
+        throws Exception {
       int second = reader.read(25);
       if (second == NonBlockingReader.READ_EXPIRED || second < 0) {
         return null;
@@ -322,10 +341,6 @@ public class Subcommands {
         }
       }
       return null;
-    }
-
-    private char[] promptPasswordLoop() {
-      return promptPassword();
     }
 
     private char[] promptPassword() {
@@ -450,14 +465,6 @@ public class Subcommands {
 
     private String resolveRecipient(ChainProfile chainProfile, String rawValue) {
       return BALANCE_HELPERS.resolveAddressInput(chainProfile, rawValue);
-    }
-
-    private String explorerTxUrl(ChainProfile chainProfile, String txHash) {
-      String template = chainProfile.explorerTxUrlTemplate();
-      if (template == null || template.isBlank()) {
-        return "(explorer URL not configured)";
-      }
-      return template.contains("%s") ? String.format(template, txHash) : template + txHash;
     }
 
     private String rootMessage(Throwable ex) {

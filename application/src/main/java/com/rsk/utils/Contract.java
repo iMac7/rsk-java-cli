@@ -1,8 +1,23 @@
 package com.rsk.utils;
 
 import com.rsk.utils.Chain.ChainProfile;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import org.web3j.abi.FunctionEncoder;
+import org.web3j.abi.TypeReference;
+import org.web3j.abi.datatypes.Address;
+import org.web3j.abi.datatypes.Function;
+import org.web3j.abi.datatypes.Type;
+import org.web3j.abi.datatypes.Utf8String;
+import org.web3j.abi.datatypes.generated.Uint256;
+import org.web3j.abi.datatypes.generated.Uint8;
+import org.web3j.protocol.Web3j;
+import org.web3j.protocol.core.methods.request.Transaction;
+import org.web3j.protocol.core.methods.response.EthEstimateGas;
+import org.web3j.protocol.http.HttpService;
 
 public final class Contract {
   public static final Map<String, Map<String, String>> TOKENS = createTokens();
@@ -31,9 +46,96 @@ public final class Contract {
     return TOKENS.containsKey(symbol);
   }
 
+  public static String resolveTokenAddress(String tokenOption, ChainProfile chainProfile) {
+    if (tokenOption == null || tokenOption.isBlank()) {
+      return null;
+    }
+    String trimmed = tokenOption.trim();
+    if ("rbtc".equalsIgnoreCase(trimmed)) {
+      return null;
+    }
+    if (hasToken(trimmed)) {
+      return tokenAddress(trimmed, chainProfile);
+    }
+    if (!trimmed.matches("^0x[a-fA-F0-9]{40}$")) {
+      throw new IllegalArgumentException("Invalid token contract address");
+    }
+    return trimmed;
+  }
+
+  public static TokenMetadata readTokenMetadata(ChainProfile chainProfile, String tokenAddress) {
+    try {
+      com.rsk.commands.contract.Helpers helpers = com.rsk.commands.contract.Helpers.defaultHelpers();
+      List<Type> symbolOut =
+          helpers.executeReadFunction(
+              chainProfile,
+              tokenAddress,
+              "symbol",
+              List.of(),
+              List.of(TypeReference.create(Utf8String.class)));
+      List<Type> decimalsOut =
+          helpers.executeReadFunction(
+              chainProfile,
+              tokenAddress,
+              "decimals",
+              List.of(),
+              List.of(TypeReference.create(Uint8.class)));
+      if (symbolOut.isEmpty() || decimalsOut.isEmpty()) {
+        throw new IllegalArgumentException("Invalid token contract address");
+      }
+      return new TokenMetadata(
+          ((Utf8String) symbolOut.get(0)).getValue(),
+          ((Uint8) decimalsOut.get(0)).getValue().intValue());
+    } catch (IllegalArgumentException ex) {
+      throw ex;
+    } catch (Exception ex) {
+      throw new IllegalArgumentException("Invalid token contract address", ex);
+    }
+  }
+
+  public static BigInteger tokenAmountToUnits(BigDecimal value, int decimals) {
+    return value.movePointRight(decimals).toBigIntegerExact();
+  }
+
+  public static String encodeErc20Transfer(String to, BigInteger amountUnits) {
+    Function function =
+        new Function("transfer", List.of(new Address(to), new Uint256(amountUnits)), List.of());
+    return FunctionEncoder.encode(function);
+  }
+
+  public static BigInteger estimateTokenTransferGas(
+      ChainProfile chainProfile,
+      String fromAddress,
+      String tokenAddress,
+      String encodedData,
+      BigInteger gasPriceWei) {
+    try (Web3j web3j = Web3j.build(new HttpService(chainProfile.rpcUrl()))) {
+      EthEstimateGas estimate =
+          web3j
+              .ethEstimateGas(
+                  Transaction.createFunctionCallTransaction(
+                      fromAddress,
+                      null,
+                      gasPriceWei,
+                      null,
+                      tokenAddress,
+                      BigInteger.ZERO,
+                      encodedData))
+              .send();
+      if (estimate.hasError() || estimate.getAmountUsed() == null) {
+        return BigInteger.valueOf(100_000L);
+      }
+      return estimate.getAmountUsed().multiply(BigInteger.valueOf(12)).divide(BigInteger.TEN);
+    } catch (Exception ex) {
+      return BigInteger.valueOf(100_000L);
+    }
+  }
+
   public static String networkKey(ChainProfile chainProfile) {
     return chainProfile.chainId() == 31L ? "testnet" : "mainnet";
   }
+
+  public record TokenMetadata(String symbol, int decimals) {}
 
   private static Map<String, Map<String, String>> createTokens() {
     Map<String, Map<String, String>> tokens = new LinkedHashMap<>();

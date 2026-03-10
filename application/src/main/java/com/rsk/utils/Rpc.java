@@ -22,6 +22,8 @@ public final class Rpc {
   public interface RpcPort {
     BigInteger getNativeBalance(ChainProfile chainProfile, String address);
 
+    BigInteger gasPriceWei(ChainProfile chainProfile);
+
     String sendNativeTransfer(
         ChainProfile chainProfile,
         String privateKeyHex,
@@ -47,6 +49,15 @@ public final class Rpc {
         return response.getBalance();
       } catch (Exception ex) {
         throw new IllegalStateException("Unable to fetch balance", ex);
+      }
+    }
+
+    @Override
+    public BigInteger gasPriceWei(ChainProfile chainProfile) {
+      try (Web3j web3j = Web3j.build(new HttpService(chainProfile.rpcUrl()))) {
+        return web3j.ethGasPrice().send().getGasPrice();
+      } catch (Exception ex) {
+        throw new IllegalStateException("Unable to fetch gas price", ex);
       }
     }
 

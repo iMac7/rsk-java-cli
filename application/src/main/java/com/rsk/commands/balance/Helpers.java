@@ -2,7 +2,6 @@ package com.rsk.commands.balance;
 
 import com.rsk.commands.wallet.Helpers.WalletMetadata;
 import com.rsk.utils.Chain;
-import com.rsk.utils.Chain.ChainFeatures;
 import com.rsk.utils.Chain.ChainProfile;
 import com.rsk.utils.Contract;
 import com.rsk.utils.Rpc;
@@ -12,7 +11,6 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Optional;
 import org.web3j.abi.TypeReference;
 import org.web3j.abi.datatypes.Address;
 import org.web3j.abi.datatypes.Type;
@@ -46,26 +44,7 @@ public class Helpers {
 
   public ChainProfile resolveChain(
       boolean mainnet, boolean testnet, String chain, String chainUrl) {
-    if (chainUrl != null && !chainUrl.isBlank()) {
-      return new ChainProfile(
-          "custom-url", chainUrl, 0L, "NATIVE", "", "", ChainFeatures.defaults());
-    }
-
-    String chainOption = normalizeChainOption(chain);
-    boolean useMainnet = mainnet;
-    boolean useTestnet = testnet;
-    if ("mainnet".equals(chainOption)) {
-      useMainnet = true;
-      useTestnet = false;
-      chainOption = null;
-    } else if ("testnet".equals(chainOption)) {
-      useMainnet = false;
-      useTestnet = true;
-      chainOption = null;
-    }
-
-    return Chain.resolve(
-        configHelpers.loadConfig(), new Chain.ChainSelection(useMainnet, useTestnet, chainOption));
+    return Chain.resolveChain(configHelpers.loadConfig(), mainnet, testnet, chain, chainUrl);
   }
 
   public String resolveWalletAddress(String walletName) {
@@ -192,20 +171,4 @@ public class Helpers {
   public record TokenBalance(
       String name, String symbol, String contractAddress, BigInteger balance, int decimals) {}
 
-  private static String normalizeChainOption(String chainOption) {
-    if (chainOption == null || chainOption.isBlank()) {
-      return chainOption;
-    }
-    String normalized = chainOption.trim();
-    if (normalized.startsWith("chains.custom.")) {
-      return normalized.substring("chains.custom.".length());
-    }
-    if ("chains.mainnet".equals(normalized)) {
-      return "mainnet";
-    }
-    if ("chains.testnet".equals(normalized)) {
-      return "testnet";
-    }
-    return normalized;
-  }
 }

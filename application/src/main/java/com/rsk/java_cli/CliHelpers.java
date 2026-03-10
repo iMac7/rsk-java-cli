@@ -2,6 +2,7 @@ package com.rsk.java_cli;
 
 import com.rsk.commands.config.Subcommands.ConfigCommand;
 import com.rsk.commands.balance.Subcommands.BalanceCommand;
+import com.rsk.commands.batchtransfer.Subcommands.BatchTransferCommand;
 import com.rsk.commands.bridge.Subcommands.BridgeCommand;
 import com.rsk.commands.contract.Subcommands.ContractCommand;
 import com.rsk.commands.deploy.Subcommands.DeployCommand;
@@ -72,6 +73,7 @@ public class CliHelpers {
         WalletCommand.class,
         ConfigCommand.class,
         BalanceCommand.class,
+        BatchTransferCommand.class,
         BridgeCommand.class,
         ContractCommand.class,
         DeployCommand.class,

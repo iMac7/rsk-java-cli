@@ -20,7 +20,6 @@ import org.web3j.protocol.Web3j;
 import org.web3j.protocol.core.DefaultBlockParameterName;
 import org.web3j.protocol.core.methods.request.Transaction;
 import org.web3j.protocol.core.methods.response.EthEstimateGas;
-import org.web3j.protocol.http.HttpService;
 
 public class Helpers {
   private final com.rsk.commands.balance.Helpers balanceHelpers;

@@ -1,7 +1,10 @@
 package com.rsk.utils;
 
+import com.rsk.commands.config.CliConfig;
 import com.rsk.utils.Chain.ChainProfile;
+import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.file.Path;
 import java.util.Optional;
 import org.web3j.crypto.Credentials;
 import org.web3j.crypto.RawTransaction;
@@ -14,7 +17,31 @@ import org.web3j.utils.Numeric;
 
 
 public final class Transaction {
+  private static final BigDecimal WEI = new BigDecimal("1000000000000000000");
+  private static final BigInteger GWEI = BigInteger.valueOf(1_000_000_000L);
+
   private Transaction() {}
+
+  public static BigInteger toWei(BigDecimal amount) {
+    return amount.multiply(WEI).toBigIntegerExact();
+  }
+
+  public static BigInteger gasPriceRbtcToWei(BigDecimal gasPriceRbtc) {
+    return gasPriceRbtc.multiply(WEI).toBigIntegerExact();
+  }
+
+  public static BigInteger defaultGasLimit() {
+    return BigInteger.valueOf(loadConfig().getGas().getDefaultGasLimit());
+  }
+
+  public static BigInteger defaultGasPriceWei(ChainProfile chainProfile) {
+    CliConfig config = loadConfig();
+    long gasPriceGwei = config.getGas().getDefaultGasPriceGwei();
+    if (gasPriceGwei <= 0L) {
+      return new Rpc.Web3jRpcGateway().gasPriceWei(chainProfile);
+    }
+    return BigInteger.valueOf(gasPriceGwei).multiply(GWEI);
+  }
 
   public static PendingTransaction submit(
       ChainProfile chainProfile, String privateKeyHex, SendRequest request) {
@@ -64,6 +91,15 @@ public final class Transaction {
     }
   }
 
+  public static TransactionReceipt waitForSuccessfulReceipt(
+      ChainProfile chainProfile, String txHash, int maxPolls, long sleepMs) {
+    TransactionReceipt receipt = waitForReceipt(chainProfile, txHash, maxPolls, sleepMs);
+    if (!"0x1".equalsIgnoreCase(receipt.getStatus())) {
+      throw new IllegalStateException("Transaction failed. Receipt status: " + receipt.getStatus());
+    }
+    return receipt;
+  }
+
   public static Optional<TxReceiptDetails> receiptDetails(ChainProfile chainProfile, String txHash) {
     try (Web3j web3j = Web3j.build(new HttpService(chainProfile.rpcUrl()))) {
       Optional<TransactionReceipt> receipt =
@@ -100,6 +136,21 @@ public final class Transaction {
       return String.format(template, txHash);
     }
     return template.endsWith("/") ? template + txHash : template + "/" + txHash;
+  }
+
+  public static String networkDisplayName(ChainProfile chainProfile) {
+    if (chainProfile.chainId() == 30L) {
+      return "Rootstock Mainnet";
+    }
+    if (chainProfile.chainId() == 31L) {
+      return "Rootstock Testnet";
+    }
+    return chainProfile.name();
+  }
+
+  private static CliConfig loadConfig() {
+    Path homeDir = Path.of(System.getProperty("user.home"), ".rsk-java-cli");
+    return new com.rsk.commands.config.Helpers(new Storage.JsonConfigRepository(homeDir)).loadConfig();
   }
 
   public record SendRequest(

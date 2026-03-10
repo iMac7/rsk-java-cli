@@ -36,24 +36,7 @@ public class Helpers {
 
   public ChainProfile resolveChain(
       boolean mainnet, boolean testnet, String chain, String chainUrl) {
-    if (chainUrl != null && !chainUrl.isBlank()) {
-      return new ChainProfile("custom-url", chainUrl, 0L, "NATIVE", "", "", ChainFeatures.defaults());
-    }
-    String chainOption = normalizeChainOption(chain);
-    boolean useMainnet = mainnet;
-    boolean useTestnet = testnet;
-    if ("mainnet".equals(chainOption)) {
-      useMainnet = true;
-      useTestnet = false;
-      chainOption = null;
-    } else if ("testnet".equals(chainOption)) {
-      useMainnet = false;
-      useTestnet = true;
-      chainOption = null;
-    }
-    CliConfig config = configHelpers.loadConfig();
-    return Chain.resolve(
-        config, new Chain.ChainSelection(useMainnet, useTestnet, chainOption));
+    return Chain.resolveChain(configHelpers.loadConfig(), mainnet, testnet, chain, chainUrl);
   }
 
   public String resolveApiKey(String explicitApiKey) {
@@ -186,20 +169,4 @@ public class Helpers {
     return List.of(value.split(",")).stream().map(String::trim).filter(s -> !s.isBlank()).toList();
   }
 
-  private static String normalizeChainOption(String chainOption) {
-    if (chainOption == null || chainOption.isBlank()) {
-      return chainOption;
-    }
-    String normalized = chainOption.trim();
-    if (normalized.startsWith("chains.custom.")) {
-      return normalized.substring("chains.custom.".length());
-    }
-    if ("chains.mainnet".equals(normalized)) {
-      return "mainnet";
-    }
-    if ("chains.testnet".equals(normalized)) {
-      return "testnet";
-    }
-    return normalized;
-  }
 }
