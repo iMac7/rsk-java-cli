@@ -17,7 +17,9 @@ import java.util.concurrent.Callable;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Help;
+import picocli.CommandLine.IParameterExceptionHandler;
 import picocli.CommandLine.Model.CommandSpec;
+import picocli.CommandLine.ParameterException;
 import picocli.CommandLine.Spec;
 
 public class CliHelpers {
@@ -26,10 +28,11 @@ public class CliHelpers {
   public static CommandLine createCommandLine() {
     CommandLine commandLine = new CommandLine(new RootCommand());
     commandLine.setColorScheme(createHelpColorScheme());
+    commandLine.setParameterExceptionHandler(createParameterExceptionHandler());
     commandLine.setExecutionExceptionHandler(
         (ex, cmd, parseResult) -> {
           String message = ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage();
-          cmd.getErr().println("Error: " + message);
+          WelcomeScreen.printError(message);
           return cmd.getCommandSpec().exitCodeOnExecutionException();
         });
     return commandLine;
@@ -52,6 +55,13 @@ public class CliHelpers {
         .optionParams(Help.Ansi.Style.fg("221"))
         .errors(Help.Ansi.Style.bold, Help.Ansi.Style.fg_red)
         .build();
+  }
+
+  private static IParameterExceptionHandler createParameterExceptionHandler() {
+    return (ParameterException ex, String[] args) -> {
+      WelcomeScreen.printError(ex.getMessage());
+      return ex.getCommandLine().getCommandSpec().exitCodeOnInvalidInput();
+    };
   }
 
   @Command(

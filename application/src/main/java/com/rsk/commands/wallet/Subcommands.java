@@ -64,7 +64,7 @@ public class Subcommands {
       TerminalText.pick("\uD83D\uDD0D List saved wallets", "[list] List saved wallets"),
       TerminalText.pick("\uD83D\uDD10 Show wallet private key", "[dump] Show wallet private key"),
       TerminalText.pick("\uD83D\uDD01 Switch wallet", "[switch] Switch wallet"),
-      TerminalText.pick("\uD83D\uDCDD Update wallet name", "[rename] Update wallet name"),
+      TerminalText.pick("\uD83D\uDCDD Rename wallet", "[rename] Rename wallet"),
       TerminalText.pick("\uD83D\uDCD2 Address book", "[book] Address book"),
       TerminalText.pick("\uD83D\uDCC2 Backup wallet data", "[backup] Backup wallet data"),
       TerminalText.pick("\u274C Delete wallet", "[delete] Delete wallet"),
@@ -303,7 +303,10 @@ public class Subcommands {
     }
 
     private void runRenameFlow() {
-      String walletName = readRequiredText("Current wallet name");
+      String walletName = selectWalletName("Select wallet to rename");
+      if (walletName == null) {
+        return;
+      }
       String newName = readRequiredText("New wallet name");
       HELPERS.renameWallet(walletName, newName);
       System.out.printf("Renamed wallet %s -> %s%n", cEmph(walletName), cEmph(newName));
@@ -417,6 +420,31 @@ public class Subcommands {
         return null;
       }
       return labels[selectedIndex];
+    }
+
+    private String selectWalletName(String title) {
+      List<WalletMetadata> wallets = HELPERS.listWallets();
+      if (wallets.isEmpty()) {
+        System.out.println("No wallets found.");
+        return null;
+      }
+
+      String activeWallet = HELPERS.activeWallet().map(WalletMetadata::name).orElse("");
+      String activeMarker = TerminalText.pick("\u2B50", "*");
+      String inactiveMarker = TerminalText.pick("\u2022", "-");
+      String[] options =
+          wallets.stream()
+              .map(
+                  wallet -> {
+                    String marker = wallet.name().equals(activeWallet) ? activeMarker : inactiveMarker;
+                    return marker + " " + wallet.name() + " " + wallet.address();
+                  })
+              .toArray(String[]::new);
+      int selectedIndex = selectMenu(title, options, -1);
+      if (selectedIndex < 0) {
+        return null;
+      }
+      return wallets.get(selectedIndex).name();
     }
 
     private void printWalletChoices() {

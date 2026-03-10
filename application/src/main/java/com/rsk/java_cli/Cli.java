@@ -62,10 +62,8 @@ public class Cli {
       if ("exit".equalsIgnoreCase(line) || "quit".equalsIgnoreCase(line)) {
         return 0;
       }
-      if ("clear".equalsIgnoreCase(line)) {
-        System.out.print("\u001b[H\u001b[2J");
-        System.out.flush();
-        WelcomeScreen.printWelcome();
+      if (isWelcomeRedrawCommand(line)) {
+        redrawWelcome();
         continue;
       }
 
@@ -73,12 +71,14 @@ public class Cli {
       try {
         words = splitArgs(line);
       } catch (Exception ex) {
-        System.err.println("Error: " + ex.getMessage());
+        WelcomeScreen.printError(ex.getMessage());
+        WelcomeScreen.printWelcome();
         continue;
       }
       int exitCode = execute(commandLine, words);
       if (exitCode != 0) {
-        System.out.println("Command failed.");
+        WelcomeScreen.printError("Command failed.");
+        WelcomeScreen.printWelcome();
       }
     }
   }
@@ -88,9 +88,22 @@ public class Cli {
       String[] normalizedArgs = CliHelpers.enforceWalletArgStyle(args);
       return commandLine.execute(normalizedArgs);
     } catch (IllegalArgumentException ex) {
-      System.err.println("Error: " + ex.getMessage());
+      WelcomeScreen.printError(ex.getMessage());
       return 1;
     }
+  }
+
+  private static boolean isWelcomeRedrawCommand(String line) {
+    return "clear".equalsIgnoreCase(line)
+        || "help".equalsIgnoreCase(line)
+        || "-h".equalsIgnoreCase(line)
+        || "--help".equalsIgnoreCase(line);
+  }
+
+  private static void redrawWelcome() {
+    System.out.print("\u001b[H\u001b[2J");
+    System.out.flush();
+    WelcomeScreen.printWelcome();
   }
 
   static String[] splitArgs(String line) {

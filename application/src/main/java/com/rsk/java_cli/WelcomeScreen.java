@@ -7,6 +7,7 @@ public class WelcomeScreen {
   private static final String ORANGE = "\u001b[38;2;255;153;51m";
   private static final String SOFT_ORANGE = "\u001b[38;2;255;183;77m";
   private static final String WHITE = "\u001b[37m";
+  private static final String RED = "\u001b[31m";
   private static final String BOLD = "\u001b[1m";
 
   private WelcomeScreen() {}
@@ -41,6 +42,10 @@ public class WelcomeScreen {
 
   public static String prompt() {
     return BOLD + ORANGE + "rsk-cli> " + RESET;
+  }
+
+  public static void printError(String message) {
+    System.err.println(BOLD + RED + "Error: " + message + RESET);
   }
 
   private static void printMenuItem(String key, String description) {
