@@ -381,7 +381,7 @@ public class Subcommands {
       System.out.println();
       lines++;
 
-      System.out.println(cInfo("? What would you like to do?"));
+      System.out.println(cInfo("-- Select Action --"));
       lines++;
 
       for (int i = 0; i < menuItems.length; i++) {

@@ -69,7 +69,7 @@ public class Helpers {
     }
     if (config.getNetwork().getDefaultNetwork() == null
         || config.getNetwork().getDefaultNetwork().isBlank()) {
-      config.getNetwork().setDefaultNetwork("mainnet");
+      config.getNetwork().setDefaultNetwork("testnet");
     }
     if (config.getGas() == null) {
       config.setGas(new CliConfig.GasPreferences());

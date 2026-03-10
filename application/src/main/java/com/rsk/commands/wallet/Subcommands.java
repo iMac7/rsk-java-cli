@@ -85,7 +85,7 @@ public class Subcommands {
     @Override
     public Integer call() {
       while (true) {
-        int selected = selectMenu("What would you like to do?", MENU_ITEMS, EXIT_INDEX);
+        int selected = selectMenu("Select action: ", MENU_ITEMS, EXIT_INDEX);
         if (selected == EXIT_INDEX) {
           return 0;
         }
@@ -99,6 +99,12 @@ public class Subcommands {
           executeAction(selected);
         } catch (InteractiveCancelledException ex) {
           System.out.println(INPUT_CANCELLED_MESSAGE);
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+          System.out.println(
+              Ansi.ansi()
+                  .fg(Ansi.Color.RED)
+                  .a("Error: " + (ex.getMessage() == null ? "Wallet action failed." : ex.getMessage()))
+                  .reset());
         }
 
         System.out.println();

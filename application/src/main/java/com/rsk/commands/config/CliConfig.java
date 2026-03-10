@@ -121,7 +121,7 @@ public class CliConfig {
   }
 
   public static class NetworkPreferences {
-    private String defaultNetwork = "mainnet";
+    private String defaultNetwork = "testnet";
 
     public String getDefaultNetwork() {
       return defaultNetwork;

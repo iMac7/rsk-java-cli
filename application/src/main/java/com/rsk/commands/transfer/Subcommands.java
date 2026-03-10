@@ -1,10 +1,15 @@
 package com.rsk.commands.transfer;
 
 import com.rsk.utils.Chain.ChainProfile;
+import com.rsk.utils.Loader;
 import java.io.Console;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.Callable;
+import org.fusesource.jansi.Ansi;
+import org.jline.reader.LineReader;
 import org.jline.reader.LineReaderBuilder;
 import org.jline.reader.UserInterruptException;
 import picocli.CommandLine.ArgGroup;
@@ -12,41 +17,56 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
 public class Subcommands {
-  private static final com.rsk.commands.transfer.Helpers HELPERS =
-      com.rsk.commands.transfer.Helpers.defaultHelpers();
+  private static final Helpers HELPERS = Helpers.defaultHelpers();
   private static final com.rsk.commands.balance.Helpers BALANCE_HELPERS =
       com.rsk.commands.balance.Helpers.defaultHelpers();
+  private static final LineReader READER = LineReaderBuilder.builder().build();
 
   private Subcommands() {}
 
-  @Command(name = "transfer", description = "Send native transfer", mixinStandardHelpOptions = true)
+  @Command(
+      name = "transfer",
+      description = "Transfer RBTC or ERC20 tokens to the provided address",
+      mixinStandardHelpOptions = true)
   public static class TransferCommand implements Callable<Integer> {
-    @Option(names = "--wallet", paramLabel = "<name>", description = "Wallet name")
+    @Option(names = "--wallet", paramLabel = "<wallet>", description = "Name of the wallet")
     String walletName;
 
-    @Option(names = "--to", required = true, paramLabel = "<target>", description = "Address or RNS name")
-    String target;
+    @Option(names = {"-a", "--address"}, paramLabel = "<address>", description = "Recipient address")
+    String address;
 
-    @Option(names = "--amount", required = true, paramLabel = "<value>", description = "Amount in native units")
+    @Option(names = "--rns", paramLabel = "<domain>", description = "Recipient RNS domain (e.g., alice.rsk)")
+    String rns;
+
+    @Option(
+        names = "--token",
+        paramLabel = "<address>",
+        description = "ERC20 token contract address (optional, for token transfers)")
+    String tokenAddress;
+
+    @Option(names = "--value", paramLabel = "<value>", description = "Amount to transfer")
     BigDecimal amount;
 
-    @Option(names = "--gas-limit", paramLabel = "<wei>", description = "Gas limit override")
+    @Option(names = {"-i", "--interactive"}, description = "Execute interactively and input transactions")
+    boolean interactive;
+
+    @Option(names = "--gas-limit", paramLabel = "<limit>", description = "Custom gas limit")
     BigInteger gasLimit;
 
-    @Option(names = "--gas-price", paramLabel = "<wei>", description = "Gas price override")
-    BigInteger gasPriceWei;
+    @Option(names = "--gas-price", paramLabel = "<price>", description = "Custom gas price in RBTC")
+    BigDecimal gasPriceRbtc;
 
-    @Option(names = "--data", defaultValue = "", description = "Optional hex data")
+    @Option(names = "--data", defaultValue = "", description = "Custom transaction data (hex)")
     String data;
 
     @ArgGroup(exclusive = true, multiplicity = "0..1")
     NetworkOptions networkOptions = new NetworkOptions();
 
     static class NetworkOptions {
-      @Option(names = "--mainnet", description = "Use chains.mainnet")
+      @Option(names = "--mainnet", description = "Transfer on the mainnet")
       boolean mainnet;
 
-      @Option(names = "--testnet", description = "Use chains.testnet")
+      @Option(names = {"-t", "--testnet"}, description = "Transfer on the testnet")
       boolean testnet;
 
       @Option(
@@ -61,38 +81,120 @@ public class Subcommands {
 
     @Override
     public Integer call() {
-      if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-        throw new IllegalArgumentException("--amount must be greater than zero.");
-      }
-
-      String selectedWallet =
-          walletName != null && !walletName.isBlank()
-              ? walletName
-              : com.rsk.commands.wallet.Helpers.defaultHelpers()
-                  .activeWallet()
-                  .map(com.rsk.commands.wallet.Helpers.WalletMetadata::name)
-                  .orElseThrow(
-                      () -> new IllegalArgumentException("No active wallet found. Provide --wallet."));
-
       ChainProfile chainProfile =
           HELPERS.resolveChain(
               networkOptions.mainnet,
               networkOptions.testnet,
               networkOptions.chain,
               networkOptions.chainUrl);
-
-      String resolvedTo = BALANCE_HELPERS.resolveAddressInput(chainProfile, target);
-      BigInteger valueWei = HELPERS.toWei(amount);
-      BigInteger resolvedGasLimit = gasLimit == null ? HELPERS.defaultGasLimit() : gasLimit;
+      String selectedWallet = HELPERS.resolveWalletName(walletName);
+      String walletAddress = HELPERS.walletAddress(selectedWallet);
+      String tokenContract = HELPERS.resolveTokenAddress(chainProfile, tokenAddress);
       BigInteger resolvedGasPrice =
-          gasPriceWei == null ? HELPERS.defaultGasPriceWei(chainProfile) : gasPriceWei;
-      char[] password = readPassword("Wallet password: ");
-      String txHash =
-          HELPERS.sendNative(
-              chainProfile, selectedWallet, password, resolvedTo, valueWei, resolvedGasLimit, resolvedGasPrice, data);
+          gasPriceRbtc == null ? HELPERS.defaultGasPriceWei(chainProfile) : HELPERS.gasPriceRbtcToWei(gasPriceRbtc);
 
-      System.out.printf("Transfer submitted on %s: %s%n", chainProfile.name(), txHash);
-      return 0;
+      List<Helpers.TransferRequest> requests =
+          interactive ? collectInteractiveRequests(chainProfile) : List.of(singleRequest(chainProfile));
+      if (requests.isEmpty()) {
+        return 0;
+      }
+
+      while (true) {
+        try {
+          char[] password = readPassword("Enter your password to decrypt the wallet: ");
+          printWalletContext(chainProfile, walletAddress);
+
+          for (Helpers.TransferRequest request : requests) {
+            Helpers.PendingTransfer pendingTransfer =
+                tokenContract == null
+                    ? HELPERS.sendNative(
+                        chainProfile,
+                        selectedWallet,
+                        password,
+                        request.recipient(),
+                        HELPERS.toWei(request.amount()),
+                        gasLimit == null ? HELPERS.defaultGasLimit() : gasLimit,
+                        resolvedGasPrice,
+                        data)
+                    : HELPERS.sendToken(
+                        chainProfile,
+                        selectedWallet,
+                        password,
+                        tokenContract,
+                        request.recipient(),
+                        request.amount(),
+                        gasLimit,
+                        resolvedGasPrice,
+                        data);
+            System.out.println(cInfo("🔄 Transaction initiated. TxHash: ") + pendingTransfer.txHash());
+            Helpers.TransferResult result =
+                Loader.runWithSpinner(
+                    "Waiting for confirmation...",
+                    () -> HELPERS.waitForConfirmation(chainProfile, pendingTransfer));
+            printTransferResult(result);
+          }
+          return 0;
+        } catch (IllegalStateException | IllegalArgumentException ex) {
+          if (!interactive) {
+            throw ex;
+          }
+          System.out.println(
+              cError(ex.getMessage() == null ? "Transfer failed." : ex.getMessage()));
+        }
+      }
+    }
+
+    private Helpers.TransferRequest singleRequest(ChainProfile chainProfile) {
+      if ((address == null || address.isBlank()) && (rns == null || rns.isBlank())) {
+        throw new IllegalArgumentException("Provide --address or --rns, and --value, or use --interactive.");
+      }
+      String rawTarget = resolveSingleTarget();
+      if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+        throw new IllegalArgumentException("Provide --value greater than zero, or use --interactive.");
+      }
+      return new Helpers.TransferRequest(resolveTarget(chainProfile, rawTarget), amount);
+    }
+
+    private String resolveSingleTarget() {
+      if (rns != null && !rns.isBlank()) {
+        return rns;
+      }
+      if (address != null && !address.isBlank()) {
+        return address;
+      }
+      throw new IllegalArgumentException("Provide --address or --rns, and --value, or use --interactive.");
+    }
+
+    private List<Helpers.TransferRequest> collectInteractiveRequests(ChainProfile chainProfile) {
+      List<Helpers.TransferRequest> requests = new ArrayList<>();
+      while (true) {
+        String rawTarget = promptRequiredText("Enter address");
+        String resolvedTarget = resolveTarget(chainProfile, rawTarget);
+        BigDecimal value = promptAmount("Enter amount");
+        requests.add(new Helpers.TransferRequest(resolvedTarget, value));
+        if (!promptYesNo("Add another transaction?", false)) {
+          return requests;
+        }
+      }
+    }
+
+    private String resolveTarget(ChainProfile chainProfile, String rawTarget) {
+      return BALANCE_HELPERS.resolveAddressInput(chainProfile, rawTarget);
+    }
+
+    private void printWalletContext(ChainProfile chainProfile, String walletAddress) {
+      System.out.println(cInfo("📄 Wallet Address: ") + walletAddress);
+      System.out.println(
+          cInfo("💰 Current Balance: ")
+              + formatAmount(HELPERS.nativeBalance(chainProfile, walletAddress))
+              + " "
+              + chainProfile.nativeSymbol());
+    }
+
+    private void printTransferResult(Helpers.TransferResult result) {
+      System.out.println(cOk("✅ Transaction confirmed successfully!"));
+      System.out.println(cInfo("📦 Block Number: ") + result.receipt().getBlockNumber());
+      System.out.println(cInfo("⛽ Gas Used: ") + result.receipt().getGasUsed());
     }
   }
 
@@ -101,16 +203,16 @@ public class Subcommands {
       try {
         Console console = System.console();
         if (console != null) {
-          char[] password = console.readPassword(prompt);
+          char[] password = console.readPassword(cOk("✔ " + prompt));
           if (password == null || password.length == 0) {
-            System.out.println("Password is required.");
+            System.out.println(cError("Password is required."));
             continue;
           }
           return password;
         }
-        String password = LineReaderBuilder.builder().build().readLine(prompt, '*');
+        String password = READER.readLine(cOk("✔ " + prompt), '*');
         if (password == null || password.isBlank()) {
-          System.out.println("Password is required.");
+          System.out.println(cError("Password is required."));
           continue;
         }
         return password.toCharArray();
@@ -125,4 +227,75 @@ public class Subcommands {
       }
     }
   }
+
+  private static String promptRequiredText(String label) {
+    while (true) {
+      try {
+        String value = READER.readLine(cOk("✔ " + label + ": "));
+        if (value != null && !value.isBlank()) {
+          return value.trim();
+        }
+        System.out.println(cError("Value is required."));
+      } catch (UserInterruptException ex) {
+        throw new IllegalStateException("Transfer cancelled.");
+      }
+    }
+  }
+
+  private static BigDecimal promptAmount(String label) {
+    while (true) {
+      String raw = promptRequiredText(label);
+      try {
+        BigDecimal amount = new BigDecimal(raw);
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+          throw new IllegalArgumentException();
+        }
+        return amount;
+      } catch (Exception ex) {
+        System.out.println(cError("Enter a valid positive amount."));
+      }
+    }
+  }
+
+  private static boolean promptYesNo(String label, boolean defaultValue) {
+    while (true) {
+      try {
+        String suffix = defaultValue ? "Y/n" : "y/N";
+        String raw = READER.readLine(label + " (" + suffix + "): ");
+        if (raw == null || raw.isBlank()) {
+          return defaultValue;
+        }
+        if ("y".equalsIgnoreCase(raw) || "yes".equalsIgnoreCase(raw)) {
+          return true;
+        }
+        if ("n".equalsIgnoreCase(raw) || "no".equalsIgnoreCase(raw)) {
+          return false;
+        }
+        System.out.println(cError("Please answer y or n."));
+      } catch (UserInterruptException ex) {
+        throw new IllegalStateException("Transfer cancelled.");
+      }
+    }
+  }
+
+  private static String formatAmount(BigDecimal amount) {
+    BigDecimal stripped = amount.stripTrailingZeros();
+    if (stripped.scale() < 0) {
+      stripped = stripped.setScale(0);
+    }
+    return stripped.toPlainString();
+  }
+
+  private static String cInfo(String text) {
+    return Ansi.ansi().fg(Ansi.Color.CYAN).a(text).reset().toString();
+  }
+
+  private static String cOk(String text) {
+    return Ansi.ansi().fg(Ansi.Color.GREEN).a(text).reset().toString();
+  }
+
+  private static String cError(String text) {
+    return Ansi.ansi().fg(Ansi.Color.RED).a(text).reset().toString();
+  }
+
 }

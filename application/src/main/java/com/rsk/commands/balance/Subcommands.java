@@ -287,7 +287,7 @@ public class Subcommands {
               + formatAmount(HELPERS.toNative(wei))
               + " "
               + chainProfile.nativeSymbol());
-      System.out.println(cInfo("🔗 Ensure that transactions are being conducted on the correct network."));
+      System.out.println(cInfo("👍 Ensure that transactions are being conducted on the correct network."));
     }
 
     private void printKnownTokenBalance(ChainProfile chainProfile, String holderAddress, String tokenSymbol) {
@@ -351,7 +351,7 @@ public class Subcommands {
           formatAmount(HELPERS.tokenUnitsToDecimal(tokenBalance.balance(), tokenBalance.decimals())),
           tokenBalance.symbol());
       System.out.printf("      🌐 Network: %s%n", HELPERS.networkDisplayName(chainProfile));
-      System.out.println(cInfo("🔗 Ensure that transactions are being conducted on the correct network."));
+      System.out.println(cInfo("👍 Ensure that transactions are being conducted on the correct network."));
     }
 
     private String formatAmount(BigDecimal amount) {
