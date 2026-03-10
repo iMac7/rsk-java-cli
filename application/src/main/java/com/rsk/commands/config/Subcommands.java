@@ -1,6 +1,7 @@
 package com.rsk.commands.config;
 
 import com.rsk.commands.wallet.Helpers.WalletMetadata;
+import com.rsk.java_cli.WelcomeScreen;
 import com.rsk.utils.TerminalText;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -77,6 +78,7 @@ public class Subcommands {
           if (selected == MAIN_SAVE_INDEX) {
             HELPERS.saveConfig(config);
             printSuccess("Configuration saved.");
+            WelcomeScreen.printWelcome();
             return 0;
           }
 

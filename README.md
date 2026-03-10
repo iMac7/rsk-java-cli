@@ -2,8 +2,10 @@ Implemented:
 wallet
 
 Todo
-config(fix ui, add missing opts)
 fix cmds, interactivity
+
+Deferred
+monitor cmd - useful?
 
 
 ### Build app
