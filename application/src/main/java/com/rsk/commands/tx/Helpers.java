@@ -2,6 +2,7 @@ package com.rsk.commands.tx;
 
 import com.rsk.utils.Chain.ChainProfile;
 import com.rsk.utils.Rpc;
+import java.math.BigInteger;
 import java.util.Optional;
 
 public class Helpers {
@@ -11,7 +12,19 @@ public class Helpers {
     this.rpcPort = rpcPort;
   }
 
+  public static Helpers defaultHelpers() {
+    return new Helpers(new Rpc.Web3jRpcGateway());
+  }
+
   public Optional<String> receiptStatus(ChainProfile chainProfile, String txHash) {
     return rpcPort.getTransactionReceiptStatus(chainProfile, txHash);
+  }
+
+  public Optional<Rpc.TxReceiptDetails> receiptDetails(ChainProfile chainProfile, String txHash) {
+    return rpcPort.getTransactionReceiptDetails(chainProfile, txHash);
+  }
+
+  public BigInteger currentBlockNumber(ChainProfile chainProfile) {
+    return rpcPort.getCurrentBlockNumber(chainProfile);
   }
 }

@@ -11,6 +11,7 @@ import org.web3j.protocol.core.DefaultBlockParameterName;
 import org.web3j.protocol.core.methods.response.EthGetBalance;
 import org.web3j.protocol.core.methods.response.EthGetTransactionCount;
 import org.web3j.protocol.core.methods.response.EthSendTransaction;
+import org.web3j.protocol.core.methods.response.EthBlockNumber;
 import org.web3j.protocol.core.methods.response.TransactionReceipt;
 import org.web3j.protocol.http.HttpService;
 import org.web3j.utils.Numeric;
@@ -31,6 +32,10 @@ public final class Rpc {
         String data);
 
     Optional<String> getTransactionReceiptStatus(ChainProfile chainProfile, String txHash);
+
+    Optional<TxReceiptDetails> getTransactionReceiptDetails(ChainProfile chainProfile, String txHash);
+
+    BigInteger getCurrentBlockNumber(ChainProfile chainProfile);
   }
 
   public static class Web3jRpcGateway implements RpcPort {
@@ -92,5 +97,44 @@ public final class Rpc {
         throw new IllegalStateException("Unable to fetch transaction receipt", ex);
       }
     }
+
+    @Override
+    public Optional<TxReceiptDetails> getTransactionReceiptDetails(ChainProfile chainProfile, String txHash) {
+      try (Web3j web3j = Web3j.build(new HttpService(chainProfile.rpcUrl()))) {
+        Optional<TransactionReceipt> receipt =
+            web3j.ethGetTransactionReceipt(txHash).send().getTransactionReceipt();
+        return receipt.map(
+            value ->
+                new TxReceiptDetails(
+                    txHash,
+                    value.getBlockHash(),
+                    value.getBlockNumber() == null ? null : value.getBlockNumber().toString(),
+                    value.getGasUsed() == null ? null : value.getGasUsed().toString(),
+                    value.getStatus(),
+                    value.getFrom(),
+                    value.getTo()));
+      } catch (Exception ex) {
+        throw new IllegalStateException("Unable to fetch transaction receipt", ex);
+      }
+    }
+
+    @Override
+    public BigInteger getCurrentBlockNumber(ChainProfile chainProfile) {
+      try (Web3j web3j = Web3j.build(new HttpService(chainProfile.rpcUrl()))) {
+        EthBlockNumber response = web3j.ethBlockNumber().send();
+        return response.getBlockNumber();
+      } catch (Exception ex) {
+        throw new IllegalStateException("Unable to fetch current block number", ex);
+      }
+    }
   }
+
+  public record TxReceiptDetails(
+      String txHash,
+      String blockHash,
+      String blockNumber,
+      String gasUsed,
+      String status,
+      String from,
+      String to) {}
 }

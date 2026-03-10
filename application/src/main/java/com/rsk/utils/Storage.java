@@ -1,6 +1,5 @@
 package com.rsk.utils;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rsk.commands.config.CliConfig;
 import com.rsk.commands.config.ConfigPort;
@@ -66,55 +65,6 @@ public final class Storage {
 
     private static CliConfig defaultConfig() {
       return com.rsk.commands.config.Helpers.defaultConfig();
-    }
-  }
-
-  public static class JsonMonitorSessionRepository implements Monitorsession.MonitorSessionPort {
-    private final Path sessionsPath;
-    private final ObjectMapper objectMapper;
-
-    public JsonMonitorSessionRepository(Path homeDir) {
-      this(homeDir.resolve("sessions.json"), Json.ObjectMapperFactory.create());
-    }
-
-    JsonMonitorSessionRepository(Path sessionsPath, ObjectMapper objectMapper) {
-      this.sessionsPath = sessionsPath;
-      this.objectMapper = objectMapper;
-    }
-
-    @Override
-    public List<Monitorsession.MonitorSession> list() {
-      try {
-        if (!Files.exists(sessionsPath)) {
-          return List.of();
-        }
-        return objectMapper.readValue(sessionsPath.toFile(), new TypeReference<>() {});
-      } catch (IOException ex) {
-        throw new IllegalStateException("Unable to load sessions", ex);
-      }
-    }
-
-    @Override
-    public Monitorsession.MonitorSession save(Monitorsession.MonitorSession session) {
-      List<Monitorsession.MonitorSession> sessions = new ArrayList<>(list());
-      sessions.removeIf(existing -> existing.getId().equals(session.getId()));
-      sessions.add(session);
-      writeAll(sessions);
-      return session;
-    }
-
-    @Override
-    public Optional<Monitorsession.MonitorSession> find(UUID id) {
-      return list().stream().filter(session -> session.getId().equals(id)).findFirst();
-    }
-
-    private void writeAll(List<Monitorsession.MonitorSession> sessions) {
-      try {
-        Files.createDirectories(sessionsPath.getParent());
-        objectMapper.writerWithDefaultPrettyPrinter().writeValue(sessionsPath.toFile(), sessions);
-      } catch (IOException ex) {
-        throw new IllegalStateException("Unable to save sessions", ex);
-      }
     }
   }
 

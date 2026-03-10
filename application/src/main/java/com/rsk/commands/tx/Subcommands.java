@@ -3,67 +3,167 @@ package com.rsk.commands.tx;
 import com.rsk.utils.Chain;
 import com.rsk.utils.Chain.ChainFeatures;
 import com.rsk.utils.Chain.ChainProfile;
-import com.rsk.utils.Monitorsession;
+import com.rsk.utils.Loader;
 import com.rsk.utils.Rpc;
 import com.rsk.utils.Storage;
+import java.math.BigInteger;
 import java.nio.file.Path;
-import java.util.Optional;
 import java.util.concurrent.Callable;
+import org.fusesource.jansi.Ansi;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
 public class Subcommands {
-  private static final Helpers HELPERS = defaultHelpers();
-  private static final com.rsk.commands.monitor.Helpers MONITOR_HELPERS =
-      com.rsk.commands.monitor.Helpers.defaultHelpers();
+  private static final Helpers HELPERS = Helpers.defaultHelpers();
 
   private Subcommands() {}
 
-  private static Helpers defaultHelpers() {
-    return new Helpers(new Rpc.Web3jRpcGateway());
-  }
-
   @Command(
       name = "tx",
-      description = "Transaction status",
+      description = "@|bold,fg(214)Check the status of a transaction|@",
       mixinStandardHelpOptions = true)
   public static class TxCommand implements Callable<Integer> {
-    @Option(names = "--txid", required = true, paramLabel = "<hash>", description = "Transaction hash")
+    @Option(
+        names = {"-id", "--txid"},
+        required = true,
+        paramLabel = "<txid>",
+        description = "@|fg(220)Transaction ID|@")
     String txid;
 
-    @Option(names = "--monitor", description = "Start a confirmation monitor session")
+    @Option(
+        names = "--monitor",
+        description = "@|fg(220)Keep monitoring the transaction until confirmation|@")
     boolean monitor;
 
-    @Option(names = "--confirmations", defaultValue = "1", description = "Required confirmations")
+    @Option(
+        names = "--confirmations",
+        defaultValue = "12",
+        description = "@|fg(220)Required confirmations for monitoring|@ (default: ${DEFAULT-VALUE})")
     int confirmations;
 
-    @Option(names = "--mainnet", description = "Use chains.mainnet")
+    @Option(names = "--mainnet", description = "@|fg(220)Check the transaction on the mainnet|@")
     boolean mainnet;
 
-    @Option(names = "--testnet", description = "Use chains.testnet")
+    @Option(
+        names = {"-t", "--testnet"},
+        description = "@|fg(220)Check the transaction status on the testnet|@")
     boolean testnet;
 
     @Option(
         names = "--chain",
         paramLabel = "<name>",
-        description = "Use config chain key, e.g. chains.custom.<name> or <name>")
+        description = "@|fg(220)Use config chain key, e.g. chains.custom.<name> or <name>|@")
     String chain;
 
-    @Option(names = "--chainurl", paramLabel = "<url>", description = "Use an explicit RPC URL")
+    @Option(
+        names = "--chainurl",
+        paramLabel = "<url>",
+        description = "@|fg(220)Use an explicit RPC URL|@")
     String chainUrl;
 
     @Override
     public Integer call() {
       ChainProfile chainProfile = resolveChain(mainnet, testnet, chain, chainUrl);
+      Rpc.TxReceiptDetails details =
+          HELPERS
+              .receiptDetails(chainProfile, txid)
+              .orElseThrow(() -> new IllegalStateException("Transaction receipt not found yet."));
+      printReceipt(details);
       if (monitor) {
-        Monitorsession.MonitorSession session =
-            MONITOR_HELPERS.startTxConfirmations(chainProfile.name(), txid, 10, confirmations);
-        System.out.println("Monitor session started: " + session.getId());
-        return 0;
+        monitorTransaction(chainProfile, details);
       }
-      Optional<String> status = HELPERS.receiptStatus(chainProfile, txid);
-      System.out.println(status.map(s -> "Receipt status: " + s).orElse("Receipt not found yet."));
       return 0;
+    }
+
+    private void printReceipt(Rpc.TxReceiptDetails details) {
+      System.out.println();
+      System.out.println(cEmph("Transaction Details"));
+      System.out.println(cInfo("🔑 Tx ID: ") + details.txHash());
+      System.out.println(cInfo("🔗 Block Hash: ") + safe(details.blockHash()));
+      System.out.println(cInfo("🧱 Block No.: ") + safe(details.blockNumber()));
+      System.out.println(cInfo("⛽ Gas Used: ") + safe(details.gasUsed()));
+      System.out.println(cInfo("✅ Status: ") + formatStatus(details.status()));
+      System.out.println(cInfo("📤 From: ") + safe(details.from()));
+      System.out.println(cInfo("📥 To: ") + safe(details.to()));
+    }
+
+    private String safe(String value) {
+      return value == null || value.isBlank() ? "(not available)" : value;
+    }
+
+    private String formatStatus(String status) {
+      if ("0x1".equalsIgnoreCase(status)) {
+        return cOk("Success");
+      }
+      if ("0x0".equalsIgnoreCase(status)) {
+        return cError("Failed");
+      }
+      return safe(status);
+    }
+
+    private void monitorTransaction(ChainProfile chainProfile, Rpc.TxReceiptDetails details) {
+      System.out.println();
+      System.out.println(cEmph("Starting Transaction Monitoring"));
+      System.out.println(cInfo("Network: ") + chainProfile.name());
+      System.out.println(cInfo("Transaction: ") + txid);
+      System.out.println(cInfo("Required confirmations: ") + confirmations);
+      System.out.println();
+      System.out.println(cOk("✔ Monitor initialized successfully"));
+
+      Loader.runWithSpinner("Starting transaction monitoring...", () -> {
+        Thread.sleep(900L);
+        return null;
+      });
+
+      System.out.println(cOk("✅ Started monitoring transaction: ") + txid);
+      System.out.println(cOk("✔ Transaction monitoring started successfully"));
+      System.out.println();
+      System.out.println(cEmph("Monitoring started successfully!"));
+      System.out.println(cMuted("Press Ctrl+C to stop monitoring"));
+      System.out.println();
+
+      long checkCount = 0L;
+      try {
+        while (true) {
+          Rpc.TxReceiptDetails currentDetails =
+              HELPERS
+                  .receiptDetails(chainProfile, txid)
+                  .orElseThrow(() -> new IllegalStateException("Transaction receipt not found yet."));
+          BigInteger receiptBlock = new BigInteger(currentDetails.blockNumber());
+          BigInteger currentBlock = HELPERS.currentBlockNumber(chainProfile);
+          long confirmationsCount = currentBlock.subtract(receiptBlock).add(BigInteger.ONE).max(BigInteger.ZERO).longValue();
+          System.out.println(
+              cInfo("📊 TX ")
+                  + abbreviate(txid)
+                  + cInfo(" - Status: ")
+                  + "confirmed"
+                  + cInfo(", Confirmations: ")
+                  + confirmationsCount);
+          checkCount++;
+
+          if (confirmationsCount >= confirmations) {
+            System.out.println(
+                cOk("✅ Transaction ")
+                    + abbreviate(txid)
+                    + cOk(" confirmed with ")
+                    + confirmationsCount
+                    + cOk(" confirmations"));
+            System.out.println(cWarn("⚠️  Monitoring stopped after ") + checkCount + cWarn(" checks"));
+            return;
+          }
+
+          Loader.runWithSpinner("Waiting for next confirmation check...", () -> {
+            Thread.sleep(3000L);
+            return null;
+          });
+        }
+      } catch (RuntimeException ex) {
+        throw ex;
+      }
+    }
+
+    private String abbreviate(String hash) {
+      return hash.length() <= 12 ? hash : hash.substring(0, 10) + "...";
     }
   }
 
@@ -105,5 +205,29 @@ public class Subcommands {
       return "testnet";
     }
     return normalized;
+  }
+
+  private static String cInfo(String text) {
+    return Ansi.ansi().fg(Ansi.Color.CYAN).a(text).reset().toString();
+  }
+
+  private static String cEmph(String text) {
+    return Ansi.ansi().fgRgb(255, 153, 51).bold().a(text).reset().toString();
+  }
+
+  private static String cOk(String text) {
+    return Ansi.ansi().fg(Ansi.Color.GREEN).a(text).reset().toString();
+  }
+
+  private static String cError(String text) {
+    return Ansi.ansi().fg(Ansi.Color.RED).a(text).reset().toString();
+  }
+
+  private static String cMuted(String text) {
+    return Ansi.ansi().fgRgb(140, 140, 140).a(text).reset().toString();
+  }
+
+  private static String cWarn(String text) {
+    return Ansi.ansi().fgRgb(255, 183, 77).a(text).reset().toString();
   }
 }
