@@ -40,7 +40,7 @@ public class Helpers {
     }
 
     return Chain.resolve(
-        configHelpers.loadConfig(), new Chain.ChainSelection(useMainnet, useTestnet || !useMainnet, chainOption));
+        configHelpers.loadConfig(), new Chain.ChainSelection(useMainnet, useTestnet, chainOption));
   }
 
   public String resolveName(ChainProfile chainProfile, String name) {

@@ -69,30 +69,7 @@ public final class Storage {
     }
 
     private static CliConfig defaultConfig() {
-      CliConfig config = new CliConfig();
-      config
-          .getChains()
-          .setMainnet(
-              new ChainProfile(
-                  "mainnet",
-                  "https://mainnet.rpc.rsk.co",
-                  30,
-                  "RBTC",
-                  "https://explorer.rsk.co/tx/%s",
-                  "https://explorer.rsk.co/address/%s",
-                  new ChainFeatures(true, true, true, true)));
-      config
-          .getChains()
-          .setTestnet(
-              new ChainProfile(
-                  "testnet",
-                  "https://public-node.testnet.rsk.co",
-                  31,
-                  "tRBTC",
-                  "https://explorer.testnet.rsk.co/tx/%s",
-                  "https://explorer.testnet.rsk.co/address/%s",
-                  new ChainFeatures(true, false, false, true)));
-      return config;
+      return com.rsk.commands.config.Helpers.defaultConfig();
     }
   }
 

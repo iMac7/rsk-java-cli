@@ -77,7 +77,7 @@ public class Helpers {
 
     CliConfig config = configHelpers.loadConfig();
     return Chain.resolve(
-        config, new Chain.ChainSelection(useMainnet, useTestnet || !useMainnet, chainOption));
+        config, new Chain.ChainSelection(useMainnet, useTestnet, chainOption));
   }
 
   public String activeWalletName() {

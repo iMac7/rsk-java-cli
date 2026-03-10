@@ -59,8 +59,7 @@ public class Helpers {
     }
 
     CliConfig config = configHelpers.loadConfig();
-    return Chain.resolve(
-        config, new Chain.ChainSelection(useMainnet, useTestnet || !useMainnet, chainOption));
+    return Chain.resolve(config, new Chain.ChainSelection(useMainnet, useTestnet, chainOption));
   }
 
   public BigInteger toWei(BigDecimal amount) {
@@ -68,7 +67,15 @@ public class Helpers {
   }
 
   public BigInteger defaultGasLimit() {
-    return BigInteger.valueOf(21_000L);
+    return BigInteger.valueOf(configHelpers.loadConfig().getGas().getDefaultGasLimit());
+  }
+
+  public BigInteger defaultGasPriceWei(ChainProfile chainProfile) {
+    long gasPriceGwei = configHelpers.loadConfig().getGas().getDefaultGasPriceGwei();
+    if (gasPriceGwei <= 0L) {
+      return fetchGasPriceWei(chainProfile);
+    }
+    return BigInteger.valueOf(gasPriceGwei).multiply(BigInteger.valueOf(1_000_000_000L));
   }
 
   public BigInteger fetchGasPriceWei(ChainProfile chainProfile) {

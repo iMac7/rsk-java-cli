@@ -43,6 +43,17 @@ public final class Chain {
       return testnet;
     }
 
+    if (!selection.mainnet()) {
+      String defaultNetwork = config.getNetwork().getDefaultNetwork();
+      if ("testnet".equalsIgnoreCase(defaultNetwork)) {
+        ChainProfile testnet = config.getChains().getTestnet();
+        if (testnet == null) {
+          throw new IllegalArgumentException("Missing chains.testnet in config");
+        }
+        return testnet;
+      }
+    }
+
     ChainProfile mainnet = config.getChains().getMainnet();
     if (mainnet == null) {
       throw new IllegalArgumentException("Missing chains.mainnet in config");

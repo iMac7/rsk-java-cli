@@ -6,6 +6,9 @@ import java.util.Map;
 
 public class CliConfig {
   private Chains chains = new Chains();
+  private NetworkPreferences network = new NetworkPreferences();
+  private GasPreferences gas = new GasPreferences();
+  private DisplayPreferences display = new DisplayPreferences();
   private WalletPreferences wallet = new WalletPreferences();
   private ApiKeys apiKeys = new ApiKeys();
 
@@ -15,6 +18,30 @@ public class CliConfig {
 
   public void setChains(Chains chains) {
     this.chains = chains;
+  }
+
+  public NetworkPreferences getNetwork() {
+    return network;
+  }
+
+  public void setNetwork(NetworkPreferences network) {
+    this.network = network;
+  }
+
+  public GasPreferences getGas() {
+    return gas;
+  }
+
+  public void setGas(GasPreferences gas) {
+    this.gas = gas;
+  }
+
+  public DisplayPreferences getDisplay() {
+    return display;
+  }
+
+  public void setDisplay(DisplayPreferences display) {
+    this.display = display;
   }
 
   public WalletPreferences getWallet() {
@@ -65,6 +92,8 @@ public class CliConfig {
 
   public static class WalletPreferences {
     private boolean cachePasswordInMemory = false;
+    private boolean autoConfirmTransactions = false;
+    private String defaultWalletName = "";
 
     public boolean isCachePasswordInMemory() {
       return cachePasswordInMemory;
@@ -72,6 +101,94 @@ public class CliConfig {
 
     public void setCachePasswordInMemory(boolean cachePasswordInMemory) {
       this.cachePasswordInMemory = cachePasswordInMemory;
+    }
+
+    public boolean isAutoConfirmTransactions() {
+      return autoConfirmTransactions;
+    }
+
+    public void setAutoConfirmTransactions(boolean autoConfirmTransactions) {
+      this.autoConfirmTransactions = autoConfirmTransactions;
+    }
+
+    public String getDefaultWalletName() {
+      return defaultWalletName;
+    }
+
+    public void setDefaultWalletName(String defaultWalletName) {
+      this.defaultWalletName = defaultWalletName;
+    }
+  }
+
+  public static class NetworkPreferences {
+    private String defaultNetwork = "mainnet";
+
+    public String getDefaultNetwork() {
+      return defaultNetwork;
+    }
+
+    public void setDefaultNetwork(String defaultNetwork) {
+      this.defaultNetwork = defaultNetwork;
+    }
+  }
+
+  public static class GasPreferences {
+    private long defaultGasLimit = 21_000L;
+    private long defaultGasPriceGwei = 0L;
+
+    public long getDefaultGasLimit() {
+      return defaultGasLimit;
+    }
+
+    public void setDefaultGasLimit(long defaultGasLimit) {
+      this.defaultGasLimit = defaultGasLimit;
+    }
+
+    public long getDefaultGasPriceGwei() {
+      return defaultGasPriceGwei;
+    }
+
+    public void setDefaultGasPriceGwei(long defaultGasPriceGwei) {
+      this.defaultGasPriceGwei = defaultGasPriceGwei;
+    }
+  }
+
+  public static class DisplayPreferences {
+    private boolean showExplorerLinks = true;
+    private boolean showGasDetails = true;
+    private boolean showBlockDetails = true;
+    private boolean compactMode = false;
+
+    public boolean isShowExplorerLinks() {
+      return showExplorerLinks;
+    }
+
+    public void setShowExplorerLinks(boolean showExplorerLinks) {
+      this.showExplorerLinks = showExplorerLinks;
+    }
+
+    public boolean isShowGasDetails() {
+      return showGasDetails;
+    }
+
+    public void setShowGasDetails(boolean showGasDetails) {
+      this.showGasDetails = showGasDetails;
+    }
+
+    public boolean isShowBlockDetails() {
+      return showBlockDetails;
+    }
+
+    public void setShowBlockDetails(boolean showBlockDetails) {
+      this.showBlockDetails = showBlockDetails;
+    }
+
+    public boolean isCompactMode() {
+      return compactMode;
+    }
+
+    public void setCompactMode(boolean compactMode) {
+      this.compactMode = compactMode;
     }
   }
 

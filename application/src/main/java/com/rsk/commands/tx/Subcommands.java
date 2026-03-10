@@ -87,7 +87,7 @@ public class Subcommands {
       useTestnet = true;
       chainOption = null;
     }
-    return Chain.resolve(config, new Chain.ChainSelection(useMainnet, useTestnet || !useMainnet, chainOption));
+    return Chain.resolve(config, new Chain.ChainSelection(useMainnet, useTestnet, chainOption));
   }
 
   private static String normalizeChainOption(String chainOption) {

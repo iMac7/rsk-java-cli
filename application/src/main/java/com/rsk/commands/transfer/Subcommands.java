@@ -84,7 +84,8 @@ public class Subcommands {
       String resolvedTo = BALANCE_HELPERS.resolveAddressInput(chainProfile, target);
       BigInteger valueWei = HELPERS.toWei(amount);
       BigInteger resolvedGasLimit = gasLimit == null ? HELPERS.defaultGasLimit() : gasLimit;
-      BigInteger resolvedGasPrice = gasPriceWei == null ? HELPERS.fetchGasPriceWei(chainProfile) : gasPriceWei;
+      BigInteger resolvedGasPrice =
+          gasPriceWei == null ? HELPERS.defaultGasPriceWei(chainProfile) : gasPriceWei;
       char[] password = readPassword("Wallet password: ");
       String txHash =
           HELPERS.sendNative(
