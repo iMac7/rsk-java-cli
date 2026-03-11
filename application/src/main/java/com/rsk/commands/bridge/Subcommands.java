@@ -23,7 +23,7 @@ public class Subcommands {
 
   private Subcommands() {}
 
-  @Command(name = "bridge", description = "Bridge flow", mixinStandardHelpOptions = true)
+  @Command(name = "bridge", description = "Interact with RSK Bridge contract", mixinStandardHelpOptions = true)
   public static class BridgeCommand implements Callable<Integer> {
     @Option(names = "--wallet", description = "Wallet name for write calls (defaults to active wallet)")
     String wallet;
