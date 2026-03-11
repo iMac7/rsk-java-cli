@@ -25,12 +25,17 @@ import picocli.CommandLine.ParameterException;
 import picocli.CommandLine.Spec;
 
 public class CliHelpers {
+  private static final String RESET = "\u001b[0m";
+  private static final String SOFT_ORANGE = "\u001b[38;2;255;183;77m";
+  private static final String BOLD = "\u001b[1m";
+
   private CliHelpers() {}
 
   public static CommandLine createCommandLine() {
     CommandLine commandLine = new CommandLine(new RootCommand());
     removeSubcommandVersionOptions(commandLine);
     commandLine.setColorScheme(createHelpColorScheme());
+    applyHelpFormatting(commandLine);
     commandLine.setParameterExceptionHandler(createParameterExceptionHandler());
     commandLine.setExecutionExceptionHandler(
         (ex, cmd, parseResult) -> {
@@ -67,10 +72,20 @@ public class CliHelpers {
     return new Help.ColorScheme.Builder(Help.Ansi.AUTO)
         .commands(Help.Ansi.Style.bold, Help.Ansi.Style.fg("214"))
         .options(Help.Ansi.Style.bold, Help.Ansi.Style.fg("208"))
-        .parameters(Help.Ansi.Style.fg("220"))
-        .optionParams(Help.Ansi.Style.fg("221"))
+        .parameters(Help.Ansi.Style.bold, Help.Ansi.Style.fg("208"))
+        .optionParams(Help.Ansi.Style.bold, Help.Ansi.Style.fg("208"))
         .errors(Help.Ansi.Style.bold, Help.Ansi.Style.fg_red)
         .build();
+  }
+
+  private static void applyHelpFormatting(CommandLine commandLine) {
+    CommandSpec spec = commandLine.getCommandSpec();
+    spec.usageMessage().synopsisHeading(BOLD + SOFT_ORANGE + "Usage:%n" + RESET);
+    spec.usageMessage().descriptionHeading("%n" + BOLD + SOFT_ORANGE + "Description:%n" + RESET);
+    spec.usageMessage().optionListHeading("%n" + BOLD + SOFT_ORANGE + "Options:%n" + RESET);
+    spec.usageMessage().parameterListHeading("%n" + BOLD + SOFT_ORANGE + "Arguments:%n" + RESET);
+    spec.usageMessage().commandListHeading("%n" + BOLD + SOFT_ORANGE + "Commands:%n" + RESET);
+    commandLine.getSubcommands().values().forEach(CliHelpers::applyHelpFormatting);
   }
 
   private static IParameterExceptionHandler createParameterExceptionHandler() {

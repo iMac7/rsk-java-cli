@@ -1,7 +1,6 @@
 package com.rsk.commands.resolve;
 
 import com.rsk.utils.Chain;
-import com.rsk.utils.Chain.ChainFeatures;
 import com.rsk.utils.Chain.ChainProfile;
 import com.rsk.utils.Rns;
 import com.rsk.utils.Storage;

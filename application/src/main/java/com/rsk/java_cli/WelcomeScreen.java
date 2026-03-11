@@ -14,7 +14,7 @@ public class WelcomeScreen {
 
   public static void printWelcome() {
     System.out.println(BOLD + ORANGE + "\nWELCOME TO RSK JAVA CLI\n" + RESET);
-    System.out.println(SOFT_ORANGE + "Usage: " + RESET + WHITE + "rsk-cli [options] [command]" + RESET);
+    System.out.println(SOFT_ORANGE + "Usage: " + RESET + WHITE + "rsk-java-cli [options] [command]" + RESET);
     System.out.println();
     System.out.println(SOFT_ORANGE + "Options:" + RESET);
     System.out.println(ORANGE + "  -v, --version" + RESET + WHITE + "             Display the current version" + RESET);
