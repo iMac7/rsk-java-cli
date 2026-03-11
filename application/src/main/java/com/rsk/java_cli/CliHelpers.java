@@ -34,6 +34,7 @@ public class CliHelpers {
   public static CommandLine createCommandLine() {
     CommandLine commandLine = new CommandLine(new RootCommand());
     removeSubcommandVersionOptions(commandLine);
+    commandLine.setSeparator(" ");
     commandLine.setColorScheme(createHelpColorScheme());
     applyHelpFormatting(commandLine);
     commandLine.setParameterExceptionHandler(createParameterExceptionHandler());

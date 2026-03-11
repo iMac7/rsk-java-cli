@@ -48,7 +48,7 @@ public class Subcommands {
       @Option(names = "--address", paramLabel = "<address>", description = "Address or RNS name")
       String address;
 
-      @Option(names = "--rns", paramLabel = "<name>", description = "RNS target")
+      @Option(names = "--rns", paramLabel = "<name>", description = "RNS name")
       String rns;
     }
 
