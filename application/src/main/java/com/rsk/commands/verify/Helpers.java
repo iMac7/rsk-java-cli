@@ -1,9 +1,10 @@
 package com.rsk.commands.verify;
 
-import com.rsk.commands.config.CliConfig;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rsk.utils.Chain;
-import com.rsk.utils.Chain.ChainFeatures;
 import com.rsk.utils.Chain.ChainProfile;
+import com.rsk.utils.Json;
 import com.rsk.utils.Rns;
 import com.rsk.utils.Storage;
 import java.io.IOException;
@@ -20,6 +21,8 @@ import java.util.Map;
 import java.util.UUID;
 
 public class Helpers {
+  private static final ObjectMapper OBJECT_MAPPER = Json.ObjectMapperFactory.create();
+
   private final com.rsk.commands.config.Helpers configHelpers;
 
   public Helpers(com.rsk.commands.config.Helpers configHelpers) {
@@ -36,25 +39,9 @@ public class Helpers {
     return Chain.resolveChain(configHelpers.loadConfig(), mainnet, testnet, chain, chainUrl);
   }
 
-  public void validateVerifyInput(
-      String address,
-      boolean autodetectConstructorArgs,
-      String constructorArgs,
-      List<String> decodedArgs) {
+  public void validateVerifyInput(String address) {
     if (!Rns.isHexAddress(address)) {
       throw new IllegalArgumentException("Invalid contract address: " + address);
-    }
-    if (!autodetectConstructorArgs) {
-      boolean hasConstructorArgs = constructorArgs != null && !constructorArgs.isBlank();
-      boolean hasDecodedArgs = decodedArgs != null && !decodedArgs.isEmpty();
-      if (!hasConstructorArgs && hasDecodedArgs) {
-        throw new IllegalArgumentException(
-            "--decodedArgs is not supported by Blockscout standard-input verify. Provide --constructor-args (hex).");
-      }
-      if (!hasConstructorArgs) {
-        throw new IllegalArgumentException(
-            "When --autodetect-constructor-args=false, --constructor-args is required.");
-      }
     }
   }
 
@@ -77,7 +64,8 @@ public class Helpers {
           + address
           + "/verification/via/standard-input";
     }
-    throw new IllegalArgumentException("Contract verification is only supported on Rootstock mainnet/testnet.");
+    throw new IllegalArgumentException(
+        "Contract verification is only supported on Rootstock mainnet/testnet.");
   }
 
   public String blockscoutAddressUrl(ChainProfile chainProfile, String address) {
@@ -98,25 +86,15 @@ public class Helpers {
   }
 
   public void submitVerification(
-      ChainProfile chainProfile,
-      String jsonPath,
-      String contractName,
-      String address,
-      String compilerVersion,
-      String licenseType,
-      boolean autodetectConstructorArgs,
-      String constructorArgs) {
+      ChainProfile chainProfile, String jsonPath, String contractName, String address) {
     String endpoint = blockscoutVerifyUrl(chainProfile, address);
     byte[] jsonFile = readJsonFile(jsonPath);
+    String compilerVersion = extractCompilerVersion(jsonFile);
 
     Map<String, String> fields = new LinkedHashMap<>();
     fields.put("compiler_version", compilerVersion);
     fields.put("contract_name", contractName);
-    fields.put("license_type", licenseType);
-    fields.put("autodetect_constructor_args", Boolean.toString(autodetectConstructorArgs));
-    if (!autodetectConstructorArgs && constructorArgs != null && !constructorArgs.isBlank()) {
-      fields.put("constructor_args", constructorArgs);
-    }
+    fields.put("autodetect_constructor_args", "true");
 
     String boundary = "----rskjavacli-" + UUID.randomUUID();
     HttpRequest.BodyPublisher body =
@@ -138,6 +116,29 @@ public class Helpers {
     } catch (Exception ex) {
       throw new IllegalStateException("Unable to verify contract.", ex);
     }
+  }
+
+  private String extractCompilerVersion(byte[] jsonFile) {
+    try {
+      JsonNode root = OBJECT_MAPPER.readTree(jsonFile);
+      List<String> candidates =
+          List.of(
+              root.path("compiler_version").asText(),
+              root.path("compilerVersion").asText(),
+              root.path("solcVersion").asText(),
+              root.path("compiler").path("version").asText(),
+              root.path("metadata").path("compiler").path("version").asText());
+      for (String candidate : candidates) {
+        if (candidate != null && !candidate.isBlank()) {
+          return candidate;
+        }
+      }
+    } catch (IOException ex) {
+      throw new IllegalArgumentException("Invalid JSON Standard Input file.", ex);
+    }
+    throw new IllegalArgumentException(
+        "Unable to determine compiler version from JSON Standard Input. "
+            + "Add a compiler version field such as compiler.version or compiler_version.");
   }
 
   private static HttpRequest.BodyPublisher multipartBody(
@@ -173,5 +174,4 @@ public class Helpers {
     byteArrays.add(ending.getBytes(StandardCharsets.UTF_8));
     return HttpRequest.BodyPublishers.ofByteArrays(byteArrays);
   }
-
 }

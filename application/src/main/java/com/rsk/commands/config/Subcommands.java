@@ -24,7 +24,8 @@ public class Subcommands {
     Terminal.pick("\uD83C\uDFA8 Configure Display Preferences", "[display] Configure Display Preferences"),
     Terminal.pick("\uD83D\uDC5B Configure Wallet Preferences", "[wallet] Configure Wallet Preferences"),
     Terminal.pick("\uD83D\uDD04 Reset to Defaults", "[reset] Reset to Defaults"),
-    Terminal.pick("\uD83D\uDCBE Save and Exit", "[save] Save and Exit")
+    Terminal.pick("\uD83D\uDCBE Save and Exit", "[save] Save and Exit"),
+    Terminal.pick("\u274C Exit without saving", "[exit] Exit without saving")
   };
   private static final String[] NETWORK_MENU_ITEMS = {
     "Mainnet", "Testnet", Terminal.pick("\u21A9\uFE0F Back", "[back] Back")
@@ -33,9 +34,10 @@ public class Subcommands {
     Terminal.pick("\uD83D\uDD10 Set/Update API Key", "[set] Set/Update API Key"),
     Terminal.pick("\u274C Remove API Key", "[remove] Remove API Key"),
     Terminal.pick("\uD83D\uDCCB List API Keys", "[list] List API Keys"),
-    Terminal.pick("\u21A9\uFE0F Back", "[back] Back")
+    Terminal.pick("\u21A9\uFE0F  Back", "[back] Back")
   };
-  private static final int MAIN_SAVE_INDEX = MAIN_MENU_ITEMS.length - 1;
+  private static final int MAIN_SAVE_INDEX = MAIN_MENU_ITEMS.length - 2;
+  private static final int MAIN_EXIT_INDEX = MAIN_MENU_ITEMS.length - 1;
   private static final int NETWORK_BACK_INDEX = NETWORK_MENU_ITEMS.length - 1;
   private static final int API_BACK_INDEX = API_MENU_ITEMS.length - 1;
 
@@ -62,6 +64,9 @@ public class Subcommands {
             HELPERS.saveConfig(config);
             printSuccess("Configuration saved.");
             WelcomeScreen.printWelcome();
+            return 0;
+          }
+          if (selected == MAIN_EXIT_INDEX) {
             return 0;
           }
 

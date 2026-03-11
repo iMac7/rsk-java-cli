@@ -20,6 +20,7 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Help;
 import picocli.CommandLine.IParameterExceptionHandler;
 import picocli.CommandLine.Model.CommandSpec;
+import picocli.CommandLine.Model.OptionSpec;
 import picocli.CommandLine.ParameterException;
 import picocli.CommandLine.Spec;
 
@@ -28,6 +29,7 @@ public class CliHelpers {
 
   public static CommandLine createCommandLine() {
     CommandLine commandLine = new CommandLine(new RootCommand());
+    removeSubcommandVersionOptions(commandLine);
     commandLine.setColorScheme(createHelpColorScheme());
     commandLine.setParameterExceptionHandler(createParameterExceptionHandler());
     commandLine.setExecutionExceptionHandler(
@@ -37,6 +39,19 @@ public class CliHelpers {
           return cmd.getCommandSpec().exitCodeOnExecutionException();
         });
     return commandLine;
+  }
+
+  private static void removeSubcommandVersionOptions(CommandLine root) {
+    root.getSubcommands().values().forEach(CliHelpers::removeVersionOptionsRecursively);
+  }
+
+  private static void removeVersionOptionsRecursively(CommandLine commandLine) {
+    CommandSpec spec = commandLine.getCommandSpec();
+    spec.options().stream()
+        .filter(OptionSpec::versionHelp)
+        .toList()
+        .forEach(spec::remove);
+    commandLine.getSubcommands().values().forEach(CliHelpers::removeVersionOptionsRecursively);
   }
 
   public static String[] enforceWalletArgStyle(String[] args) {

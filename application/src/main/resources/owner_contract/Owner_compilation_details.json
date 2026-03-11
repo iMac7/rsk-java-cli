@@ -1,0 +1,20 @@
+{
+  "language": "Solidity",
+  "compiler_version": "0.8.31+commit.fd3a2265",
+  "sources": {
+    "Owner.sol": {
+      "content": "// SPDX-License-Identifier: GPL-3.0\npragma solidity ^0.8.0;\n\ncontract Owner {\n    address private owner;\n\n    event OwnerSet(address indexed oldOwner, address indexed newOwner);\n\n    modifier onlyOwner() {\n        require(msg.sender == owner, \"Caller is not owner\");\n        _;\n    }\n\n    constructor() {\n        owner = msg.sender;\n        emit OwnerSet(address(0), owner);\n    }\n\n    function changeOwner(address newOwner) public onlyOwner {\n        require(newOwner != address(0), \"Zero address not allowed\");\n        emit OwnerSet(owner, newOwner);\n        owner = newOwner;\n    }\n\n    function getOwner() external view returns (address) {\n        return owner;\n    }\n}"
+    }
+  },
+  "settings": {
+    "optimizer": {
+      "enabled": false,
+      "runs": 200
+    },
+    "outputSelection": {
+      "*": {
+        "*": ["abi", "evm.bytecode"]
+      }
+    }
+  }
+}

@@ -87,26 +87,30 @@ public class Helpers {
     if (!Numeric.containsHexPrefix(bytecode)) {
       bytecode = Numeric.prependHexPrefix(bytecode);
     }
-    List<String> constructorTypes = constructorTypesFromAbi(abiJson);
+    List<ConstructorInput> constructorInputs = constructorInputsFromAbi(abiJson);
     List<String> providedArgs = args == null ? List.of() : args;
-    if (constructorTypes.size() != providedArgs.size()) {
+    if (constructorInputs.size() != providedArgs.size()) {
       throw new IllegalArgumentException(
           "Constructor argument count mismatch. Expected "
-              + constructorTypes.size()
+              + constructorInputs.size()
               + " but got "
               + providedArgs.size()
               + ".");
     }
-    if (constructorTypes.isEmpty()) {
+    if (constructorInputs.isEmpty()) {
       return bytecode;
     }
 
     List<Type> constructorArgs = new ArrayList<>();
-    for (int i = 0; i < constructorTypes.size(); i++) {
-      constructorArgs.add(toAbiType(constructorTypes.get(i), providedArgs.get(i)));
+    for (int i = 0; i < constructorInputs.size(); i++) {
+      constructorArgs.add(toAbiType(constructorInputs.get(i).type(), providedArgs.get(i)));
     }
     String encoded = FunctionEncoder.encodeConstructor(constructorArgs);
     return bytecode + Numeric.cleanHexPrefix(encoded);
+  }
+
+  public List<ConstructorInput> constructorInputs(String abiJson) {
+    return constructorInputsFromAbi(abiJson);
   }
 
   public DeploymentResult deployContract(
@@ -164,7 +168,9 @@ public class Helpers {
 
   public record DeploymentResult(String txHash, String contractAddress, String explorerUrl) {}
 
-  private static List<String> constructorTypesFromAbi(String abiJson) {
+  public record ConstructorInput(String name, String type) {}
+
+  private static List<ConstructorInput> constructorInputsFromAbi(String abiJson) {
     try {
       JsonNode root = OBJECT_MAPPER.readTree(abiJson);
       if (!root.isArray()) {
@@ -176,15 +182,17 @@ public class Helpers {
           if (!inputs.isArray()) {
             return List.of();
           }
-          List<String> types = new ArrayList<>();
+          List<ConstructorInput> constructorInputs = new ArrayList<>();
           for (JsonNode input : inputs) {
             String type = input.path("type").asText();
             if (type == null || type.isBlank()) {
               throw new IllegalArgumentException("Constructor input is missing type.");
             }
-            types.add(type);
+            String name = input.path("name").asText();
+            constructorInputs.add(
+                new ConstructorInput(name == null || name.isBlank() ? "" : name, type));
           }
-          return types;
+          return constructorInputs;
         }
       }
       return List.of();

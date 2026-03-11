@@ -1,108 +1,103 @@
 package com.rsk.commands.verify;
 
 import com.rsk.utils.Chain.ChainProfile;
-import java.util.List;
+import java.nio.file.Path;
 import java.util.concurrent.Callable;
-import picocli.CommandLine.ArgGroup;
+import org.fusesource.jansi.Ansi;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
 public class Subcommands {
   private static final Helpers HELPERS = Helpers.defaultHelpers();
+  private static final Path EXAMPLE_JSON_PATH =
+      Path.of(
+              "application",
+              "src",
+              "main",
+              "resources",
+              "owner_contract",
+              "Owner_compilation_details.json")
+          .toAbsolutePath()
+          .normalize();
 
   private Subcommands() {}
 
-  @Command(name = "verify", description = "Verify contract", mixinStandardHelpOptions = true)
+  @Command(name = "verify", description = "Verify a contract", mixinStandardHelpOptions = true)
   public static class VerifyCommand implements Callable<Integer> {
     @Option(
         names = "--json",
-        required = true,
         paramLabel = "<path>",
-        description = "Path to Standard JSON Input file")
+        description = "Path to the JSON Standard Input")
     String jsonPath;
 
-    @Option(names = "--name", required = true, paramLabel = "<name>", description = "Contract name")
+    @Option(names = "--example", description = "Use the bundled Owner example verification JSON")
+    boolean example;
+
+    @Option(names = "--name", required = true, paramLabel = "<name>", description = "Name of the contract")
     String contractName;
 
-    @Option(names = "--address", required = true, paramLabel = "<address>", description = "Deployed contract address")
-    String address;
-
     @Option(
-        names = "--compiler-version",
+        names = {"-a", "--address"},
         required = true,
-        paramLabel = "<version>",
-        description = "Compiler version, e.g. v0.8.17+commit...")
-    String compilerVersion;
-
-    @Option(names = "--license-type", defaultValue = "mit", description = "License type")
-    String licenseType;
-
-    @Option(names = "--autodetect-constructor-args", defaultValue = "true")
-    boolean autodetectConstructorArgs;
-
-    @Option(
-        names = "--constructor-args",
-        paramLabel = "<hex>",
-        description = "Hex-encoded constructor args if autodetect is false")
-    String constructorArgs;
-
-    @Option(
-        names = "--decodedArgs",
-        description = "Deprecated alias. Use --constructor-args hex value")
-    List<String> decodedArgs;
-
-    @ArgGroup(exclusive = true, multiplicity = "0..1")
-    NetworkOptions networkOptions = new NetworkOptions();
-
-    static class NetworkOptions {
-      @Option(names = "--mainnet", description = "Use chains.mainnet")
-      boolean mainnet;
-
-      @Option(names = "--testnet", description = "Use chains.testnet")
-      boolean testnet;
-
-      @Option(
-          names = "--chain",
-          paramLabel = "<name>",
-          description = "Use config chain key, e.g. chains.custom.<name> or <name>")
-      String chain;
-
-      @Option(names = "--chainurl", paramLabel = "<url>", description = "Use an explicit RPC URL")
-      String chainUrl;
-    }
+        paramLabel = "<address>",
+        description = "Address of the deployed contract")
+    String address;
 
     @Override
     public Integer call() {
-      HELPERS.validateVerifyInput(address, autodetectConstructorArgs, constructorArgs, decodedArgs);
+      HELPERS.validateVerifyInput(address);
+      String resolvedJsonPath = resolveJsonPath();
 
-      ChainProfile chainProfile =
-          HELPERS.resolveChain(
-              networkOptions.mainnet,
-              networkOptions.testnet,
-              networkOptions.chain,
-              networkOptions.chainUrl);
+      ChainProfile chainProfile = HELPERS.resolveChain(false, false, null, null);
 
-      System.out.printf("Initializing verification on %s...%n", chainProfile.name());
-      System.out.println("Reading JSON Standard Input from " + jsonPath + "...");
-      System.out.println("Verifying contract " + contractName + " deployed at " + address + "...");
-      if (!autodetectConstructorArgs) {
-        System.out.println("Using constructor arguments: " + constructorArgs);
-      }
+      System.out.println();
+      System.out.println(cEmph("Initializing verification on " + chainProfile.name() + "..."));
+      System.out.println(cInfo("Reading JSON Standard Input from ") + resolvedJsonPath + "...");
+      System.out.println(cInfo("Verifying contract ") + contractName + cInfo(" deployed at ") + address + "...");
 
-      HELPERS.submitVerification(
-          chainProfile,
-          jsonPath,
-          contractName,
-          address,
-          compilerVersion,
-          licenseType,
-          autodetectConstructorArgs,
-          constructorArgs);
+      HELPERS.submitVerification(chainProfile, resolvedJsonPath, contractName, address);
 
-      System.out.println("Contract verification request sent.");
-      System.out.println("Verification submitted successfully.");
-      System.out.println("Explorer: " + HELPERS.blockscoutAddressUrl(chainProfile, address));
+      System.out.println();
+      System.out.println(cRule());
+      System.out.println(cOk("Contract verification request sent."));
+      System.out.println(cOk("Verification submitted successfully."));
+      System.out.println(cMuted("Explorer: " + HELPERS.blockscoutAddressUrl(chainProfile, address)));
+      System.out.println(cRule());
       return 0;
     }
+
+    private String resolveJsonPath() {
+      if (example) {
+        return EXAMPLE_JSON_PATH.toString();
+      }
+      if (jsonPath == null || jsonPath.isBlank()) {
+        throw new IllegalArgumentException("Provide --json <path> or use --example.");
+      }
+      return jsonPath.trim();
+    }
+  }
+
+  private static String cEmph(String text) {
+    return Ansi.ansi().fgRgb(255, 153, 51).bold().a(text).reset().toString();
+  }
+
+  private static String cInfo(String text) {
+    return Ansi.ansi().fg(Ansi.Color.CYAN).a(text).reset().toString();
+  }
+
+  private static String cMuted(String text) {
+    return Ansi.ansi().fgRgb(140, 140, 140).a(text).reset().toString();
+  }
+
+  private static String cOk(String text) {
+    return Ansi.ansi().fg(Ansi.Color.GREEN).a(text).reset().toString();
+  }
+
+  private static String cRule() {
+    return Ansi.ansi()
+        .fgRgb(140, 140, 140)
+        .a("────────────────────────────────────────")
+        .reset()
+        .toString();
   }
 }
