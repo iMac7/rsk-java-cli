@@ -32,7 +32,10 @@ public class Subcommands {
     @Option(names = "--exclude-zero-value")
     String excludeZeroValue;
 
-    @Option(names = "--category", description = "Comma-separated categories, e.g. erc721,erc1155")
+    @Option(
+        names = "--category",
+        description =
+            "Requires non-empty comma-separated categories. Allowed: external, internal, erc20, erc721, erc1155, specialnft")
     String category;
 
     @Option(names = "--maxcount", description = "Hex maxCount (or decimal, auto-converted)")
