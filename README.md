@@ -1,23 +1,43 @@
-Implemented:
-wallet
-
-Todo
-fix cmds, interactivity
-
-Deferred
-monitor cmd - useful?
 
 
-### Build app
-./gradlew :application:build
-./gradlew.bat :application:build (windows)
+### Build
+macOS/Linux:
+`./gradlew :application:build`
 
-### Run app
-(in root dir)
-./rsk-java-cli
+make sure `gradlew` is executable
+```bash
+chmod +x gradlew
+```
 
-Wallets and config are stored in
-~/.rsk-java-cli
+Windows:
+`.\gradlew.bat :application:build`
 
-For backup wallet command, use forward slashes for path (including on windows). (bug/feature?)
+### Run
+Run from the repo root.
 
+macOS/Linux wrapper:
+`./rsk-java-cli`
+
+Windows CMD wrapper:
+`rsk-java-cli.bat`
+
+Windows PowerShell wrapper:
+`.\rsk-java-cli.ps1`
+
+Run from source with Gradle:
+macOS/Linux:
+`./gradlew :application:runCli`
+
+Windows:
+`.\gradlew.bat :application:runCli`
+
+pass CLI arguments after the command
+`./rsk-java-cli wallet --help`
+`.\rsk-java-cli.ps1 wallet --help`
+`.\gradlew.bat :application:runCli --args="wallet --help"`
+
+Wallets and config are stored in:
+`~/.rsk-java-cli`
+`[home-dir]/.rsk-java-cli`
+
+For backup wallet command, use forward slashes for path in case of failed path arg.

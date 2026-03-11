@@ -2,7 +2,6 @@
 .gradle/
 **/build/
 **/bin/
-!gradle/wrapper/gradle-wrapper.jar
 
 # Java
 *.class
@@ -10,6 +9,9 @@
 *.war
 *.ear
 out/
+
+!gradle/wrapper/gradle-wrapper.jar
+
 
 # IDEs
 .idea/
