@@ -1,9 +1,8 @@
 package com.rsk.commands.wallet;
 
 import com.rsk.commands.wallet.Helpers.WalletMetadata;
-import com.rsk.utils.TerminalText;
+import com.rsk.utils.Terminal;
 import java.io.Console;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -12,32 +11,19 @@ import org.fusesource.jansi.Ansi;
 import org.jline.reader.LineReader;
 import org.jline.reader.LineReaderBuilder;
 import org.jline.reader.UserInterruptException;
-import org.jline.terminal.Attributes;
-import org.jline.terminal.Terminal;
-import org.jline.terminal.TerminalBuilder;
-import org.jline.utils.NonBlockingReader;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
 public class Subcommands {
   private static final Helpers HELPERS = Helpers.defaultHelpers();
   private static final String INPUT_CANCELLED_MESSAGE = "Input cancelled.";
-  private static final Terminal MENU_TERMINAL = createTerminal();
   private static final LineReader PROMPT_READER = createPromptReader();
 
   private Subcommands() {}
 
-  private static Terminal createTerminal() {
-    try {
-      return TerminalBuilder.builder().system(true).encoding(StandardCharsets.UTF_8).build();
-    } catch (Exception ignored) {
-      return null;
-    }
-  }
-
   private static LineReader createPromptReader() {
-    if (MENU_TERMINAL != null) {
-      return LineReaderBuilder.builder().terminal(MENU_TERMINAL).build();
+    if (Terminal.interactiveTerminal() != null) {
+      return LineReaderBuilder.builder().terminal(Terminal.interactiveTerminal()).build();
     }
     return LineReaderBuilder.builder().build();
   }
@@ -59,28 +45,26 @@ public class Subcommands {
       })
   public static class WalletCommand implements Callable<Integer> {
     private static final String[] MENU_ITEMS = {
-      TerminalText.pick("\uD83C\uDD95 Create a new wallet", "[new] Create a new wallet"),
-      TerminalText.pick("\uD83D\uDD11 Import existing wallet", "[import] Import existing wallet"),
-      TerminalText.pick("\uD83D\uDD0D List saved wallets", "[list] List saved wallets"),
-      TerminalText.pick("\uD83D\uDD10 Show wallet private key", "[dump] Show wallet private key"),
-      TerminalText.pick("\uD83D\uDD01 Switch wallet", "[switch] Switch wallet"),
-      TerminalText.pick("\uD83D\uDCDD Rename wallet", "[rename] Rename wallet"),
-      TerminalText.pick("\uD83D\uDCD2 Address book", "[book] Address book"),
-      TerminalText.pick("\uD83D\uDCC2 Backup wallet data", "[backup] Backup wallet data"),
-      TerminalText.pick("\u274C Delete wallet", "[delete] Delete wallet"),
-      TerminalText.pick("\uD83D\uDEAA Exit", "[exit] Exit")
+      Terminal.pick("\uD83C\uDD95 Create a new wallet", "[new] Create a new wallet"),
+      Terminal.pick("\uD83D\uDD11 Import existing wallet", "[import] Import existing wallet"),
+      Terminal.pick("\uD83D\uDD0D List saved wallets", "[list] List saved wallets"),
+      Terminal.pick("\uD83D\uDD10 Show wallet private key", "[dump] Show wallet private key"),
+      Terminal.pick("\uD83D\uDD01 Switch wallet", "[switch] Switch wallet"),
+      Terminal.pick("\uD83D\uDCDD Rename wallet", "[rename] Rename wallet"),
+      Terminal.pick("\uD83D\uDCD2 Address book", "[book] Address book"),
+      Terminal.pick("\uD83D\uDCC2 Backup wallet data", "[backup] Backup wallet data"),
+      Terminal.pick("\u274C Delete wallet", "[delete] Delete wallet"),
+      Terminal.pick("\uD83D\uDEAA Exit", "[exit] Exit")
     };
     private static final String[] ADDRESS_BOOK_MENU_ITEMS = {
-      TerminalText.pick("\u2795 Add address", "[add] Add address"),
-      TerminalText.pick("\uD83D\uDCD6 View address book", "[view] View address book"),
-      TerminalText.pick("\u270F\uFE0F Update address", "[update] Update address"),
-      TerminalText.pick("\uD83D\uDDD1\uFE0F Delete address", "[delete] Delete address"),
-      TerminalText.pick("\u21A9\uFE0F Back", "[back] Back")
+      Terminal.pick("\u2795 Add address", "[add] Add address"),
+      Terminal.pick("\uD83D\uDCD6 View address book", "[view] View address book"),
+      Terminal.pick("\u270F\uFE0F Update address", "[update] Update address"),
+      Terminal.pick("\uD83D\uDDD1\uFE0F Delete address", "[delete] Delete address"),
+      Terminal.pick("\u21A9\uFE0F Back", "[back] Back")
     };
     private static final int EXIT_INDEX = MENU_ITEMS.length - 1;
     private static final int ADDRESS_BOOK_BACK_INDEX = ADDRESS_BOOK_MENU_ITEMS.length - 1;
-
-    private int renderedLines = 0;
 
     @Override
     public Integer call() {
@@ -113,150 +97,12 @@ public class Subcommands {
     }
 
     private int selectMenu(String title, String[] menuItems, int cancelIndex) {
-      renderedLines = 0;
-      int selectedIndex = 0;
-
-      if (MENU_TERMINAL == null) {
-        throw new IllegalStateException("Unable to initialize wallet terminal.");
-      }
-
-      try {
-        Attributes originalAttributes = MENU_TERMINAL.enterRawMode();
-        NonBlockingReader reader = MENU_TERMINAL.reader();
-
-        try {
-          while (true) {
-            renderMenu(title, menuItems, selectedIndex, cancelIndex >= 0 ? "exit" : "back");
-            int key = reader.read();
-            if (key < 0) {
-              continue;
-            }
-            if (key == 3) {
-              renderedLines = 0;
-              return cancelIndex;
-            }
-            if (key == 13 || key == 10) {
-              renderedLines = 0;
-              return selectedIndex;
-            }
-            if (isForwardCycleKey(key)) {
-              selectedIndex = moveDown(selectedIndex, menuItems.length);
-              continue;
-            }
-            if (isBackwardCycleKey(key)) {
-              selectedIndex = moveUp(selectedIndex, menuItems.length);
-              continue;
-            }
-            if (key == 224 || key == 0) {
-              selectedIndex = handleWindowsArrow(reader, selectedIndex, menuItems.length);
-              continue;
-            }
-            if (key == 27) {
-              Integer updated = handleEscapeSequence(reader, selectedIndex, menuItems.length);
-              if (updated == null) {
-                renderedLines = 0;
-                return cancelIndex;
-              }
-              selectedIndex = updated;
-            }
-          }
-        } finally {
-          MENU_TERMINAL.setAttributes(originalAttributes);
-          MENU_TERMINAL.writer().flush();
-        }
-      } catch (Exception ex) {
-        throw new IllegalStateException("Unable to render wallet menu.", ex);
-      }
-    }
-
-    private Integer handleEscapeSequence(NonBlockingReader reader, int selectedIndex, int itemCount) {
-      try {
-        int second = reader.read(25);
-        if (second == NonBlockingReader.READ_EXPIRED || second < 0) {
-          return null;
-        }
-        if (second == '[' || second == 'O') {
-          int third = reader.read(25);
-          if (third == 'A') {
-            return moveUp(selectedIndex, itemCount);
-          }
-          if (third == 'B') {
-            return moveDown(selectedIndex, itemCount);
-          }
-        }
-        return null;
-      } catch (Exception ex) {
-        throw new IllegalStateException("Unable to read keyboard escape sequence.", ex);
-      }
-    }
-
-    private int handleWindowsArrow(NonBlockingReader reader, int selectedIndex, int itemCount) {
-      try {
-        int scan = reader.read(25);
-        if (scan == 72) {
-          return moveUp(selectedIndex, itemCount);
-        }
-        if (scan == 80) {
-          return moveDown(selectedIndex, itemCount);
-        }
-        return selectedIndex;
-      } catch (Exception ex) {
-        throw new IllegalStateException("Unable to read keyboard scan code.", ex);
-      }
-    }
-
-    private int moveUp(int selectedIndex, int itemCount) {
-      return (selectedIndex - 1 + itemCount) % itemCount;
-    }
-
-    private int moveDown(int selectedIndex, int itemCount) {
-      return (selectedIndex + 1) % itemCount;
-    }
-
-    private boolean isForwardCycleKey(int key) {
-      return key == 9 || key == 's' || key == 'S' || key == 'j' || key == 'J';
-    }
-
-    private boolean isBackwardCycleKey(int key) {
-      return key == 'w' || key == 'W' || key == 'k' || key == 'K';
-    }
-
-    private void renderMenu(String title, String[] menuItems, int selectedIndex, String escapeAction) {
-      if (renderedLines > 0) {
-        System.out.print("\u001b[" + renderedLines + "F");
-      }
-
-      int lines = 0;
-
-      System.out.println(Ansi.ansi().fgRgb(255, 183, 77).bold().a(title).reset());
-      lines++;
-
-      System.out.println();
-      lines++;
-
-      for (int i = 0; i < menuItems.length; i++) {
-        String pointer = i == selectedIndex ? "> " : "  ";
-        if (i == selectedIndex) {
-          System.out.println(
-              Ansi.ansi().fgRgb(255, 153, 51).bold().a(pointer + menuItems[i]).reset());
-        } else {
-          System.out.println(Ansi.ansi().fg(Ansi.Color.WHITE).a(pointer + menuItems[i]).reset());
-        }
-        lines++;
-      }
-
-      System.out.println();
-      lines++;
-
-      System.out.println(
-          Ansi.ansi()
-              .fgRgb(255, 183, 77)
-              .a("Up/Down navigate | Enter select | Ctrl+C/Esc " + escapeAction)
-              .reset());
-      lines++;
-
-      renderedLines = lines;
-      System.out.flush();
+      return Terminal.selectMenu(
+          List.of(title, ""),
+          menuItems,
+          List.of("", "Up/Down navigate | Enter select | Ctrl+C/Esc " + (cancelIndex >= 0 ? "exit" : "back")),
+          cancelIndex,
+          "wallet");
     }
 
     private void executeAction(int selectedIndex) {
@@ -436,8 +282,8 @@ public class Subcommands {
       }
 
       String activeWallet = HELPERS.activeWallet().map(WalletMetadata::name).orElse("");
-      String activeMarker = TerminalText.pick("\u2B50", "*");
-      String inactiveMarker = TerminalText.pick("\u2022", "-");
+      String activeMarker = Terminal.pick("\u2B50", "*");
+      String inactiveMarker = Terminal.pick("\u2022", "-");
       String[] options =
           wallets.stream()
               .map(
@@ -460,8 +306,8 @@ public class Subcommands {
       }
 
       String active = HELPERS.activeWallet().map(WalletMetadata::name).orElse("");
-      String activeMarker = TerminalText.pick("\u2B50", "*");
-      String inactiveMarker = TerminalText.pick("\u2022", "-");
+      String activeMarker = Terminal.pick("\u2B50", "*");
+      String inactiveMarker = Terminal.pick("\u2022", "-");
       System.out.println("Available wallets:");
       wallets.forEach(
           wallet -> {

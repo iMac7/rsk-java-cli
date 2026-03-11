@@ -2,10 +2,8 @@ package com.rsk.commands.deploy;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.rsk.commands.config.CliConfig;
 import com.rsk.commands.wallet.Helpers.WalletMetadata;
 import com.rsk.utils.Chain;
-import com.rsk.utils.Chain.ChainFeatures;
 import com.rsk.utils.Chain.ChainProfile;
 import com.rsk.utils.Json;
 import java.io.IOException;

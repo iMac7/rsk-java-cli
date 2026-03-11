@@ -1,6 +1,6 @@
 package com.rsk.java_cli;
 
-import com.rsk.utils.TerminalText;
+import com.rsk.utils.Terminal;
 
 public class WelcomeScreen {
   private static final String RESET = "\u001b[0m";
@@ -20,20 +20,20 @@ public class WelcomeScreen {
     System.out.println(ORANGE + "  -v, --version" + RESET + WHITE + "             Display the current version" + RESET);
     System.out.println(ORANGE + "  -h, --help" + RESET + WHITE + "                display help for command" + RESET);
     System.out.println();
-    printMenuItem(TerminalText.pick("\uD83D\uDD11 wallet          ", "wallet      "), "Wallet management");
-    printMenuItem(TerminalText.pick("\u2699\uFE0F  config          ", "config      "), "Config UI");
-    printMenuItem(TerminalText.pick("\uD83D\uDCB0 balance         ", "balance     "), "Check native balance");
-    printMenuItem(TerminalText.pick("\uD83D\uDE80 transfer        ", "transfer    "), "Send native transfer");
-    printMenuItem(TerminalText.pick("\uD83E\uDDFE tx              ", "tx          "), "Transaction status and monitoring");
-    printMenuItem(TerminalText.pick("\uD83D\uDD0E resolve         ", "resolve     "), "Resolve RNS names to and from addresses");
-    printMenuItem(TerminalText.pick("\uD83D\uDEE0\uFE0F  deploy          ", "deploy      "), "Deploy contract");
-    printMenuItem(TerminalText.pick("\u2705 verify          ", "verify      "), "Verify contract");
-    printMenuItem(TerminalText.pick("\uD83D\uDCDC contract        ", "contract    "), "Interactive contract mode");
-    printMenuItem(TerminalText.pick("\uD83C\uDF09 bridge          ", "bridge      "), "Bridge flow");
-    printMenuItem(TerminalText.pick("\uD83D\uDD58 history         ", "history     "), "History API");
-    printMenuItem(TerminalText.pick("\uD83E\uDDF1 transaction     ", "transaction "), "Create and send transactions");
-    printMenuItem(TerminalText.pick("\uD83D\uDCE6 batch-transfer  ", "batch-transfer  "), "Execute batch transfers");
-    printMenuItem(TerminalText.pick("\uD83E\uDDEA simulate        ", "simulate    "), "Simulate transactions");
+    printMenuItem(Terminal.pick("\uD83D\uDD11 wallet          ", "wallet      "), "Wallet management");
+    printMenuItem(Terminal.pick("\u2699\uFE0F  config          ", "config      "), "Config UI");
+    printMenuItem(Terminal.pick("\uD83D\uDCB0 balance         ", "balance     "), "Check native balance");
+    printMenuItem(Terminal.pick("\uD83D\uDE80 transfer        ", "transfer    "), "Send native transfer");
+    printMenuItem(Terminal.pick("\uD83E\uDDFE tx              ", "tx          "), "Transaction status and monitoring");
+    printMenuItem(Terminal.pick("\uD83D\uDD0E resolve         ", "resolve     "), "Resolve RNS names to and from addresses");
+    printMenuItem(Terminal.pick("\uD83D\uDEE0\uFE0F  deploy          ", "deploy      "), "Deploy contract");
+    printMenuItem(Terminal.pick("\u2705 verify          ", "verify      "), "Verify contract");
+    printMenuItem(Terminal.pick("\uD83D\uDCDC contract        ", "contract    "), "Interactive contract mode");
+    printMenuItem(Terminal.pick("\uD83C\uDF09 bridge          ", "bridge      "), "Bridge flow");
+    printMenuItem(Terminal.pick("\uD83D\uDD58 history         ", "history     "), "History API");
+    printMenuItem(Terminal.pick("\uD83E\uDDF1 transaction     ", "transaction "), "Create and send transactions");
+    printMenuItem(Terminal.pick("\uD83D\uDCE6 batch-transfer  ", "batch-transfer  "), "Execute batch transfers");
+    printMenuItem(Terminal.pick("\uD83E\uDDEA simulate        ", "simulate    "), "Simulate transactions");
     System.out.println();
     System.out.println(SOFT_ORANGE + "Type 'clear' to start over, 'exit' to quit." + RESET);
   }

@@ -2,13 +2,10 @@ package com.rsk.commands.contract;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.rsk.commands.config.CliConfig;
 import com.rsk.utils.Chain;
-import com.rsk.utils.Chain.ChainFeatures;
 import com.rsk.utils.Chain.ChainProfile;
 import com.rsk.utils.Json;
 import com.rsk.utils.Rns;
-import java.io.IOException;
 import java.math.BigInteger;
 import java.net.URI;
 import java.net.http.HttpClient;
