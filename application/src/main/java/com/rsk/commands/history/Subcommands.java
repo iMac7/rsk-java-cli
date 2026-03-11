@@ -57,9 +57,9 @@ public class Subcommands {
     NetworkOptions networkOptions = new NetworkOptions();
 
     static class NetworkOptions {
-      @Option(names = "--mainnet", description = "Use chains.mainnet")
+      @Option(names = "--mainnet", description = "Use rootstock mainnet")
       boolean mainnet;
-      @Option(names = "--testnet", description = "Use chains.testnet")
+      @Option(names = "--testnet", description = "Use rootstock testnet")
       boolean testnet;
       @Option(names = "--chain", paramLabel = "<name>", description = "Use config chain key, e.g. chains.custom.<name> or <name>")
       String chain;

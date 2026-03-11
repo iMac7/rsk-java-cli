@@ -163,7 +163,7 @@ public class Subcommands {
       for (int i = 0; i < readFunctions.size(); i++) {
         menuItems[i] = functionMenuLabel(readFunctions.get(i));
       }
-      menuItems[readFunctions.size()] = Terminal.pick("🚪 Exit", "[exit] Exit");
+      menuItems[readFunctions.size()] = Terminal.pick("🚪 Exit", "Exit");
       return menuItems;
     }
 

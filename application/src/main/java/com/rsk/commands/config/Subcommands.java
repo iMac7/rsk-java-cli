@@ -17,24 +17,24 @@ public class Subcommands {
       com.rsk.commands.wallet.Helpers.defaultHelpers();
   private static final LineReader PROMPT_READER = createPromptReader();
   private static final String[] MAIN_MENU_ITEMS = {
-    Terminal.pick("\uD83D\uDCCB View Current Configuration", "[view] View Current Configuration"),
-    Terminal.pick("\uD83C\uDF10 Configure Network Settings", "[network] Configure Network Settings"),
-    Terminal.pick("\u26FD Configure Gas Settings", "[gas] Configure Gas Settings"),
-    Terminal.pick("\uD83D\uDD11 Configure API Keys", "[api] Configure API Keys"),
-    Terminal.pick("\uD83C\uDFA8 Configure Display Preferences", "[display] Configure Display Preferences"),
-    Terminal.pick("\uD83D\uDC5B Configure Wallet Preferences", "[wallet] Configure Wallet Preferences"),
-    Terminal.pick("\uD83D\uDD04 Reset to Defaults", "[reset] Reset to Defaults"),
-    Terminal.pick("\uD83D\uDCBE Save and Exit", "[save] Save and Exit"),
-    Terminal.pick("\u274C Exit without saving", "[exit] Exit without saving")
+    Terminal.pick("\uD83D\uDCCB View Current Configuration", "View Current Configuration"),
+    Terminal.pick("\uD83C\uDF10 Configure Network Settings", "Configure Network Settings"),
+    Terminal.pick("\u26FD Configure Gas Settings", "Configure Gas Settings"),
+    Terminal.pick("\uD83D\uDD11 Configure API Keys", "Configure API Keys"),
+    Terminal.pick("\uD83C\uDFA8 Configure Display Preferences", "Configure Display Preferences"),
+    Terminal.pick("\uD83D\uDC5B Configure Wallet Preferences", "Configure Wallet Preferences"),
+    Terminal.pick("\uD83D\uDD04 Reset to Defaults", "Reset to Defaults"),
+    Terminal.pick("\uD83D\uDCBE Save and Exit", "Save and Exit"),
+    Terminal.pick("\u274C Exit without saving", "Exit without saving")
   };
   private static final String[] NETWORK_MENU_ITEMS = {
-    "Mainnet", "Testnet", Terminal.pick("\u21A9\uFE0F Back", "[back] Back")
+    "Mainnet", "Testnet", Terminal.pick("\u21A9\uFE0F Back", "Back")
   };
   private static final String[] API_MENU_ITEMS = {
-    Terminal.pick("\uD83D\uDD10 Set/Update API Key", "[set] Set/Update API Key"),
-    Terminal.pick("\u274C Remove API Key", "[remove] Remove API Key"),
-    Terminal.pick("\uD83D\uDCCB List API Keys", "[list] List API Keys"),
-    Terminal.pick("\u21A9\uFE0F  Back", "[back] Back")
+    Terminal.pick("\uD83D\uDD10 Set/Update API Key", "Set/Update API Key"),
+    Terminal.pick("\u274C Remove API Key", "Remove API Key"),
+    Terminal.pick("\uD83D\uDCCB List API Keys", "List API Keys"),
+    Terminal.pick("\u21A9\uFE0F  Back", "Back")
   };
   private static final int MAIN_SAVE_INDEX = MAIN_MENU_ITEMS.length - 2;
   private static final int MAIN_EXIT_INDEX = MAIN_MENU_ITEMS.length - 1;

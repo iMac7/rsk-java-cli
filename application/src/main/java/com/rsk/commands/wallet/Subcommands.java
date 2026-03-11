@@ -45,23 +45,23 @@ public class Subcommands {
       })
   public static class WalletCommand implements Callable<Integer> {
     private static final String[] MENU_ITEMS = {
-      Terminal.pick("\uD83C\uDD95 Create a new wallet", "[new] Create a new wallet"),
-      Terminal.pick("\uD83D\uDD11 Import existing wallet", "[import] Import existing wallet"),
-      Terminal.pick("\uD83D\uDD0D List saved wallets", "[list] List saved wallets"),
-      Terminal.pick("\uD83D\uDD10 Show wallet private key", "[dump] Show wallet private key"),
-      Terminal.pick("\uD83D\uDD01 Switch wallet", "[switch] Switch wallet"),
-      Terminal.pick("\uD83D\uDCDD Rename wallet", "[rename] Rename wallet"),
-      Terminal.pick("\uD83D\uDCD2 Address book", "[book] Address book"),
-      Terminal.pick("\uD83D\uDCC2 Backup wallet data", "[backup] Backup wallet data"),
-      Terminal.pick("\u274C Delete wallet", "[delete] Delete wallet"),
-      Terminal.pick("\uD83D\uDEAA Exit", "[exit] Exit")
+      Terminal.pick("\uD83C\uDD95 Create a new wallet", "Create a new wallet"),
+      Terminal.pick("\uD83D\uDD11 Import existing wallet", "Import existing wallet"),
+      Terminal.pick("\uD83D\uDD0D List saved wallets", "List saved wallets"),
+      Terminal.pick("\uD83D\uDD10 Show wallet private key", "Show wallet private key"),
+      Terminal.pick("\uD83D\uDD01 Switch wallet", "Switch wallet"),
+      Terminal.pick("\uD83D\uDCDD Rename wallet", "Rename wallet"),
+      Terminal.pick("\uD83D\uDCD2 Address book", "Address book"),
+      Terminal.pick("\uD83D\uDCC2 Backup wallet data", "Backup wallet data"),
+      Terminal.pick("\u274C Delete wallet", "Delete wallet"),
+      Terminal.pick("\uD83D\uDEAA Exit", "Exit")
     };
     private static final String[] ADDRESS_BOOK_MENU_ITEMS = {
-      Terminal.pick("\u2795 Add address", "[add] Add address"),
-      Terminal.pick("\uD83D\uDCD6 View address book", "[view] View address book"),
-      Terminal.pick("\u270F\uFE0F Update address", "[update] Update address"),
-      Terminal.pick("\uD83D\uDDD1\uFE0F Delete address", "[delete] Delete address"),
-      Terminal.pick("\u21A9\uFE0F Back", "[back] Back")
+      Terminal.pick("\u2795 Add address", "Add address"),
+      Terminal.pick("\uD83D\uDCD6 View address book", "View address book"),
+      Terminal.pick("\u270F\uFE0F Update address", "Update address"),
+      Terminal.pick("\uD83D\uDDD1\uFE0F Delete address", "Delete address"),
+      Terminal.pick("\u21A9\uFE0F Back", "Back")
     };
     private static final int EXIT_INDEX = MENU_ITEMS.length - 1;
     private static final int ADDRESS_BOOK_BACK_INDEX = ADDRESS_BOOK_MENU_ITEMS.length - 1;
