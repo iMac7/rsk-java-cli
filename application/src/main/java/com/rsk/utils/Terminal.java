@@ -2,10 +2,13 @@ package com.rsk.utils;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import org.fusesource.jansi.Ansi;
 import org.jline.terminal.Attributes;
 import org.jline.terminal.TerminalBuilder;
+import org.jline.utils.AttributedString;
+import org.jline.utils.Display;
 import org.jline.utils.NonBlockingReader;
 
 public final class Terminal {
@@ -32,16 +35,18 @@ public final class Terminal {
       throw new IllegalStateException("Unable to initialize " + errorContext + " terminal.");
     }
 
-    int renderedLines = 0;
     int selectedIndex = 0;
+    int windowStart = 0;
 
     try {
       Attributes originalAttributes = MENU_TERMINAL.enterRawMode();
       NonBlockingReader reader = MENU_TERMINAL.reader();
+      Display display = new Display(MENU_TERMINAL, false);
 
       try {
         while (true) {
-          renderedLines = renderMenu(titleLines, options, footerLines, selectedIndex, renderedLines);
+          windowStart = clampWindowStart(titleLines, options, footerLines, selectedIndex, windowStart);
+          renderMenu(display, titleLines, options, footerLines, selectedIndex, windowStart);
           int key = reader.read();
           if (key < 0) {
             continue;
@@ -73,6 +78,9 @@ public final class Terminal {
           }
         }
       } finally {
+        display.update(List.of(AttributedString.fromAnsi("")), 0);
+        MENU_TERMINAL.writer().println();
+        MENU_TERMINAL.puts(org.jline.utils.InfoCmp.Capability.cursor_visible);
         MENU_TERMINAL.setAttributes(originalAttributes);
         MENU_TERMINAL.writer().flush();
       }
@@ -99,48 +107,69 @@ public final class Terminal {
     }
   }
 
-  private static int renderMenu(
+  private static void renderMenu(
+      Display display,
       List<String> titleLines,
       String[] options,
       List<String> footerLines,
       int selectedIndex,
-      int renderedLines) {
-    if (renderedLines > 0) {
-      System.out.print("\u001b[" + renderedLines + "F");
-    }
-
-    int lines = 0;
+      int windowStart) {
+    List<AttributedString> rendered = new ArrayList<>();
+    int terminalRows = Math.max(1, MENU_TERMINAL.getSize().getRows());
+    int reservedRows = titleLines.size() + footerLines.size();
+    int availableOptionRows = Math.max(1, terminalRows - reservedRows);
+    int indicatorRows = options.length > availableOptionRows ? 2 : 0;
+    int visibleOptions = Math.max(1, availableOptionRows - indicatorRows);
+    int windowSize = Math.min(options.length - windowStart, visibleOptions);
+    int windowEnd = Math.min(options.length, windowStart + windowSize);
 
     for (String titleLine : titleLines) {
-      if (titleLine == null || titleLine.isBlank()) {
-        System.out.println();
-      } else {
-        System.out.println(cTitle(titleLine));
-      }
-      lines++;
+      rendered.add(AttributedString.fromAnsi(titleLine == null || titleLine.isBlank() ? "" : cTitle(titleLine)));
     }
 
-    for (int i = 0; i < options.length; i++) {
+    if (windowStart > 0) {
+      rendered.add(AttributedString.fromAnsi(cFooter("↑ more")));
+    }
+
+    for (int i = windowStart; i < windowEnd; i++) {
       String pointer = i == selectedIndex ? pick("❯ ", "> ") : "  ";
-      if (i == selectedIndex) {
-        System.out.println(cSelected(pointer + options[i]));
-      } else {
-        System.out.println(cPlain(pointer + options[i]));
-      }
-      lines++;
+      String line = pointer + options[i];
+      rendered.add(AttributedString.fromAnsi(i == selectedIndex ? cSelected(line) : cPlain(line)));
+    }
+
+    if (windowEnd < options.length) {
+      rendered.add(AttributedString.fromAnsi(cFooter("↓ more")));
     }
 
     for (String footerLine : footerLines) {
-      if (footerLine == null || footerLine.isBlank()) {
-        System.out.println();
-      } else {
-        System.out.println(cFooter(footerLine));
-      }
-      lines++;
+      rendered.add(AttributedString.fromAnsi(footerLine == null || footerLine.isBlank() ? "" : cFooter(footerLine)));
     }
 
-    System.out.flush();
-    return lines;
+    display.resize(MENU_TERMINAL.getSize().getRows(), MENU_TERMINAL.getSize().getColumns());
+    display.update(rendered, -1);
+  }
+
+  private static int clampWindowStart(
+      List<String> titleLines,
+      String[] options,
+      List<String> footerLines,
+      int selectedIndex,
+      int currentWindowStart) {
+    int terminalRows = Math.max(1, MENU_TERMINAL.getSize().getRows());
+    int reservedRows = titleLines.size() + footerLines.size();
+    int availableOptionRows = Math.max(1, terminalRows - reservedRows);
+    int indicatorRows = options.length > availableOptionRows ? 2 : 0;
+    int visibleOptions = Math.max(1, availableOptionRows - indicatorRows);
+    int maxWindowStart = Math.max(0, options.length - visibleOptions);
+    int windowStart = Math.max(0, Math.min(currentWindowStart, maxWindowStart));
+
+    if (selectedIndex < windowStart) {
+      windowStart = selectedIndex;
+    } else if (selectedIndex >= windowStart + visibleOptions) {
+      windowStart = selectedIndex - visibleOptions + 1;
+    }
+
+    return Math.max(0, Math.min(windowStart, maxWindowStart));
   }
 
   private static Integer handleEscapeSequence(

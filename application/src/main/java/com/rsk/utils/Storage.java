@@ -2,7 +2,7 @@ package com.rsk.utils;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rsk.commands.config.CliConfig;
-import com.rsk.commands.config.ConfigPort;
+import com.rsk.commands.config.Helpers.ConfigPort;
 import com.rsk.commands.wallet.Helpers.WalletMetadata;
 import com.rsk.commands.wallet.Helpers.WalletPort;
 import com.rsk.commands.wallet.Helpers.WalletRegistry;

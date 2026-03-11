@@ -7,6 +7,12 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 
 public class Helpers {
+  public interface ConfigPort {
+    CliConfig load();
+
+    void save(CliConfig config);
+  }
+
   private final ConfigPort configPort;
 
   public Helpers(ConfigPort configPort) {
