@@ -155,7 +155,7 @@ where `~` is your home directory.
 
 Use forward slashes for path in case of failed path arg (and file an issue with the cmd and os name to reproduce).
 
-Monitoring is only available under tx --monitor because address monitoring is not really implemented yet
+Monitoring is available under tx --monitor but not as a standalone command, because address monitoring is not really implemented yet in the main cli code
 
 Use --example for `contract` and `deploy` commands to use the example artifacts provided
 
