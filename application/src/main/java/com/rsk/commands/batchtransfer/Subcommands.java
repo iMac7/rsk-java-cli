@@ -24,7 +24,7 @@ public class Subcommands {
 
   @Command(
       name = "batch-transfer",
-      description = "Execute batch transactions interactively or from stdin",
+      description = "Execute batch transactions interactively or from a JSON file",
       mixinStandardHelpOptions = true)
   public static class BatchTransferCommand implements Callable<Integer> {
     @Option(names = {"-t", "--testnet"}, description = "Execute on the testnet")
@@ -42,7 +42,24 @@ public class Subcommands {
       @Option(names = {"-i", "--interactive"}, description = "Execute interactively and input transactions")
       boolean interactive;
 
-      @Option(names = {"-f", "--file"}, paramLabel = "<path>", description = "Execute transactions from a file")
+      @Option(
+          names = {"-f", "--file"},
+          paramLabel = "<path>",
+          description = {
+            "Execute transactions from a JSON file.",
+            "Expected structure:",
+            "[",
+            "  {",
+            "    \"to\": \"0x742d35Cc6634C0532925a3b844Bc454e4438f44e\",",
+            "    \"value\": 0.1",
+            "  },",
+            "  {",
+            "    \"to\": \"alice.rsk\",",
+            "    \"value\": 1.5",
+            "  }",
+            "]",
+            "Each item must include a recipient `to` and a positive numeric `value`."
+          })
       Path file;
     }
 

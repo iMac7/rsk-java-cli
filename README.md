@@ -20,7 +20,7 @@
 |  | `--testnet` | Use rootstock testnet. |
 |  | `--chain <name>` | Use a configured chain key. |
 |  | `--chainurl <url>` | Use an explicit RPC URL. |
-| `batch-transfer` | `-f, --file <path>` 🔒 | Execute transactions from a file. |
+| `batch-transfer` | `-f, --file <path>` 🔒 | Execute transactions from a JSON file `[{ "to": "0x26c98ca1e51d39cea14583128fe11fb51db83d2a", "value": 0.12 }]` . `to` may be an  address or an RNS name. |
 |  | `-i, --interactive` 🔒 | Execute interactively and input transactions. |
 |  | `--rns` | Enable RNS domain resolution for recipient addresses. |
 |  | `-t, --testnet` | Execute on the testnet. |
