@@ -157,6 +157,4 @@ For backup wallet command, use forward slashes for path in case of failed path a
 
 Use --example for `contract` and `deploy` commands to use the example artifacts provided
 
-Emoji rendering may be problematic sometimes, should not affect functionality
-
 Install globally on your system by adding one of the run scripts to `PATH`
