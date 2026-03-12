@@ -153,7 +153,9 @@ where `~` is your home directory.
 
 ## Testing
 
-For backup wallet command, use forward slashes for path in case of failed path arg.
+Use forward slashes for path in case of failed path arg (and file an issue with the cmd and os name to reproduce).
+
+Monitoring is only available under tx --monitor because address monitoring is not really implemented yet
 
 Use --example for `contract` and `deploy` commands to use the example artifacts provided
 
