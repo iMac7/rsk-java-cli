@@ -110,6 +110,16 @@ public final class Chain {
         "Blockscout API is only supported on Rootstock mainnet/testnet.");
   }
 
+  public static String networkDisplayName(ChainProfile chainProfile) {
+    if (chainProfile.chainId() == 30L) {
+      return "Rootstock Mainnet";
+    }
+    if (chainProfile.chainId() == 31L) {
+      return "Rootstock Testnet";
+    }
+    return chainProfile.name();
+  }
+
   private static String normalizeChainOption(String chainOption) {
     if (chainOption == null || chainOption.isBlank()) {
       return chainOption;
