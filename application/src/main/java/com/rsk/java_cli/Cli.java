@@ -109,15 +109,29 @@ public class Cli {
   static String[] splitArgs(String line) {
     List<String> args = new ArrayList<>();
     StringBuilder current = new StringBuilder();
-    boolean inQuotes = false;
+    Character quoteDelimiter = null;
+    boolean escaping = false;
 
     for (int i = 0; i < line.length(); i++) {
       char c = line.charAt(i);
-      if (c == '"') {
-        inQuotes = !inQuotes;
+
+      if (escaping) {
+        current.append(c);
+        escaping = false;
         continue;
       }
-      if (Character.isWhitespace(c) && !inQuotes) {
+
+      if (c == '\\') {
+        escaping = true;
+        continue;
+      }
+
+      if ((c == '"' || c == '\'') && (quoteDelimiter == null || quoteDelimiter == c)) {
+        quoteDelimiter = quoteDelimiter == null ? c : null;
+        continue;
+      }
+
+      if (Character.isWhitespace(c) && quoteDelimiter == null) {
         if (current.length() > 0) {
           args.add(current.toString());
           current.setLength(0);
@@ -127,7 +141,10 @@ public class Cli {
       current.append(c);
     }
 
-    if (inQuotes) {
+    if (escaping) {
+      current.append('\\');
+    }
+    if (quoteDelimiter != null) {
       throw new IllegalArgumentException("Unclosed quote in command.");
     }
     if (current.length() > 0) {
