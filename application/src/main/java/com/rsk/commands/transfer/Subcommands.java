@@ -1,5 +1,7 @@
 package com.rsk.commands.transfer;
 
+import static com.rsk.utils.CliColors.*;
+
 import com.rsk.utils.Chain.ChainProfile;
 import com.rsk.utils.CliInput;
 import com.rsk.utils.Loader;
@@ -9,7 +11,6 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
-import org.fusesource.jansi.Ansi;
 import org.jline.reader.LineReader;
 import org.jline.reader.LineReaderBuilder;
 import org.jline.reader.UserInterruptException;
@@ -264,16 +265,5 @@ public class Subcommands {
     }
     return stripped.toPlainString();
   }
-
-  private static String cInfo(String text) {
-    return Ansi.ansi().fg(Ansi.Color.CYAN).a(text).reset().toString();
-  }
-
-  private static String cOk(String text) {
-    return Ansi.ansi().fg(Ansi.Color.GREEN).a(text).reset().toString();
-  }
-
-  private static String cError(String text) {
-    return Ansi.ansi().fg(Ansi.Color.RED).a(text).reset().toString();
-  }
 }
+

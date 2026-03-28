@@ -1,5 +1,7 @@
 package com.rsk.commands.transaction;
 
+import static com.rsk.utils.CliColors.*;
+
 import com.rsk.commands.transfer.Helpers;
 import com.rsk.java_cli.WelcomeScreen;
 import com.rsk.utils.Chain.ChainProfile;
@@ -11,7 +13,6 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.Callable;
-import org.fusesource.jansi.Ansi;
 import org.jline.reader.LineReader;
 import org.jline.reader.LineReaderBuilder;
 import org.jline.reader.UserInterruptException;
@@ -491,28 +492,5 @@ public class Subcommands {
       String data) {}
 
   private static class PromptCancelledException extends RuntimeException {}
-
-  private static String cInfo(String text) {
-    return Ansi.ansi().fg(Ansi.Color.CYAN).a(text).reset().toString();
-  }
-
-  private static String cOk(String text) {
-    return Ansi.ansi().fg(Ansi.Color.GREEN).a(text).reset().toString();
-  }
-
-  private static String cError(String text) {
-    return Ansi.ansi().fg(Ansi.Color.RED).a(text).reset().toString();
-  }
-
-  private static String cWarn(String text) {
-    return Ansi.ansi().fgRgb(255, 183, 77).a(text).reset().toString();
-  }
-
-  private static String cEmph(String text) {
-    return Ansi.ansi().fgRgb(255, 153, 51).bold().a(text).reset().toString();
-  }
-
-  private static String cPlain(String text) {
-    return Ansi.ansi().fg(Ansi.Color.WHITE).a(text).reset().toString();
-  }
 }
+

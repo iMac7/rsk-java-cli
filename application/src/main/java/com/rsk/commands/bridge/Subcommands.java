@@ -1,5 +1,7 @@
 package com.rsk.commands.bridge;
 
+import static com.rsk.utils.CliColors.*;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.rsk.utils.Chain.ChainProfile;
 import com.rsk.utils.CliInput;
@@ -13,7 +15,6 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
-import org.fusesource.jansi.Ansi;
 import org.web3j.abi.datatypes.Type;
 import picocli.CommandLine.ArgGroup;
 import picocli.CommandLine.Command;
@@ -282,36 +283,5 @@ public class Subcommands {
       System.out.println("Value is required.");
     }
   }
-
-  private static String cEmph(String text) {
-    return Ansi.ansi().fgRgb(255, 153, 51).bold().a(text).reset().toString();
-  }
-
-  private static String cInfo(String text) {
-    return Ansi.ansi().fg(Ansi.Color.CYAN).a(text).reset().toString();
-  }
-
-  private static String cPlain(String text) {
-    return Ansi.ansi().fg(Ansi.Color.WHITE).a(text).reset().toString();
-  }
-
-  private static String cMuted(String text) {
-    return Ansi.ansi().fgRgb(140, 140, 140).a(text).reset().toString();
-  }
-
-  private static String cOk(String text) {
-    return Ansi.ansi().fg(Ansi.Color.GREEN).a(text).reset().toString();
-  }
-
-  private static String cWarn(String text) {
-    return Ansi.ansi().fgRgb(255, 183, 77).a(text).reset().toString();
-  }
-
-  private static String cRule() {
-    return Ansi.ansi()
-        .fgRgb(140, 140, 140)
-        .a("────────────────────────────────────────")
-        .reset()
-        .toString();
-  }
 }
+

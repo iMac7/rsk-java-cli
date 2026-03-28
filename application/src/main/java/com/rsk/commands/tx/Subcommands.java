@@ -1,5 +1,7 @@
 package com.rsk.commands.tx;
 
+import static com.rsk.utils.CliColors.*;
+
 import com.rsk.utils.Chain;
 import com.rsk.utils.Chain.ChainProfile;
 import com.rsk.utils.Loader;
@@ -8,7 +10,6 @@ import com.rsk.utils.TxReceiptDetails;
 import java.math.BigInteger;
 import java.nio.file.Path;
 import java.util.concurrent.Callable;
-import org.fusesource.jansi.Ansi;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -173,28 +174,5 @@ public class Subcommands {
         new com.rsk.commands.config.Helpers(new Storage.JsonConfigRepository(homeDir)).loadConfig();
     return Chain.resolveChain(config, mainnet, testnet, chain, chainUrl);
   }
-
-  private static String cInfo(String text) {
-    return Ansi.ansi().fg(Ansi.Color.CYAN).a(text).reset().toString();
-  }
-
-  private static String cEmph(String text) {
-    return Ansi.ansi().fgRgb(255, 153, 51).bold().a(text).reset().toString();
-  }
-
-  private static String cOk(String text) {
-    return Ansi.ansi().fg(Ansi.Color.GREEN).a(text).reset().toString();
-  }
-
-  private static String cError(String text) {
-    return Ansi.ansi().fg(Ansi.Color.RED).a(text).reset().toString();
-  }
-
-  private static String cMuted(String text) {
-    return Ansi.ansi().fgRgb(140, 140, 140).a(text).reset().toString();
-  }
-
-  private static String cWarn(String text) {
-    return Ansi.ansi().fgRgb(255, 183, 77).a(text).reset().toString();
-  }
 }
+

@@ -1,5 +1,7 @@
 package com.rsk.commands.wallet;
 
+import static com.rsk.utils.CliColors.cOk;
+
 import com.rsk.commands.wallet.Helpers.WalletMetadata;
 import com.rsk.utils.CliInput;
 import com.rsk.utils.Terminal;
@@ -127,7 +129,7 @@ public class Subcommands {
       String walletName = readRequiredText("Wallet name");
       char[] password = readPassword("Wallet password: ");
       WalletMetadata wallet = HELPERS.createWallet(walletName, password);
-      System.out.printf("Created wallet %s (%s)%n", cEmph(wallet.name()), wallet.address());
+      System.out.printf("Created wallet %s (%s)%n", cOk(wallet.name()), wallet.address());
     }
 
     private void runImportFlow() {
@@ -135,14 +137,14 @@ public class Subcommands {
       String privateKey = readRequiredText("Private key (hex)");
       char[] password = readPassword("Wallet password: ");
       WalletMetadata wallet = HELPERS.importWallet(walletName, privateKey, password);
-      System.out.printf("Imported wallet %s (%s)%n", cEmph(wallet.name()), wallet.address());
+      System.out.printf("Imported wallet %s (%s)%n", cOk(wallet.name()), wallet.address());
     }
 
     private void runSwitchFlow() {
       printWalletChoices();
       String walletName = readRequiredText("Wallet name");
       HELPERS.switchWallet(walletName);
-      System.out.println("Active wallet switched to " + cEmph(walletName));
+      System.out.println("Active wallet switched to " + cOk(walletName));
     }
 
     private void runDumpFlow() {
@@ -161,7 +163,7 @@ public class Subcommands {
       }
       String newName = readRequiredText("New wallet name");
       HELPERS.renameWallet(walletName, newName);
-      System.out.printf("Renamed wallet %s -> %s%n", cEmph(walletName), cEmph(newName));
+      System.out.printf("Renamed wallet %s -> %s%n", cOk(walletName), cOk(newName));
     }
 
     private void runDeleteFlow() {
@@ -173,7 +175,7 @@ public class Subcommands {
         return;
       }
       HELPERS.deleteWallet(walletName);
-      System.out.println("Deleted wallet " + cEmph(walletName));
+      System.out.println("Deleted wallet " + cOk(walletName));
     }
 
     private void runBackupFlow() {
@@ -225,7 +227,7 @@ public class Subcommands {
       String label = readRequiredText("Address label");
       String address = readRequiredText("Address");
       HELPERS.addAddressBookEntry(label, address);
-      System.out.printf("Saved address %s -> %s%n", cEmph(label), address);
+      System.out.printf("Saved address %s -> %s%n", cOk(label), address);
     }
 
     private void runViewAddressBookFlow() {
@@ -235,7 +237,7 @@ public class Subcommands {
         return;
       }
 
-      addressBook.forEach((label, address) -> System.out.printf("%s: %s%n", cEmph(label), address));
+      addressBook.forEach((label, address) -> System.out.printf("%s: %s%n", cOk(label), address));
     }
 
     private void runUpdateAddressFlow() {
@@ -246,7 +248,7 @@ public class Subcommands {
 
       String newAddress = readRequiredText("New address");
       HELPERS.updateAddressBookEntry(label, newAddress);
-      System.out.printf("Updated address %s -> %s%n", cEmph(label), newAddress);
+      System.out.printf("Updated address %s -> %s%n", cOk(label), newAddress);
     }
 
     private void runDeleteAddressFlow() {
@@ -256,7 +258,7 @@ public class Subcommands {
       }
 
       HELPERS.deleteAddressBookEntry(label);
-      System.out.println("Deleted address " + cEmph(label));
+      System.out.println("Deleted address " + cOk(label));
     }
 
     private String selectAddressBookLabel(String title) {
@@ -312,7 +314,7 @@ public class Subcommands {
       wallets.forEach(
           wallet -> {
             String marker = wallet.name().equals(active) ? activeMarker : inactiveMarker;
-            System.out.printf("%s %s %s%n", marker, cEmph(wallet.name()), wallet.address());
+            System.out.printf("%s %s %s%n", marker, cOk(wallet.name()), wallet.address());
           });
       System.out.println();
     }
@@ -320,7 +322,7 @@ public class Subcommands {
     private void printCurrentWallet() {
       HELPERS
           .activeWallet()
-          .ifPresent(wallet -> System.out.println("Current wallet: " + cEmph(wallet.name())));
+          .ifPresent(wallet -> System.out.println("Current wallet: " + cOk(wallet.name())));
     }
   }
 
@@ -343,7 +345,7 @@ public class Subcommands {
     public Integer call() {
       char[] password = readPassword("Wallet password: ");
       WalletMetadata wallet = HELPERS.createWallet(walletName, password);
-      System.out.printf("Created wallet %s (%s)%n", cEmph(wallet.name()), wallet.address());
+      System.out.printf("Created wallet %s (%s)%n", cOk(wallet.name()), wallet.address());
       return 0;
     }
   }
@@ -367,7 +369,7 @@ public class Subcommands {
     public Integer call() {
       char[] password = readPassword("Wallet password: ");
       WalletMetadata wallet = HELPERS.importWallet(walletName, privateKey, password);
-      System.out.printf("Imported wallet %s (%s)%n", cEmph(wallet.name()), wallet.address());
+      System.out.printf("Imported wallet %s (%s)%n", cOk(wallet.name()), wallet.address());
       return 0;
     }
   }
@@ -385,7 +387,7 @@ public class Subcommands {
       wallets.forEach(
           wallet -> {
             String marker = wallet.name().equals(active) ? "*" : " ";
-            System.out.printf("%s %s %s%n", marker, cEmph(wallet.name()), wallet.address());
+            System.out.printf("%s %s %s%n", marker, cOk(wallet.name()), wallet.address());
           });
       return 0;
     }
@@ -398,7 +400,7 @@ public class Subcommands {
       HELPERS
           .activeWallet()
           .ifPresentOrElse(
-              wallet -> System.out.printf("%s %s%n", cEmph(wallet.name()), wallet.address()),
+              wallet -> System.out.printf("%s %s%n", cOk(wallet.name()), wallet.address()),
               () -> System.out.println("No active wallet."));
       return 0;
     }
@@ -435,7 +437,7 @@ public class Subcommands {
     @Override
     public Integer call() {
       HELPERS.switchWallet(walletName);
-      System.out.println("Active wallet switched to " + cEmph(walletName));
+      System.out.println("Active wallet switched to " + cOk(walletName));
       return 0;
     }
   }
@@ -455,7 +457,7 @@ public class Subcommands {
     @Override
     public Integer call() {
       HELPERS.renameWallet(walletName, newName);
-      System.out.printf("Renamed wallet %s -> %s%n", cEmph(walletName), cEmph(newName));
+      System.out.printf("Renamed wallet %s -> %s%n", cOk(walletName), cOk(newName));
       return 0;
     }
   }
@@ -478,7 +480,7 @@ public class Subcommands {
     @Override
     public Integer call() {
       HELPERS.deleteWallet(walletName);
-      System.out.println("Deleted wallet " + cEmph(walletName));
+      System.out.println("Deleted wallet " + cOk(walletName));
       return 0;
     }
   }
@@ -510,9 +512,5 @@ public class Subcommands {
       }
       System.out.println("Value is required.");
     }
-  }
-
-  private static String cEmph(String value) {
-    return Ansi.ansi().fg(Ansi.Color.GREEN).a(value).reset().toString();
   }
 }

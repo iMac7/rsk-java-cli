@@ -1,5 +1,7 @@
 package com.rsk.commands.balance;
 
+import static com.rsk.utils.CliColors.*;
+
 import com.rsk.utils.Chain.ChainProfile;
 import com.rsk.utils.Terminal;
 import java.math.BigDecimal;
@@ -250,23 +252,4 @@ public class Subcommands {
     }
   }
 
-  private static String cInfo(String text) {
-    return Ansi.ansi().fg(Ansi.Color.CYAN).a(text).reset().toString();
-  }
-
-  private static String cEmph(String text) {
-    return Ansi.ansi().fgRgb(255, 153, 51).bold().a(text).reset().toString();
-  }
-
-  private static String cPlain(String text) {
-    return Ansi.ansi().fg(Ansi.Color.WHITE).a(text).reset().toString();
-  }
-
-  private static String cOk(String text) {
-    return Ansi.ansi().fg(Ansi.Color.GREEN).a(text).reset().toString();
-  }
-
-  private static String cError(String text) {
-    return Ansi.ansi().fg(Ansi.Color.RED).a(text).reset().toString();
-  }
 }
