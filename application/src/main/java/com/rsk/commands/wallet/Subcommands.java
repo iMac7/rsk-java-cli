@@ -1,8 +1,8 @@
 package com.rsk.commands.wallet;
 
 import com.rsk.commands.wallet.Helpers.WalletMetadata;
+import com.rsk.utils.CliInput;
 import com.rsk.utils.Terminal;
-import java.io.Console;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -484,38 +484,13 @@ public class Subcommands {
   }
 
   static char[] readPassword(String prompt) {
-    while (true) {
-      try {
-        Console console = System.console();
-        if (console != null) {
-          char[] password = console.readPassword(prompt);
-          if (password == null) {
-            throw new InteractiveCancelledException();
-          }
-          if (password.length == 0) {
-            System.out.println("Password is required.");
-            continue;
-          }
-          return password;
-        }
-        String password = PROMPT_READER.readLine(prompt, '*');
-        if (password == null) {
-          throw new InteractiveCancelledException();
-        }
-        if (password.isBlank()) {
-          System.out.println("Password is required.");
-          continue;
-        }
-        return password.toCharArray();
-      } catch (UserInterruptException ex) {
+    try {
+      return CliInput.readPassword(prompt, INPUT_CANCELLED_MESSAGE);
+    } catch (IllegalStateException ex) {
+      if (INPUT_CANCELLED_MESSAGE.equals(ex.getMessage())) {
         throw new InteractiveCancelledException();
-      } catch (RuntimeException ex) {
-        if (Thread.currentThread().isInterrupted()) {
-          Thread.interrupted();
-          throw new InteractiveCancelledException();
-        }
-        throw ex;
       }
+      throw ex;
     }
   }
 

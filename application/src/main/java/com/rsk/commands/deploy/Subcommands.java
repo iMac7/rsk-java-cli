@@ -1,6 +1,6 @@
 package com.rsk.commands.deploy;
 
-import com.rsk.utils.Terminal;
+import com.rsk.utils.CliInput;
 import java.io.BufferedReader;
 import java.io.Console;
 import java.io.IOException;
@@ -10,15 +10,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import org.fusesource.jansi.Ansi;
-import org.jline.reader.LineReader;
-import org.jline.reader.LineReaderBuilder;
 import org.jline.reader.UserInterruptException;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
 public class Subcommands {
   private static final Helpers HELPERS = Helpers.defaultHelpers();
-  private static final LineReader PROMPT_READER = createPromptReader();
+  //TODO is PROMPT_READER needed?
   private static final Path EXAMPLE_ABI_PATH =
       Path.of("application", "src", "main", "resources", "owner_contract", "Owner.abi")
           .toAbsolutePath()
@@ -29,13 +27,6 @@ public class Subcommands {
           .normalize();
 
   private Subcommands() {}
-
-  private static LineReader createPromptReader() {
-    if (Terminal.interactiveTerminal() != null) {
-      return LineReaderBuilder.builder().terminal(Terminal.interactiveTerminal()).build();
-    }
-    return LineReaderBuilder.builder().build();
-  }
 
   @Command(name = "deploy", description = "Deploy a contract", mixinStandardHelpOptions = true)
   public static class DeployCommand implements Callable<Integer> {
@@ -152,33 +143,7 @@ public class Subcommands {
   }
 
   static char[] readPassword(String prompt) {
-    while (true) {
-      try {
-        Console console = System.console();
-        if (console != null) {
-          char[] password = console.readPassword(cOk("✔ " + prompt));
-          if (password == null || password.length == 0) {
-            System.out.println(cError("Password is required."));
-            continue;
-          }
-          return password;
-        }
-        String password = PROMPT_READER.readLine(cOk("✔ " + prompt), '*');
-        if (password == null || password.isBlank()) {
-          System.out.println(cError("Password is required."));
-          continue;
-        }
-        return password.toCharArray();
-      } catch (UserInterruptException ex) {
-        throw new IllegalStateException("Deployment cancelled.");
-      } catch (RuntimeException ex) {
-        if (Thread.currentThread().isInterrupted()) {
-          Thread.interrupted();
-          throw new IllegalStateException("Deployment cancelled.");
-        }
-        throw ex;
-      }
-    }
+    return CliInput.readPassword(cOk("✔" + prompt), "Deployment cancelled.");
   }
 
   static String promptRequiredText(String label) {

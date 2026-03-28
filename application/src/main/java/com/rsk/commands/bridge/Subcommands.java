@@ -2,6 +2,7 @@ package com.rsk.commands.bridge;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.rsk.utils.Chain.ChainProfile;
+import com.rsk.utils.CliInput;
 import com.rsk.utils.Terminal;
 import java.io.BufferedReader;
 import java.io.Console;
@@ -241,29 +242,7 @@ public class Subcommands {
   }
 
   static char[] readPassword(String prompt) {
-    while (true) {
-      try {
-        Console console = System.console();
-        if (console != null) {
-          char[] password = console.readPassword(prompt);
-          if (password == null || password.length == 0) {
-            System.out.println("Password is required.");
-            continue;
-          }
-          return password;
-        }
-        System.out.print(prompt);
-        System.out.flush();
-        String password = new BufferedReader(new InputStreamReader(System.in)).readLine();
-        if (password == null || password.isBlank()) {
-          System.out.println("Password is required.");
-          continue;
-        }
-        return password.toCharArray();
-      } catch (IOException ex) {
-        throw new IllegalStateException("Unable to read interactive input", ex);
-      }
-    }
+    return CliInput.readPassword(prompt, "Bridge interaction cancelled.");
   }
 
   static String readTextPrompt(String label, String defaultValue) {

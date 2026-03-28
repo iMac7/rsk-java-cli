@@ -1,9 +1,9 @@
 package com.rsk.commands.transfer;
 
 import com.rsk.utils.Chain.ChainProfile;
+import com.rsk.utils.CliInput;
 import com.rsk.utils.Loader;
 import com.rsk.utils.Transaction;
-import java.io.Console;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -204,33 +204,7 @@ public class Subcommands {
   }
 
   static char[] readPassword(String prompt) {
-    while (true) {
-      try {
-        Console console = System.console();
-        if (console != null) {
-          char[] password = console.readPassword(cOk("✔ " + prompt));
-          if (password == null || password.length == 0) {
-            System.out.println(cError("Password is required."));
-            continue;
-          }
-          return password;
-        }
-        String password = READER.readLine(cOk("✔ " + prompt), '*');
-        if (password == null || password.isBlank()) {
-          System.out.println(cError("Password is required."));
-          continue;
-        }
-        return password.toCharArray();
-      } catch (UserInterruptException ex) {
-        throw new IllegalStateException("Transfer cancelled.");
-      } catch (RuntimeException ex) {
-        if (Thread.currentThread().isInterrupted()) {
-          Thread.interrupted();
-          throw new IllegalStateException("Transfer cancelled.");
-        }
-        throw ex;
-      }
-    }
+    return CliInput.readPassword(cOk("✔" + prompt), "Transfer cancelled.");
   }
 
   private static String promptRequiredText(String label) {
@@ -302,5 +276,4 @@ public class Subcommands {
   private static String cError(String text) {
     return Ansi.ansi().fg(Ansi.Color.RED).a(text).reset().toString();
   }
-
 }

@@ -1,8 +1,8 @@
 package com.rsk.commands.batchtransfer;
 
 import com.rsk.commands.transfer.Helpers.TransferRequest;
+import com.rsk.utils.CliInput;
 import com.rsk.utils.Loader;
-import java.io.Console;
 import java.math.BigDecimal;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -152,31 +152,7 @@ public class Subcommands {
   }
 
   static char[] readPassword(String prompt) {
-    while (true) {
-      try {
-        Console console = System.console();
-        if (console != null) {
-          char[] password = console.readPassword(cOk("✔ " + prompt));
-          if (password == null) {
-            throw new IllegalStateException("Batch transfer cancelled.");
-          }
-          if (password.length > 0) {
-            return password;
-          }
-        } else {
-          String password = READER.readLine(cOk("✔ " + prompt), '\0');
-          if (password == null) {
-            throw new IllegalStateException("Batch transfer cancelled.");
-          }
-          if (!password.isBlank()) {
-            return password.toCharArray();
-          }
-        }
-        System.out.println(cError("Password is required."));
-      } catch (UserInterruptException ex) {
-        throw new IllegalStateException("Batch transfer cancelled.");
-      }
-    }
+    return CliInput.readPassword(cOk("✔" + prompt), "Batch transfer cancelled.");
   }
 
   private static String promptRequiredText(String label) {
