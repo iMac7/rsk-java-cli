@@ -3,6 +3,8 @@ package com.rsk.utils;
 import com.rsk.utils.Chain.ChainProfile;
 import java.math.BigInteger;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import org.web3j.crypto.Credentials;
 import org.web3j.crypto.RawTransaction;
 import org.web3j.crypto.TransactionEncoder;
@@ -17,7 +19,17 @@ import org.web3j.protocol.http.HttpService;
 import org.web3j.utils.Numeric;
 
 public final class Rpc {
+  private static final ConcurrentMap<String, Web3j> CLIENTS_BY_RPC_URL = new ConcurrentHashMap<>();
+
   private Rpc() {}
+
+  public static Web3j web3j(ChainProfile chainProfile) {
+    String rpcUrl = chainProfile.rpcUrl();
+    if (rpcUrl == null || rpcUrl.isBlank()) {
+      throw new IllegalArgumentException("RPC URL is required.");
+    }
+    return CLIENTS_BY_RPC_URL.computeIfAbsent(rpcUrl, url -> Web3j.build(new HttpService(url)));
+  }
 
   public interface RpcPort {
     BigInteger getNativeBalance(ChainProfile chainProfile, String address);
@@ -43,7 +55,8 @@ public final class Rpc {
   public static class Web3jRpcGateway implements RpcPort {
     @Override
     public BigInteger getNativeBalance(ChainProfile chainProfile, String address) {
-      try (Web3j web3j = Web3j.build(new HttpService(chainProfile.rpcUrl()))) {
+      try {
+        Web3j web3j = web3j(chainProfile);
         EthGetBalance response =
             web3j.ethGetBalance(address, DefaultBlockParameterName.LATEST).send();
         return response.getBalance();
@@ -54,8 +67,8 @@ public final class Rpc {
 
     @Override
     public BigInteger gasPriceWei(ChainProfile chainProfile) {
-      try (Web3j web3j = Web3j.build(new HttpService(chainProfile.rpcUrl()))) {
-        return web3j.ethGasPrice().send().getGasPrice();
+      try {
+        return web3j(chainProfile).ethGasPrice().send().getGasPrice();
       } catch (Exception ex) {
         throw new IllegalStateException("Unable to fetch gas price", ex);
       }
@@ -70,7 +83,8 @@ public final class Rpc {
         BigInteger gasLimit,
         BigInteger gasPriceWei,
         String data) {
-      try (Web3j web3j = Web3j.build(new HttpService(chainProfile.rpcUrl()))) {
+      try {
+        Web3j web3j = web3j(chainProfile);
         Credentials credentials = Credentials.create(privateKeyHex);
         EthGetTransactionCount nonceResponse =
             web3j
@@ -100,9 +114,9 @@ public final class Rpc {
 
     @Override
     public Optional<String> getTransactionReceiptStatus(ChainProfile chainProfile, String txHash) {
-      try (Web3j web3j = Web3j.build(new HttpService(chainProfile.rpcUrl()))) {
+      try {
         Optional<TransactionReceipt> receipt =
-            web3j.ethGetTransactionReceipt(txHash).send().getTransactionReceipt();
+            web3j(chainProfile).ethGetTransactionReceipt(txHash).send().getTransactionReceipt();
         return receipt.map(TransactionReceipt::getStatus);
       } catch (Exception ex) {
         throw new IllegalStateException("Unable to fetch transaction receipt", ex);
@@ -111,9 +125,9 @@ public final class Rpc {
 
     @Override
     public Optional<TxReceiptDetails> getTransactionReceiptDetails(ChainProfile chainProfile, String txHash) {
-      try (Web3j web3j = Web3j.build(new HttpService(chainProfile.rpcUrl()))) {
+      try {
         Optional<TransactionReceipt> receipt =
-            web3j.ethGetTransactionReceipt(txHash).send().getTransactionReceipt();
+            web3j(chainProfile).ethGetTransactionReceipt(txHash).send().getTransactionReceipt();
         return receipt.map(
             value ->
                 new TxReceiptDetails(
@@ -131,8 +145,8 @@ public final class Rpc {
 
     @Override
     public BigInteger getCurrentBlockNumber(ChainProfile chainProfile) {
-      try (Web3j web3j = Web3j.build(new HttpService(chainProfile.rpcUrl()))) {
-        EthBlockNumber response = web3j.ethBlockNumber().send();
+      try {
+        EthBlockNumber response = web3j(chainProfile).ethBlockNumber().send();
         return response.getBlockNumber();
       } catch (Exception ex) {
         throw new IllegalStateException("Unable to fetch current block number", ex);

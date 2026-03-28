@@ -9,10 +9,9 @@ import java.util.Optional;
 import org.web3j.crypto.Credentials;
 import org.web3j.crypto.RawTransaction;
 import org.web3j.crypto.TransactionEncoder;
+import org.web3j.protocol.Web3j;
 import org.web3j.protocol.core.DefaultBlockParameterName;
 import org.web3j.protocol.core.methods.response.TransactionReceipt;
-import org.web3j.protocol.Web3j;
-import org.web3j.protocol.http.HttpService;
 import org.web3j.utils.Numeric;
 
 
@@ -45,7 +44,8 @@ public final class Transaction {
 
   public static PendingTransaction submit(
       ChainProfile chainProfile, String privateKeyHex, SendRequest request) {
-    try (Web3j web3j = Web3j.build(new HttpService(chainProfile.rpcUrl()))) {
+    try {
+      Web3j web3j = Rpc.web3j(chainProfile);
       Credentials credentials = Credentials.create(privateKeyHex);
       BigInteger nonce =
           web3j
@@ -75,7 +75,8 @@ public final class Transaction {
 
   public static TransactionReceipt waitForReceipt(
       ChainProfile chainProfile, String txHash, int maxPolls, long sleepMs) {
-    try (Web3j web3j = Web3j.build(new HttpService(chainProfile.rpcUrl()))) {
+    try {
+      Web3j web3j = Rpc.web3j(chainProfile);
       for (int i = 0; i < maxPolls; i++) {
         var receiptResponse = web3j.ethGetTransactionReceipt(txHash).send();
         if (receiptResponse.getTransactionReceipt().isPresent()) {
@@ -101,7 +102,8 @@ public final class Transaction {
   }
 
   public static Optional<TxReceiptDetails> receiptDetails(ChainProfile chainProfile, String txHash) {
-    try (Web3j web3j = Web3j.build(new HttpService(chainProfile.rpcUrl()))) {
+    try {
+      Web3j web3j = Rpc.web3j(chainProfile);
       Optional<TransactionReceipt> receipt =
           web3j.ethGetTransactionReceipt(txHash).send().getTransactionReceipt();
       return receipt.map(
@@ -120,8 +122,8 @@ public final class Transaction {
   }
 
   public static BigInteger currentBlockNumber(ChainProfile chainProfile) {
-    try (Web3j web3j = Web3j.build(new HttpService(chainProfile.rpcUrl()))) {
-      return web3j.ethBlockNumber().send().getBlockNumber();
+    try {
+      return Rpc.web3j(chainProfile).ethBlockNumber().send().getBlockNumber();
     } catch (Exception ex) {
       throw new IllegalStateException("Unable to fetch current block number", ex);
     }
