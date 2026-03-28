@@ -142,10 +142,10 @@ public class Helpers {
     }
 
     String sanitizedPath = stripWrappingQuotes(targetPathInput.trim());
-    if (!looksLikeWindowsAbsolutePath(sanitizedPath)) {
+    Path resolvedPath = Path.of(sanitizedPath).normalize();
+    if (!resolvedPath.isAbsolute()) {
       throw new IllegalArgumentException("Backup path must be an absolute directory path.");
     }
-    Path resolvedPath = Path.of(sanitizedPath).normalize();
     if (!Files.exists(resolvedPath) || !Files.isDirectory(resolvedPath)) {
       throw new IllegalArgumentException("Backup path must point to an existing directory.");
     }
@@ -223,9 +223,5 @@ public class Helpers {
       return value.substring(1, value.length() - 1).trim();
     }
     return value;
-  }
-
-  private static boolean looksLikeWindowsAbsolutePath(String value) {
-    return value.matches("^[A-Za-z]:[\\\\/].*") || value.startsWith("\\\\");
   }
 }

@@ -157,13 +157,4 @@ public final class Transaction {
       String to, BigInteger valueWei, BigInteger gasLimit, BigInteger gasPriceWei, String data) {}
 
   public record PendingTransaction(String fromAddress, String txHash) {}
-
-  public record TxReceiptDetails(
-      String txHash,
-      String blockHash,
-      String blockNumber,
-      String gasUsed,
-      String status,
-      String from,
-      String to) {}
 }
