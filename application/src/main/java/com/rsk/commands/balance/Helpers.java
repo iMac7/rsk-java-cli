@@ -9,6 +9,7 @@ import com.rsk.utils.Rns;
 import com.rsk.utils.Storage.JsonConfigRepository;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.math.RoundingMode;
 import java.nio.file.Path;
 import java.util.List;
 import org.web3j.abi.TypeReference;
@@ -85,7 +86,7 @@ public class Helpers {
   }
 
   public BigDecimal toNative(BigInteger wei) {
-    return new BigDecimal(wei).divide(WEI);
+    return new BigDecimal(wei).divide(WEI, 18, RoundingMode.HALF_UP);
   }
 
   public String knownTokenAddress(String symbol, ChainProfile chainProfile) {

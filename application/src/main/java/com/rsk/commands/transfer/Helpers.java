@@ -9,6 +9,7 @@ import com.rsk.utils.Rpc;
 import com.rsk.utils.Storage;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.math.RoundingMode;
 import java.nio.file.Path;
 
 public class Helpers {
@@ -59,7 +60,7 @@ public class Helpers {
 
   public BigDecimal nativeBalance(ChainProfile chainProfile, String address) {
     return new BigDecimal(rpcPort.getNativeBalance(chainProfile, address))
-        .divide(new BigDecimal("1000000000000000000"));
+        .divide(new BigDecimal("1000000000000000000"), 18, RoundingMode.HALF_UP);
   }
 
   public PendingTransfer sendNative(
