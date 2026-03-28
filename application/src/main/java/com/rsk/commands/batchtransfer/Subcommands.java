@@ -1,6 +1,7 @@
 package com.rsk.commands.batchtransfer;
 
 import static com.rsk.utils.CliColors.*;
+import static com.rsk.utils.Format.formatAmount;
 
 import com.rsk.commands.transfer.Helpers.TransferRequest;
 import com.rsk.utils.CliInput;
@@ -205,13 +206,4 @@ public class Subcommands {
       }
     }
   }
-
-  private static String formatAmount(BigDecimal amount) {
-    BigDecimal stripped = amount.stripTrailingZeros();
-    if (stripped.scale() < 0) {
-      stripped = stripped.setScale(0);
-    }
-    return stripped.toPlainString();
-  }
 }
-

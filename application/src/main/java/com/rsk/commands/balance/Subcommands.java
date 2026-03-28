@@ -1,10 +1,10 @@
 package com.rsk.commands.balance;
 
 import static com.rsk.utils.CliColors.*;
+import static com.rsk.utils.Format.formatAmount;
 
 import com.rsk.utils.Chain.ChainProfile;
 import com.rsk.utils.Terminal;
-import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.concurrent.Callable;
 import org.fusesource.jansi.Ansi;
@@ -213,15 +213,6 @@ public class Subcommands {
       System.out.printf("      🌐 Network: %s%n", HELPERS.networkDisplayName(chainProfile));
       System.out.println(cInfo("👍 Ensure that transactions are being conducted on the correct network."));
     }
-
-    private String formatAmount(BigDecimal amount) {
-      BigDecimal stripped = amount.stripTrailingZeros();
-      if (stripped.scale() < 0) {
-        stripped = stripped.setScale(0);
-      }
-      return stripped.toPlainString();
-    }
-
     private boolean isNativeToken(String value) {
       return "rbtc".equalsIgnoreCase(value);
     }
