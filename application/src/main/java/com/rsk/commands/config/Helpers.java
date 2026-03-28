@@ -3,6 +3,7 @@ package com.rsk.commands.config;
 import com.rsk.utils.Storage.JsonConfigRepository;
 import com.rsk.utils.Chain.ChainFeatures;
 import com.rsk.utils.Chain.ChainProfile;
+import com.rsk.utils.Constants;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 
@@ -42,22 +43,22 @@ public class Helpers {
         .setMainnet(
             new ChainProfile(
                 "mainnet",
-                "https://mainnet.rpc.rsk.co",
+                Constants.RSK_MAINNET_RPC_URL,
                 30,
                 "RBTC",
-                "https://explorer.rsk.co/tx/%s",
-                "https://explorer.rsk.co/address/%s",
+                Constants.RSK_MAINNET_EXPLORER_URL + "/tx/%s",
+                Constants.RSK_MAINNET_EXPLORER_URL + "/address/%s",
                 new ChainFeatures(true, true, true, true)));
     config
         .getChains()
         .setTestnet(
             new ChainProfile(
                 "testnet",
-                "https://public-node.testnet.rsk.co",
+                Constants.RSK_TESTNET_RPC_URL,
                 31,
                 "tRBTC",
-                "https://explorer.testnet.rsk.co/tx/%s",
-                "https://explorer.testnet.rsk.co/address/%s",
+                Constants.RSK_TESTNET_EXPLORER_URL + "/tx/%s",
+                Constants.RSK_TESTNET_EXPLORER_URL + "/address/%s",
                 new ChainFeatures(true, false, false, true)));
     ensureConfigShape(config);
     return config;

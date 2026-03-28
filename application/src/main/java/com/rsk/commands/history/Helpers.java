@@ -2,10 +2,9 @@ package com.rsk.commands.history;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.rsk.commands.config.CliConfig;
 import com.rsk.utils.Chain;
-import com.rsk.utils.Chain.ChainFeatures;
 import com.rsk.utils.Chain.ChainProfile;
+import com.rsk.utils.Constants;
 import com.rsk.utils.Json;
 import com.rsk.utils.Storage;
 import java.math.BigInteger;
@@ -17,10 +16,6 @@ import java.nio.file.Path;
 import java.util.List;
 
 public class Helpers {
-  private static final String ALCHEMY_ROOTSTOCK_MAINNET_URL =
-      "https://rootstock-mainnet.g.alchemy.com/v2/%s";
-  private static final String ALCHEMY_ROOTSTOCK_TESTNET_URL =
-      "https://rootstock-testnet.g.alchemy.com/v2/%s";
   private static final ObjectMapper OBJECT_MAPPER = Json.ObjectMapperFactory.create();
 
   private final com.rsk.commands.config.Helpers configHelpers;
@@ -125,10 +120,10 @@ public class Helpers {
 
   public String resolveAlchemyUrl(ChainProfile chainProfile, String apiKey) {
     if (chainProfile.chainId() == 30L) {
-      return String.format(ALCHEMY_ROOTSTOCK_MAINNET_URL, apiKey);
+      return Constants.ALCHEMY_ROOTSTOCK_MAINNET_URL + "/" + apiKey;
     }
     if (chainProfile.chainId() == 31L) {
-      return String.format(ALCHEMY_ROOTSTOCK_TESTNET_URL, apiKey);
+      return Constants.ALCHEMY_ROOTSTOCK_TESTNET_URL + "/" + apiKey;
     }
     throw new IllegalArgumentException(
         "Alchemy asset history is only supported for Rootstock mainnet/testnet.");

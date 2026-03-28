@@ -208,14 +208,7 @@ public class Helpers {
   }
 
   public String explorerTxUrl(ChainProfile chainProfile, String txHash) {
-    String template = chainProfile.explorerTxUrlTemplate();
-    if (template == null || template.isBlank()) {
-      return "(explorer URL not configured)";
-    }
-    if (template.contains("%s")) {
-      return String.format(template, txHash);
-    }
-    return template.endsWith("/") ? template + txHash : template + "/" + txHash;
+    return Chain.explorerUrl(chainProfile, txHash, true);
   }
 
   public String explorerAddressUrl(ChainProfile chainProfile, String address) {

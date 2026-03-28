@@ -54,35 +54,17 @@ public class Helpers {
   }
 
   public String blockscoutVerifyUrl(ChainProfile chainProfile, String address) {
-    if (chainProfile.chainId() == 30L) {
-      return "https://rootstock.blockscout.com/api/v2/smart-contracts/"
-          + address
-          + "/verification/via/standard-input";
-    }
-    if (chainProfile.chainId() == 31L) {
-      return "https://rootstock-testnet.blockscout.com/api/v2/smart-contracts/"
-          + address
-          + "/verification/via/standard-input";
-    }
-    throw new IllegalArgumentException(
-        "Contract verification is only supported on Rootstock mainnet/testnet.");
+    return Chain.blockscoutUrl(chainProfile)
+        + "/api/v2/smart-contracts/"
+        + address
+        + "/verification/via/standard-input";
   }
 
   public String blockscoutAddressUrl(ChainProfile chainProfile, String address) {
-    if (chainProfile.chainId() == 30L) {
-      return "https://rootstock.blockscout.com/address/" + address;
+    if (chainProfile.chainId() == 30L || chainProfile.chainId() == 31L) {
+      return Chain.blockscoutUrl(chainProfile) + "/address/" + address;
     }
-    if (chainProfile.chainId() == 31L) {
-      return "https://rootstock-testnet.blockscout.com/address/" + address;
-    }
-    String template = chainProfile.explorerAddressUrlTemplate();
-    if (template == null || template.isBlank()) {
-      return "(explorer URL not configured)";
-    }
-    if (template.contains("%s")) {
-      return String.format(template, address);
-    }
-    return template.endsWith("/") ? template + address : template + "/" + address;
+    return Chain.explorerUrl(chainProfile, address, false);
   }
 
   public void submitVerification(

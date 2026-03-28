@@ -235,14 +235,7 @@ public class Helpers {
   }
 
   private static String explorerAddressUrl(ChainProfile chainProfile, String address) {
-    String template = chainProfile.explorerAddressUrlTemplate();
-    if (template == null || template.isBlank()) {
-      return "(explorer URL not configured)";
-    }
-    if (template.contains("%s")) {
-      return String.format(template, address);
-    }
-    return template.endsWith("/") ? template + address : template + "/" + address;
+    return Chain.explorerUrl(chainProfile, address, false);
   }
 
 }

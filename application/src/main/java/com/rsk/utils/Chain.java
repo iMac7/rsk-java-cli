@@ -87,6 +87,29 @@ public final class Chain {
     return mainnet;
   }
 
+  public static String explorerUrl(ChainProfile chainProfile, String value, boolean isTx) {
+    String template =
+        isTx ? chainProfile.explorerTxUrlTemplate() : chainProfile.explorerAddressUrlTemplate();
+    if (template == null || template.isBlank()) {
+      return "(explorer URL not configured)";
+    }
+    if (template.contains("%s")) {
+      return String.format(template, value);
+    }
+    return template.endsWith("/") ? template + value : template + "/" + value;
+  }
+
+  public static String blockscoutUrl(ChainProfile chainProfile) {
+    if (chainProfile.chainId() == 30L) {
+      return Constants.ROOTSTOCK_MAINNET_BLOCKSCOUT_URL;
+    }
+    if (chainProfile.chainId() == 31L) {
+      return Constants.ROOTSTOCK_TESTNET_BLOCKSCOUT_URL;
+    }
+    throw new IllegalArgumentException(
+        "Blockscout API is only supported on Rootstock mainnet/testnet.");
+  }
+
   private static String normalizeChainOption(String chainOption) {
     if (chainOption == null || chainOption.isBlank()) {
       return chainOption;
