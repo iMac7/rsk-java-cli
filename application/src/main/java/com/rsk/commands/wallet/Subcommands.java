@@ -1,7 +1,6 @@
 package com.rsk.commands.wallet;
 
 import static com.rsk.utils.Terminal.cOk;
-import static com.rsk.utils.Terminal.readPassword;
 
 import com.rsk.commands.wallet.Helpers.WalletMetadata;
 import com.rsk.utils.Terminal;
@@ -13,6 +12,7 @@ import org.fusesource.jansi.Ansi;
 import org.jline.reader.LineReader;
 import org.jline.reader.LineReaderBuilder;
 import org.jline.reader.UserInterruptException;
+import org.jline.reader.impl.DefaultParser;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -24,10 +24,15 @@ public class Subcommands {
   private Subcommands() {}
 
   private static LineReader createPromptReader() {
+    DefaultParser parser = new DefaultParser();
+    parser.setEscapeChars(null);
     if (Terminal.interactiveTerminal() != null) {
-      return LineReaderBuilder.builder().terminal(Terminal.interactiveTerminal()).build();
+      return LineReaderBuilder.builder()
+          .terminal(Terminal.interactiveTerminal())
+          .parser(parser)
+          .build();
     }
-    return LineReaderBuilder.builder().build();
+    return LineReaderBuilder.builder().parser(parser).build();
   }
 
   @Command(
