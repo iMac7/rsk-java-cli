@@ -184,9 +184,6 @@ At runtime they are mapped to these Java system properties:
 `rsk.cli.log.file`
 `rsk.cli.log.console.level`
 
-To run from source on Windows with the defaults:
-`.\gradlew.bat :application:runCli --args="wallet --help"`
-
 Example `cli_config.txt`:
 ```properties
 rskCliLogRootLevel=INFO
@@ -226,9 +223,6 @@ Wallets and config are stored in
 where `~` is your home directory.
 
 ## Testing
-
-Use forward slashes for path in case of failed path arg (and file an issue with the cmd and os name to reproduce).
-
 Monitoring is available under tx --monitor but not as a standalone command, because address monitoring is not really implemented yet in the main cli code
 
 Use --example for `contract` and `deploy` commands to use the example artifacts provided
