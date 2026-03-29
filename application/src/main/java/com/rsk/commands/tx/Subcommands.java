@@ -1,12 +1,12 @@
 package com.rsk.commands.tx;
 
-import static com.rsk.utils.CliColors.*;
+import static com.rsk.utils.Terminal.*;
 
 import com.rsk.utils.Chain;
 import com.rsk.utils.Chain.ChainProfile;
 import com.rsk.utils.Loader;
 import com.rsk.utils.Storage;
-import com.rsk.utils.TxReceiptDetails;
+import com.rsk.utils.Rpc.TxReceiptDetails;
 import java.math.BigInteger;
 import java.nio.file.Path;
 import java.util.concurrent.Callable;
@@ -175,4 +175,3 @@ public class Subcommands {
     return Chain.resolveChain(config, mainnet, testnet, chain, chainUrl);
   }
 }
-

@@ -1,6 +1,6 @@
 package com.rsk.commands.contract;
 
-import static com.rsk.utils.CliColors.*;
+import static com.rsk.utils.Terminal.*;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.rsk.utils.Terminal;

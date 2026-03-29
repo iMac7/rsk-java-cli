@@ -1,10 +1,9 @@
 package com.rsk.commands.bridge;
 
-import static com.rsk.utils.CliColors.*;
+import static com.rsk.utils.Terminal.*;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.rsk.utils.Chain.ChainProfile;
-import com.rsk.utils.CliInput;
 import com.rsk.utils.Terminal;
 import java.io.BufferedReader;
 import java.io.Console;
@@ -243,7 +242,7 @@ public class Subcommands {
   }
 
   static char[] readPassword(String prompt) {
-    return CliInput.readPassword(prompt, "Bridge interaction cancelled.");
+    return com.rsk.utils.Terminal.readPassword(prompt, "Bridge interaction cancelled.");
   }
 
   static String readTextPrompt(String label, String defaultValue) {
@@ -284,4 +283,3 @@ public class Subcommands {
     }
   }
 }
-

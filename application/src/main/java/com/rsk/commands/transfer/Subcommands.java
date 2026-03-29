@@ -1,10 +1,9 @@
 package com.rsk.commands.transfer;
 
-import static com.rsk.utils.CliColors.*;
+import static com.rsk.utils.Terminal.*;
 import static com.rsk.utils.Format.formatAmount;
 
 import com.rsk.utils.Chain.ChainProfile;
-import com.rsk.utils.CliInput;
 import com.rsk.utils.Loader;
 import com.rsk.utils.Transaction;
 import java.math.BigDecimal;
@@ -206,7 +205,7 @@ public class Subcommands {
   }
 
   static char[] readPassword(String prompt) {
-    return CliInput.readPassword(cOk("✔" + prompt), "Transfer cancelled.");
+    return com.rsk.utils.Terminal.readPassword(cOk("✔" + prompt), "Transfer cancelled.");
   }
 
   private static String promptRequiredText(String label) {

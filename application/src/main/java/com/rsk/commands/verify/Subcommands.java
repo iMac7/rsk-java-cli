@@ -1,6 +1,6 @@
 package com.rsk.commands.verify;
 
-import static com.rsk.utils.CliColors.*;
+import static com.rsk.utils.Terminal.*;
 
 import com.rsk.utils.Chain.ChainProfile;
 import java.nio.file.Path;
@@ -78,4 +78,3 @@ public class Subcommands {
     }
   }
 }
-

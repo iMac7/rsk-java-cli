@@ -5,6 +5,7 @@ import java.math.BigInteger;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.function.Function;
 import org.web3j.crypto.Credentials;
 import org.web3j.crypto.RawTransaction;
 import org.web3j.crypto.TransactionEncoder;
@@ -147,28 +148,20 @@ public final class Rpc {
     }
 
     @Override
-    public Optional<TxReceiptDetails> getTransactionReceiptDetails(ChainProfile chainProfile, String txHash) {
-      try {
-        Optional<TransactionReceipt> receipt =
-            web3j(chainProfile).ethGetTransactionReceipt(txHash).send().getTransactionReceipt();
-        return receipt.map(
-            value ->
-                new TxReceiptDetails(
-                    txHash,
-                    value.getBlockHash(),
-                    value.getBlockNumber() == null ? null : value.getBlockNumber().toString(),
-                    value.getGasUsed() == null ? null : value.getGasUsed().toString(),
-                    value.getStatus(),
-                    value.getFrom(),
-                    value.getTo()));
-      } catch (Exception ex) {
-        LOGGER.error(
-            "Unable to fetch transaction receipt details for {} on chain {}",
-            txHash,
-            chainProfile.chainId(),
-            ex);
-        throw new IllegalStateException("Unable to fetch transaction receipt", ex);
-      }
+    public Optional<TxReceiptDetails> getTransactionReceiptDetails(
+        ChainProfile chainProfile, String txHash) {
+      return mapTransactionReceipt(
+          chainProfile,
+          txHash,
+          value ->
+              new TxReceiptDetails(
+                  txHash,
+                  value.getBlockHash(),
+                  value.getBlockNumber() == null ? null : value.getBlockNumber().toString(),
+                  value.getGasUsed() == null ? null : value.getGasUsed().toString(),
+                  value.getStatus(),
+                  value.getFrom(),
+                  value.getTo()));
     }
 
     @Override
@@ -181,6 +174,30 @@ public final class Rpc {
         throw new IllegalStateException("Unable to fetch current block number", ex);
       }
     }
+
+    private <T> Optional<T> mapTransactionReceipt(
+        ChainProfile chainProfile, String txHash, Function<TransactionReceipt, T> mapper) {
+      try {
+        Optional<TransactionReceipt> receipt =
+            web3j(chainProfile).ethGetTransactionReceipt(txHash).send().getTransactionReceipt();
+        return receipt.map(mapper);
+      } catch (Exception ex) {
+        LOGGER.error(
+            "Unable to fetch transaction receipt details for {} on chain {}",
+            txHash,
+            chainProfile.chainId(),
+            ex);
+        throw new IllegalStateException("Unable to fetch transaction receipt", ex);
+      }
+    }
   }
 
+  public record TxReceiptDetails(
+      String txHash,
+      String blockHash,
+      String blockNumber,
+      String gasUsed,
+      String status,
+      String from,
+      String to) {}
 }

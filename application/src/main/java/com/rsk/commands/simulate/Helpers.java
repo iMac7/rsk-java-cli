@@ -1,6 +1,6 @@
 package com.rsk.commands.simulate;
 
-import static com.rsk.utils.CliColors.*;
+import static com.rsk.utils.Terminal.*;
 
 import com.rsk.commands.wallet.Helpers.WalletMetadata;
 import com.rsk.utils.Chain.ChainProfile;

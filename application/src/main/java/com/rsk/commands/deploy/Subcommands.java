@@ -1,8 +1,7 @@
 package com.rsk.commands.deploy;
 
-import static com.rsk.utils.CliColors.*;
+import static com.rsk.utils.Terminal.*;
 
-import com.rsk.utils.CliInput;
 import java.io.BufferedReader;
 import java.io.Console;
 import java.io.IOException;
@@ -17,7 +16,6 @@ import picocli.CommandLine.Option;
 
 public class Subcommands {
   private static final Helpers HELPERS = Helpers.defaultHelpers();
-  //TODO is PROMPT_READER needed?
   private static final Path EXAMPLE_ABI_PATH =
       Path.of("application", "src", "main", "resources", "owner_contract", "Owner.abi")
           .toAbsolutePath()
@@ -144,7 +142,7 @@ public class Subcommands {
   }
 
   static char[] readPassword(String prompt) {
-    return CliInput.readPassword(cOk("✔" + prompt), "Deployment cancelled.");
+    return com.rsk.utils.Terminal.readPassword(cOk("✔" + prompt), "Deployment cancelled.");
   }
 
   static String promptRequiredText(String label) {
@@ -181,4 +179,3 @@ public class Subcommands {
     return promptRequiredText(label);
   }
 }
-

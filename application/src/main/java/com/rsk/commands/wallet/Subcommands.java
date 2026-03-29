@@ -1,9 +1,9 @@
 package com.rsk.commands.wallet;
 
-import static com.rsk.utils.CliColors.cOk;
+import static com.rsk.utils.Terminal.cOk;
+import static com.rsk.utils.Terminal.readPassword;
 
 import com.rsk.commands.wallet.Helpers.WalletMetadata;
-import com.rsk.utils.CliInput;
 import com.rsk.utils.Terminal;
 import java.nio.file.Path;
 import java.util.List;
@@ -487,7 +487,7 @@ public class Subcommands {
 
   static char[] readPassword(String prompt) {
     try {
-      return CliInput.readPassword(prompt, INPUT_CANCELLED_MESSAGE);
+      return com.rsk.utils.Terminal.readPassword(prompt, INPUT_CANCELLED_MESSAGE);
     } catch (IllegalStateException ex) {
       if (INPUT_CANCELLED_MESSAGE.equals(ex.getMessage())) {
         throw new InteractiveCancelledException();

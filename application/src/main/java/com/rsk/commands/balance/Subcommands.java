@@ -1,6 +1,6 @@
 package com.rsk.commands.balance;
 
-import static com.rsk.utils.CliColors.*;
+import static com.rsk.utils.Terminal.*;
 import static com.rsk.utils.Format.formatAmount;
 
 import com.rsk.utils.Chain.ChainProfile;

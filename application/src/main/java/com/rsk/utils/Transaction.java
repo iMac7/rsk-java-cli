@@ -5,16 +5,11 @@ import com.rsk.utils.Chain.ChainProfile;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.file.Path;
-import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.web3j.crypto.Credentials;
-import org.web3j.crypto.RawTransaction;
-import org.web3j.crypto.TransactionEncoder;
 import org.web3j.protocol.Web3j;
-import org.web3j.protocol.core.DefaultBlockParameterName;
 import org.web3j.protocol.core.methods.response.TransactionReceipt;
-import org.web3j.utils.Numeric;
 
 public final class Transaction {
   private static final Logger LOGGER = LoggerFactory.getLogger(Transaction.class);
@@ -47,33 +42,18 @@ public final class Transaction {
   public static PendingTransaction submit(
       ChainProfile chainProfile, String privateKeyHex, SendRequest request) {
     try {
-      Web3j web3j = Rpc.web3j(chainProfile);
       Credentials credentials = Credentials.create(privateKeyHex);
-      BigInteger nonce =
-          web3j
-              .ethGetTransactionCount(
-                  credentials.getAddress(), DefaultBlockParameterName.PENDING)
-              .send()
-              .getTransactionCount();
-
-      RawTransaction tx =
-          RawTransaction.createTransaction(
-              nonce,
-              request.gasPriceWei(),
-              request.gasLimit(),
-              request.to(),
-              request.valueWei(),
-              request.data() == null ? "" : request.data());
-      byte[] signed = TransactionEncoder.signMessage(tx, chainProfile.chainId(), credentials);
-      var sent = web3j.ethSendRawTransaction(Numeric.toHexString(signed)).send();
-      if (sent.hasError()) {
-        LOGGER.warn(
-            "Transaction submission failed on chain {}: {}",
-            chainProfile.chainId(),
-            sent.getError().getMessage());
-        throw new IllegalStateException(sent.getError().getMessage());
-      }
-      return new PendingTransaction(credentials.getAddress(), sent.getTransactionHash());
+      String txHash =
+          new Rpc.Web3jRpcGateway()
+              .sendNativeTransfer(
+                  chainProfile,
+                  privateKeyHex,
+                  request.to(),
+                  request.valueWei(),
+                  request.gasLimit(),
+                  request.gasPriceWei(),
+                  request.data());
+      return new PendingTransaction(credentials.getAddress(), txHash);
     } catch (Exception ex) {
       LOGGER.error("Unable to submit transaction on chain {}", chainProfile.chainId(), ex);
       throw new IllegalStateException("Unable to submit transaction", ex);
@@ -121,40 +101,6 @@ public final class Transaction {
       throw new IllegalStateException("Transaction failed. Receipt status: " + receipt.getStatus());
     }
     return receipt;
-  }
-
-  public static Optional<TxReceiptDetails> receiptDetails(ChainProfile chainProfile, String txHash) {
-    try {
-      Web3j web3j = Rpc.web3j(chainProfile);
-      Optional<TransactionReceipt> receipt =
-          web3j.ethGetTransactionReceipt(txHash).send().getTransactionReceipt();
-      return receipt.map(
-          value ->
-              new TxReceiptDetails(
-                  txHash,
-                  value.getBlockHash(),
-                  value.getBlockNumber() == null ? null : value.getBlockNumber().toString(),
-                  value.getGasUsed() == null ? null : value.getGasUsed().toString(),
-                  value.getStatus(),
-                  value.getFrom(),
-                  value.getTo()));
-    } catch (Exception ex) {
-      LOGGER.error(
-          "Unable to fetch transaction receipt details {} on chain {}",
-          txHash,
-          chainProfile.chainId(),
-          ex);
-      throw new IllegalStateException("Unable to fetch transaction receipt", ex);
-    }
-  }
-
-  public static BigInteger currentBlockNumber(ChainProfile chainProfile) {
-    try {
-      return Rpc.web3j(chainProfile).ethBlockNumber().send().getBlockNumber();
-    } catch (Exception ex) {
-      LOGGER.error("Unable to fetch current block number on chain {}", chainProfile.chainId(), ex);
-      throw new IllegalStateException("Unable to fetch current block number", ex);
-    }
   }
 
   public static String explorerTxUrl(ChainProfile chainProfile, String txHash) {

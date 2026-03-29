@@ -1,6 +1,6 @@
 package com.rsk.commands.transaction;
 
-import static com.rsk.utils.CliColors.*;
+import static com.rsk.utils.Terminal.*;
 
 import com.rsk.commands.transfer.Helpers;
 import com.rsk.java_cli.WelcomeScreen;
@@ -493,4 +493,3 @@ public class Subcommands {
 
   private static class PromptCancelledException extends RuntimeException {}
 }
-

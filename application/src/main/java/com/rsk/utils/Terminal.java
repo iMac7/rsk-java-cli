@@ -1,10 +1,14 @@
 package com.rsk.utils;
 
+import java.io.Console;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import org.fusesource.jansi.Ansi;
+import org.jline.reader.LineReader;
+import org.jline.reader.LineReaderBuilder;
+import org.jline.reader.UserInterruptException;
 import org.jline.terminal.Attributes;
 import org.jline.terminal.TerminalBuilder;
 import org.jline.utils.AttributedString;
@@ -14,6 +18,7 @@ import org.jline.utils.NonBlockingReader;
 public final class Terminal {
   private static final boolean UNICODE_SYMBOLS = detectUnicodeSymbols();
   private static final org.jline.terminal.Terminal MENU_TERMINAL = createInteractiveTerminal();
+  private static final LineReader PASSWORD_READER = createPasswordReader();
 
   private Terminal() {}
 
@@ -23,6 +28,79 @@ public final class Terminal {
 
   public static org.jline.terminal.Terminal interactiveTerminal() {
     return MENU_TERMINAL;
+  }
+
+  public static char[] readPassword(String prompt, String cancelMessage) {
+    while (true) {
+      try {
+        Console console = System.console();
+        if (console != null) {
+          char[] password = console.readPassword(prompt);
+          if (password == null) {
+            throw new IllegalStateException(cancelMessage);
+          }
+          if (password.length == 0) {
+            System.out.println("Password is required.");
+            continue;
+          }
+          return password;
+        }
+
+        String password = PASSWORD_READER.readLine(prompt, '*');
+        if (password == null) {
+          throw new IllegalStateException(cancelMessage);
+        }
+        if (password.isBlank()) {
+          System.out.println("Password is required.");
+          continue;
+        }
+        return password.toCharArray();
+      } catch (UserInterruptException ex) {
+        throw new IllegalStateException(cancelMessage);
+      } catch (RuntimeException ex) {
+        if (Thread.currentThread().isInterrupted()) {
+          Thread.interrupted();
+          throw new IllegalStateException(cancelMessage);
+        }
+        throw ex;
+      }
+    }
+  }
+
+  public static String cInfo(String text) {
+    return Ansi.ansi().fg(Ansi.Color.CYAN).a(text).reset().toString();
+  }
+
+  public static String cOk(String text) {
+    return Ansi.ansi().fg(Ansi.Color.GREEN).a(text).reset().toString();
+  }
+
+  public static String cError(String text) {
+    return Ansi.ansi().fg(Ansi.Color.RED).a(text).reset().toString();
+  }
+
+  public static String cEmph(String text) {
+    return Ansi.ansi().fgRgb(255, 153, 51).bold().a(text).reset().toString();
+  }
+
+  public static String cPlain(String text) {
+    return Ansi.ansi().fg(Ansi.Color.WHITE).a(text).reset().toString();
+  }
+
+  public static String cMuted(String text) {
+    return Ansi.ansi().fgRgb(140, 140, 140).a(text).reset().toString();
+  }
+
+  public static String cWarn(String text) {
+    return Ansi.ansi().fgRgb(255, 183, 77).a(text).reset().toString();
+  }
+
+  public static String cRule() {
+    return Ansi.ansi()
+        .fgRgb(140, 140, 140)
+        .a("────────────────────────────────────────")
+        .reset()
+        .toString();
   }
 
   public static int selectMenu(
@@ -105,6 +183,13 @@ public final class Terminal {
     } catch (Exception ignored) {
       return null;
     }
+  }
+
+  private static LineReader createPasswordReader() {
+    if (interactiveTerminal() != null) {
+      return LineReaderBuilder.builder().terminal(interactiveTerminal()).build();
+    }
+    return LineReaderBuilder.builder().build();
   }
 
   private static void renderMenu(
@@ -247,10 +332,6 @@ public final class Terminal {
 
   private static String cSelected(String text) {
     return Ansi.ansi().fgRgb(255, 153, 51).bold().a(text).reset().toString();
-  }
-
-  private static String cPlain(String text) {
-    return Ansi.ansi().fg(Ansi.Color.WHITE).a(text).reset().toString();
   }
 
   private static String cFooter(String text) {
