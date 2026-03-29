@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+  <property name="LOG_FILE" value="${rsk.cli.log.file}" />
+  <property name="ROOT_LEVEL" value="${rsk.cli.log.root.level:-INFO}" />
+  <property name="APP_LEVEL" value="${rsk.cli.log.app.level:-DEBUG}" />
+  <property name="CONSOLE_LEVEL" value="${rsk.cli.log.console.level:-OFF}" />
+
+  <appender name="FILE" class="ch.qos.logback.core.FileAppender">
+    <file>${LOG_FILE}</file>
+    <append>true</append>
+    <encoder>
+      <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger - %msg%n%ex</pattern>
+    </encoder>
+  </appender>
+
+  <appender name="STDERR" class="ch.qos.logback.core.ConsoleAppender">
+    <target>System.err</target>
+    <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+      <level>${CONSOLE_LEVEL}</level>
+    </filter>
+    <encoder>
+      <pattern>%d{HH:mm:ss.SSS} %-5level %logger - %msg%n%ex</pattern>
+    </encoder>
+  </appender>
+
+  <logger name="com.rsk" level="${APP_LEVEL}" additivity="false">
+    <appender-ref ref="FILE" />
+    <appender-ref ref="STDERR" />
+  </logger>
+
+  <root level="${ROOT_LEVEL}">
+    <appender-ref ref="FILE" />
+  </root>
+</configuration>

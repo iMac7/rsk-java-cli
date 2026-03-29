@@ -18,8 +18,11 @@ import org.web3j.protocol.Web3j;
 import org.web3j.protocol.core.methods.request.Transaction;
 import org.web3j.protocol.core.methods.response.EthEstimateGas;
 import org.web3j.protocol.http.HttpService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class Contract {
+  private static final Logger LOGGER = LoggerFactory.getLogger(Contract.class);
   public static final Map<String, Map<String, String>> TOKENS = createTokens();
 
   private Contract() {}
@@ -89,6 +92,11 @@ public final class Contract {
     } catch (IllegalArgumentException ex) {
       throw ex;
     } catch (Exception ex) {
+      LOGGER.warn(
+          "Unable to read token metadata for {} on chain {}",
+          tokenAddress,
+          chainProfile.chainId(),
+          ex);
       throw new IllegalArgumentException("Invalid token contract address", ex);
     }
   }
@@ -123,10 +131,19 @@ public final class Contract {
                       encodedData))
               .send();
       if (estimate.hasError() || estimate.getAmountUsed() == null) {
+        LOGGER.debug(
+            "Falling back to default gas estimate for token transfer to {} on chain {}",
+            tokenAddress,
+            chainProfile.chainId());
         return BigInteger.valueOf(100_000L);
       }
       return estimate.getAmountUsed().multiply(BigInteger.valueOf(12)).divide(BigInteger.TEN);
     } catch (Exception ex) {
+      LOGGER.warn(
+          "Unable to estimate token transfer gas for {} on chain {}, using fallback",
+          tokenAddress,
+          chainProfile.chainId(),
+          ex);
       return BigInteger.valueOf(100_000L);
     }
   }

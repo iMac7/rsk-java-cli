@@ -17,8 +17,11 @@ import org.web3j.protocol.core.methods.response.EthBlockNumber;
 import org.web3j.protocol.core.methods.response.TransactionReceipt;
 import org.web3j.protocol.http.HttpService;
 import org.web3j.utils.Numeric;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class Rpc {
+  private static final Logger LOGGER = LoggerFactory.getLogger(Rpc.class);
   private static final ConcurrentMap<String, Web3j> CLIENTS_BY_RPC_URL = new ConcurrentHashMap<>();
 
   private Rpc() {}
@@ -61,6 +64,11 @@ public final class Rpc {
             web3j.ethGetBalance(address, DefaultBlockParameterName.LATEST).send();
         return response.getBalance();
       } catch (Exception ex) {
+        LOGGER.error(
+            "Unable to fetch balance for address {} on chain {}",
+            address,
+            chainProfile.chainId(),
+            ex);
         throw new IllegalStateException("Unable to fetch balance", ex);
       }
     }
@@ -70,6 +78,7 @@ public final class Rpc {
       try {
         return web3j(chainProfile).ethGasPrice().send().getGasPrice();
       } catch (Exception ex) {
+        LOGGER.error("Unable to fetch gas price on chain {}", chainProfile.chainId(), ex);
         throw new IllegalStateException("Unable to fetch gas price", ex);
       }
     }
@@ -104,10 +113,19 @@ public final class Rpc {
 
         EthSendTransaction sent = web3j.ethSendRawTransaction(payload).send();
         if (sent.hasError()) {
+          LOGGER.warn(
+              "Raw transaction submission failed on chain {}: {}",
+              chainProfile.chainId(),
+              sent.getError().getMessage());
           throw new IllegalStateException(sent.getError().getMessage());
         }
         return sent.getTransactionHash();
       } catch (Exception ex) {
+        LOGGER.error(
+            "Unable to send transfer to {} on chain {}",
+            to,
+            chainProfile.chainId(),
+            ex);
         throw new IllegalStateException("Unable to send transfer", ex);
       }
     }
@@ -119,6 +137,11 @@ public final class Rpc {
             web3j(chainProfile).ethGetTransactionReceipt(txHash).send().getTransactionReceipt();
         return receipt.map(TransactionReceipt::getStatus);
       } catch (Exception ex) {
+        LOGGER.error(
+            "Unable to fetch transaction receipt status for {} on chain {}",
+            txHash,
+            chainProfile.chainId(),
+            ex);
         throw new IllegalStateException("Unable to fetch transaction receipt", ex);
       }
     }
@@ -139,6 +162,11 @@ public final class Rpc {
                     value.getFrom(),
                     value.getTo()));
       } catch (Exception ex) {
+        LOGGER.error(
+            "Unable to fetch transaction receipt details for {} on chain {}",
+            txHash,
+            chainProfile.chainId(),
+            ex);
         throw new IllegalStateException("Unable to fetch transaction receipt", ex);
       }
     }
@@ -149,6 +177,7 @@ public final class Rpc {
         EthBlockNumber response = web3j(chainProfile).ethBlockNumber().send();
         return response.getBlockNumber();
       } catch (Exception ex) {
+        LOGGER.error("Unable to fetch current block number on chain {}", chainProfile.chainId(), ex);
         throw new IllegalStateException("Unable to fetch current block number", ex);
       }
     }

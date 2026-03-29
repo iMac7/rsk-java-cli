@@ -147,6 +147,80 @@ pass CLI arguments after the command
 `.\rsk-java-cli.ps1 wallet --help`
 `.\gradlew.bat :application:runCli --args="wallet --help"`
 
+### Logging
+The CLI uses SLF4J for internal diagnostic logging and Logback as the runtime logger.
+User-facing command output still goes to `stdout` and `stderr` with `System.out` and `System.err`.
+SLF4J is reserved for non-user-facing diagnostics such as RPC, HTTP, storage, and transaction failures.
+
+Diagnostic logs are written to:
+`~/.rsk-java-cli/logs.txt`
+
+By default this keeps stack traces and transport failures out of the interactive terminal UI while preserving them on disk.
+
+The logging settings are read from:
+`~/.rsk-java-cli/cli_config.txt`
+
+Supported keys:
+`rskCliLogRootLevel=INFO`
+`rskCliLogAppLevel=DEBUG`
+`rskCliLogFile=~/.rsk-java-cli/logs.txt`
+`rskCliLogConsoleLevel=OFF`
+
+Log levels
+`DEBUG` detailed
+`INFO` normal operational events with less detail than `DEBUG`.
+`WARN` unexpected conditions where the CLI may still continue or fall back safely.
+`ERROR` failed operations and exception cases.
+`OFF` disables logging completely.
+
+Logback uses normal severity ordering.
+If a level is set to `WARN`, you still get `WARN` and `ERROR`, but not `INFO` or `DEBUG`.
+`rskCliLogConsoleLevel` controls what logged application events are also printed to the terminal via `stderr`.
+Set it to `OFF` to keep logs file-only.
+
+At runtime they are mapped to these Java system properties:
+`rsk.cli.log.root.level`
+`rsk.cli.log.app.level`
+`rsk.cli.log.file`
+`rsk.cli.log.console.level`
+
+To run from source on Windows with the defaults:
+`.\gradlew.bat :application:runCli --args="wallet --help"`
+
+Example `cli_config.txt`:
+```properties
+rskCliLogRootLevel=INFO
+rskCliLogAppLevel=DEBUG
+rskCliLogFile=C:/Users/your-user/.rsk-java-cli/logs.txt
+rskCliLogConsoleLevel=OFF
+```
+
+For packaged runs started with the wrapper scripts or `java -jar`, the default file remains `~/.rsk-java-cli/logs.txt`.
+Gradle runs and wrapper-script runs both read the same `cli_config.txt`.
+You can still override these values manually with JVM properties if needed.
+
+To enable application debug logging in `cli_config.txt`, set:
+`rskCliLogAppLevel=DEBUG`
+
+To print logged errors and stacktraces to the terminal during development, also set:
+`rskCliLogConsoleLevel=DEBUG`
+
+To reduce logging noise but keep warnings and errors, set:
+`rskCliLogRootLevel=WARN`
+`rskCliLogAppLevel=WARN`
+`rskCliLogConsoleLevel=WARN`
+
+To disable almost all logging, set both levels to `OFF`.
+In `cli_config.txt`:
+`rskCliLogRootLevel=OFF`
+`rskCliLogAppLevel=OFF`
+`rskCliLogConsoleLevel=OFF`
+
+To re-enable the default behavior, set:
+`rskCliLogRootLevel=INFO`
+`rskCliLogAppLevel=DEBUG`
+`rskCliLogConsoleLevel=OFF`
+
 Wallets and config are stored in
 `~/.rsk-java-cli`
 where `~` is your home directory.

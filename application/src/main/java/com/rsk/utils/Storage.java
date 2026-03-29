@@ -22,8 +22,12 @@ import org.web3j.crypto.Keys;
 import org.web3j.crypto.Wallet;
 import org.web3j.crypto.WalletFile;
 import org.web3j.utils.Numeric;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class Storage {
+  private static final Logger LOGGER = LoggerFactory.getLogger(Storage.class);
+
   private Storage() {}
 
   public static class JsonConfigRepository implements ConfigPort {
@@ -44,11 +48,13 @@ public final class Storage {
       try {
         if (!Files.exists(configPath)) {
           CliConfig defaultConfig = defaultConfig();
+          LOGGER.debug("Config file {} not found, writing defaults", configPath);
           save(defaultConfig);
           return defaultConfig;
         }
         return objectMapper.readValue(configPath.toFile(), CliConfig.class);
       } catch (IOException ex) {
+        LOGGER.error("Unable to load config from {}", configPath, ex);
         throw new IllegalStateException("Unable to load config", ex);
       }
     }
@@ -59,6 +65,7 @@ public final class Storage {
         Files.createDirectories(configPath.getParent());
         objectMapper.writerWithDefaultPrettyPrinter().writeValue(configPath.toFile(), config);
       } catch (IOException ex) {
+        LOGGER.error("Unable to save config to {}", configPath, ex);
         throw new IllegalStateException("Unable to save config", ex);
       }
     }
@@ -93,6 +100,7 @@ public final class Storage {
         ECKeyPair keyPair = Keys.createEcKeyPair();
         return storeWallet(name, keyPair, password);
       } catch (Exception ex) {
+        LOGGER.error("Unable to create wallet {}", name, ex);
         throw new IllegalStateException("Unable to create wallet", ex);
       }
     }
@@ -105,6 +113,7 @@ public final class Storage {
         ECKeyPair keyPair = ECKeyPair.create(privateKey);
         return storeWallet(name, keyPair, password);
       } catch (Exception ex) {
+        LOGGER.warn("Invalid private key provided for wallet import {}", name, ex);
         throw new IllegalArgumentException("Invalid private key", ex);
       }
     }
@@ -194,6 +203,7 @@ public final class Storage {
         ECKeyPair keyPair = Wallet.decrypt(new String(password), walletFile);
         return Numeric.toHexStringNoPrefixZeroPadded(keyPair.getPrivateKey(), 64);
       } catch (Exception ex) {
+        LOGGER.error("Unable to unlock wallet {}", walletName, ex);
         throw new IllegalArgumentException("Unable to unlock wallet " + walletName, ex);
       }
     }
@@ -232,11 +242,13 @@ public final class Storage {
       try {
         if (!Files.exists(registryPath)) {
           WalletRegistry registry = new WalletRegistry();
+          LOGGER.debug("Wallet registry {} not found, creating default registry", registryPath);
           saveRegistry(registry);
           return registry;
         }
         return objectMapper.readValue(registryPath.toFile(), WalletRegistry.class);
       } catch (IOException ex) {
+        LOGGER.error("Unable to load wallet registry from {}", registryPath, ex);
         throw new IllegalStateException("Unable to load wallet registry", ex);
       }
     }
@@ -246,6 +258,7 @@ public final class Storage {
         Files.createDirectories(registryPath.getParent());
         objectMapper.writerWithDefaultPrettyPrinter().writeValue(registryPath.toFile(), registry);
       } catch (IOException ex) {
+        LOGGER.error("Unable to save wallet registry to {}", registryPath, ex);
         throw new IllegalStateException("Unable to save wallet registry", ex);
       }
     }

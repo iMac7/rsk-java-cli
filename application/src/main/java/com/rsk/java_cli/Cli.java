@@ -3,21 +3,83 @@ package com.rsk.java_cli;
 import java.io.BufferedReader;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.PrintStream;
 import java.io.InputStreamReader;
+import java.io.Reader;
+import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 import picocli.CommandLine;
 
 public class Cli {
   private Cli() {}
 
   public static void main(String[] args) {
+    configureLogging();
     configureUtf8Console();
     CommandLine commandLine = CliHelpers.createCommandLine();
     int exitCode = args.length == 0 ? runInteractive(commandLine) : execute(commandLine, args);
     System.exit(exitCode);
+  }
+
+  private static void configureLogging() {
+    Path cliHome = Path.of(System.getProperty("user.home"), ".rsk-java-cli");
+    try {
+      Files.createDirectories(cliHome);
+    } catch (IOException ignored) {
+      // Keep startup resilient. Logback will fall back to its own error reporting if needed.
+    }
+
+    Properties cliConfig = loadCliConfig(cliHome.resolve("cli_config.txt"));
+    String logFile = resolveLoggingSetting("rsk.cli.log.file", cliConfig, "rskCliLogFile", cliHome.resolve("logs.txt").toString());
+    String rootLevel = resolveLoggingSetting("rsk.cli.log.root.level", cliConfig, "rskCliLogRootLevel", "INFO");
+    String appLevel = resolveLoggingSetting("rsk.cli.log.app.level", cliConfig, "rskCliLogAppLevel", "DEBUG");
+    String consoleLevel = resolveLoggingSetting("rsk.cli.log.console.level", cliConfig, "rskCliLogConsoleLevel", "OFF");
+
+    System.setProperty("rsk.cli.log.file", logFile);
+    System.setProperty("rsk.cli.log.root.level", rootLevel);
+    System.setProperty("rsk.cli.log.app.level", appLevel);
+    System.setProperty("rsk.cli.log.console.level", consoleLevel);
+  }
+
+  private static Properties loadCliConfig(Path configPath) {
+    Properties properties = new Properties();
+    if (!Files.exists(configPath)) {
+      return properties;
+    }
+
+    try (Reader reader = Files.newBufferedReader(configPath, StandardCharsets.UTF_8)) {
+      properties.load(reader);
+    } catch (IOException ignored) {
+      // Keep startup resilient. Logging falls back to defaults if the config cannot be read.
+    }
+    return properties;
+  }
+
+  private static String resolveLoggingSetting(
+      String systemPropertyKey, Properties cliConfig, String cliConfigKey, String defaultValue) {
+    String systemPropertyValue = trimToNull(System.getProperty(systemPropertyKey));
+    if (systemPropertyValue != null) {
+      return systemPropertyValue;
+    }
+
+    String cliConfigValue = trimToNull(cliConfig.getProperty(cliConfigKey));
+    if (cliConfigValue != null) {
+      return cliConfigValue;
+    }
+
+    return defaultValue;
+  }
+
+  private static String trimToNull(String value) {
+    if (value == null) {
+      return null;
+    }
+    String trimmed = value.trim();
+    return trimmed.isEmpty() ? null : trimmed;
   }
 
   private static void configureUtf8Console() {

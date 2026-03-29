@@ -9,8 +9,11 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 final class AddressBookStore {
+  private static final Logger LOGGER = LoggerFactory.getLogger(AddressBookStore.class);
   private static final TypeReference<LinkedHashMap<String, Object>> REGISTRY_TYPE =
       new TypeReference<>() {};
 
@@ -90,6 +93,7 @@ final class AddressBookStore {
       registry.putIfAbsent("wallets", new ArrayList<>());
       return registry;
     } catch (IOException ex) {
+      LOGGER.error("Unable to load wallet registry document from {}", registryPath, ex);
       throw new IllegalStateException("Unable to load wallet registry", ex);
     }
   }
@@ -99,6 +103,7 @@ final class AddressBookStore {
       Files.createDirectories(registryPath.getParent());
       objectMapper.writerWithDefaultPrettyPrinter().writeValue(registryPath.toFile(), registry);
     } catch (IOException ex) {
+      LOGGER.error("Unable to save wallet registry document to {}", registryPath, ex);
       throw new IllegalStateException("Unable to save wallet registry", ex);
     }
   }

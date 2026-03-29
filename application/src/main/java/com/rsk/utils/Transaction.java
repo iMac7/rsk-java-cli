@@ -6,6 +6,8 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.file.Path;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.web3j.crypto.Credentials;
 import org.web3j.crypto.RawTransaction;
 import org.web3j.crypto.TransactionEncoder;
@@ -14,8 +16,8 @@ import org.web3j.protocol.core.DefaultBlockParameterName;
 import org.web3j.protocol.core.methods.response.TransactionReceipt;
 import org.web3j.utils.Numeric;
 
-
 public final class Transaction {
+  private static final Logger LOGGER = LoggerFactory.getLogger(Transaction.class);
   private static final BigDecimal WEI = new BigDecimal("1000000000000000000");
   private static final BigInteger GWEI = BigInteger.valueOf(1_000_000_000L);
 
@@ -65,10 +67,15 @@ public final class Transaction {
       byte[] signed = TransactionEncoder.signMessage(tx, chainProfile.chainId(), credentials);
       var sent = web3j.ethSendRawTransaction(Numeric.toHexString(signed)).send();
       if (sent.hasError()) {
+        LOGGER.warn(
+            "Transaction submission failed on chain {}: {}",
+            chainProfile.chainId(),
+            sent.getError().getMessage());
         throw new IllegalStateException(sent.getError().getMessage());
       }
       return new PendingTransaction(credentials.getAddress(), sent.getTransactionHash());
     } catch (Exception ex) {
+      LOGGER.error("Unable to submit transaction on chain {}", chainProfile.chainId(), ex);
       throw new IllegalStateException("Unable to submit transaction", ex);
     }
   }
@@ -84,10 +91,20 @@ public final class Transaction {
         }
         Thread.sleep(sleepMs);
       }
+      LOGGER.warn(
+          "Timed out waiting for transaction receipt {} on chain {} after {} polls",
+          txHash,
+          chainProfile.chainId(),
+          maxPolls);
       throw new IllegalStateException("Timed out waiting for transaction receipt: " + txHash);
     } catch (IllegalStateException ex) {
       throw ex;
     } catch (Exception ex) {
+      LOGGER.error(
+          "Unable to fetch transaction receipt {} on chain {}",
+          txHash,
+          chainProfile.chainId(),
+          ex);
       throw new IllegalStateException("Unable to fetch transaction receipt", ex);
     }
   }
@@ -96,6 +113,11 @@ public final class Transaction {
       ChainProfile chainProfile, String txHash, int maxPolls, long sleepMs) {
     TransactionReceipt receipt = waitForReceipt(chainProfile, txHash, maxPolls, sleepMs);
     if (!"0x1".equalsIgnoreCase(receipt.getStatus())) {
+      LOGGER.warn(
+          "Transaction {} on chain {} completed with status {}",
+          txHash,
+          chainProfile.chainId(),
+          receipt.getStatus());
       throw new IllegalStateException("Transaction failed. Receipt status: " + receipt.getStatus());
     }
     return receipt;
@@ -117,6 +139,11 @@ public final class Transaction {
                   value.getFrom(),
                   value.getTo()));
     } catch (Exception ex) {
+      LOGGER.error(
+          "Unable to fetch transaction receipt details {} on chain {}",
+          txHash,
+          chainProfile.chainId(),
+          ex);
       throw new IllegalStateException("Unable to fetch transaction receipt", ex);
     }
   }
@@ -125,6 +152,7 @@ public final class Transaction {
     try {
       return Rpc.web3j(chainProfile).ethBlockNumber().send().getBlockNumber();
     } catch (Exception ex) {
+      LOGGER.error("Unable to fetch current block number on chain {}", chainProfile.chainId(), ex);
       throw new IllegalStateException("Unable to fetch current block number", ex);
     }
   }

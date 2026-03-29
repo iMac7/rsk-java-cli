@@ -7,6 +7,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.web3j.abi.FunctionEncoder;
 import org.web3j.abi.FunctionReturnDecoder;
 import org.web3j.abi.TypeReference;
@@ -26,6 +28,7 @@ import org.web3j.protocol.http.HttpService;
 import org.web3j.utils.Numeric;
 
 public final class Rns {
+  private static final Logger LOGGER = LoggerFactory.getLogger(Rns.class);
   private static final String RNS_REGISTRY_MAINNET = "0xcb868aeabd31e2b66f74e9a55cf064abb31a4ad5";
   private static final String RNS_REGISTRY_TESTNET = "0x7d284aaac6e925aad802a53c0c69efe3764597b8";
   private static final long CHAIN_ID_MAINNET = 30L;
@@ -49,6 +52,7 @@ public final class Rns {
       }
       return Optional.of(normalizeAddress(resolvedAddress));
     } catch (Exception ex) {
+      LOGGER.error("RNS lookup failed for {}", name, ex);
       throw new IllegalStateException("RNS lookup failed for '" + name + "'", ex);
     }
   }
@@ -69,6 +73,7 @@ public final class Rns {
       }
       return Optional.of(name);
     } catch (Exception ex) {
+      LOGGER.error("RNS reverse lookup failed for {}", address, ex);
       throw new IllegalStateException("RNS reverse lookup failed for '" + address + "'", ex);
     }
   }
@@ -180,6 +185,7 @@ public final class Rns {
                 DefaultBlockParameterName.LATEST)
             .send();
     if (response.hasError()) {
+      LOGGER.warn("RNS eth_call to {} failed: {}", to, response.getError().getMessage());
       throw new IllegalStateException(response.getError().getMessage());
     }
     String value = response.getValue();
