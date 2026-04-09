@@ -2,7 +2,6 @@ package com.rsk.commands.tx;
 
 import static com.rsk.utils.Terminal.*;
 
-import com.rsk.utils.Chain;
 import com.rsk.utils.Chain.ChainProfile;
 import com.rsk.utils.Loader;
 import com.rsk.utils.Rpc.TxReceiptDetails;

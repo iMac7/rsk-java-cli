@@ -3,7 +3,6 @@ package com.rsk.commands.transfer;
 import com.rsk.commands.config.Helpers.ChainResolutionSupport;
 import com.rsk.commands.wallet.Helpers.WalletMetadata;
 import com.rsk.commands.wallet.Helpers.WalletUnlockPort;
-import com.rsk.utils.Chain;
 import com.rsk.utils.Chain.ChainProfile;
 import com.rsk.utils.Contract;
 import com.rsk.utils.Rpc;

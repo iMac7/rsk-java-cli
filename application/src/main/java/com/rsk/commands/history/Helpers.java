@@ -3,7 +3,6 @@ package com.rsk.commands.history;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rsk.commands.config.Helpers.ChainResolutionSupport;
-import com.rsk.utils.Chain;
 import com.rsk.utils.Chain.ChainProfile;
 import com.rsk.utils.Constants;
 import com.rsk.utils.Json;

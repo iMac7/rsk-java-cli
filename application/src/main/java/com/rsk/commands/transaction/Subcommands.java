@@ -16,7 +16,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.Callable;
 import org.jline.reader.LineReader;
 import org.jline.reader.LineReaderBuilder;
-import org.jline.reader.UserInterruptException;
 import org.jline.terminal.Attributes;
 import org.jline.terminal.TerminalBuilder;
 import org.jline.utils.NonBlockingReader;
