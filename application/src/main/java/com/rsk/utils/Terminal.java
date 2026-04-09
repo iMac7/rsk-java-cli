@@ -71,6 +71,15 @@ public final class Terminal {
     }
   }
 
+  public static void revealSensitiveValue(String value, long timeoutMillis) {
+    System.out.println(value);
+    System.out.println(
+        cMuted("Press any key to clear this secret now. It will be removed from the screen in 5 minutes."));
+    waitForAnyKeyOrTimeout(timeoutMillis);
+    clearScreenAndScrollback();
+    System.out.println(cMuted("Sensitive output cleared from the visible terminal."));
+  }
+
   public static String cInfo(String text) {
     return Ansi.ansi().fg(Ansi.Color.CYAN).a(text).reset().toString();
   }
@@ -105,6 +114,16 @@ public final class Terminal {
         .a("────────────────────────────────────────")
         .reset()
         .toString();
+  }
+
+  public static void clearScreenAndScrollback() {
+    String clearSequence = "\u001b[3J\u001b[2J\u001b[H";
+    System.out.print(clearSequence);
+    System.out.flush();
+    if (MENU_TERMINAL != null) {
+      MENU_TERMINAL.writer().print(clearSequence);
+      MENU_TERMINAL.writer().flush();
+    }
   }
 
   public static int selectMenu(
@@ -328,6 +347,38 @@ public final class Terminal {
 
     Charset charset = Charset.defaultCharset();
     return StandardCharsets.UTF_8.equals(charset);
+  }
+
+  private static void waitForAnyKeyOrTimeout(long timeoutMillis) {
+    if (timeoutMillis <= 0L) {
+      return;
+    }
+
+    if (MENU_TERMINAL == null) {
+      sleepQuietly(timeoutMillis);
+      return;
+    }
+
+    Attributes originalAttributes = MENU_TERMINAL.enterRawMode();
+    try {
+      MENU_TERMINAL.puts(org.jline.utils.InfoCmp.Capability.cursor_invisible);
+      MENU_TERMINAL.writer().flush();
+      MENU_TERMINAL.reader().read(timeoutMillis);
+    } catch (Exception ex) {
+      sleepQuietly(timeoutMillis);
+    } finally {
+      MENU_TERMINAL.puts(org.jline.utils.InfoCmp.Capability.cursor_visible);
+      MENU_TERMINAL.setAttributes(originalAttributes);
+      MENU_TERMINAL.writer().flush();
+    }
+  }
+
+  private static void sleepQuietly(long timeoutMillis) {
+    try {
+      Thread.sleep(timeoutMillis);
+    } catch (InterruptedException ex) {
+      Thread.currentThread().interrupt();
+    }
   }
 
   private static String cTitle(String text) {

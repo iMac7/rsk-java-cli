@@ -20,6 +20,7 @@ import picocli.CommandLine.Option;
 public class Subcommands {
   private static final Helpers HELPERS = Helpers.defaultHelpers();
   private static final String INPUT_CANCELLED_MESSAGE = "Input cancelled.";
+  private static final long PRIVATE_KEY_REVEAL_TIMEOUT_MILLIS = 5L * 60L * 1000L;
   private static final LineReader PROMPT_READER = createPromptReader();
 
   private Subcommands() {}
@@ -157,7 +158,7 @@ public class Subcommands {
       warnBeforePrivateKeyReveal(selectedWallet);
       char[] password = readPassword("Wallet password: ");
       String privateKey = HELPERS.dumpPrivateKey(selectedWallet, password);
-      System.out.println(privateKey);
+      Terminal.revealSensitiveValue(privateKey, PRIVATE_KEY_REVEAL_TIMEOUT_MILLIS);
     }
 
     private void runRenameFlow() {
@@ -424,7 +425,7 @@ public class Subcommands {
       warnBeforePrivateKeyReveal(selectedWallet);
       char[] password = readPassword("Wallet password: ");
       String privateKey = HELPERS.dumpPrivateKey(selectedWallet, password);
-      System.out.println(privateKey);
+      Terminal.revealSensitiveValue(privateKey, PRIVATE_KEY_REVEAL_TIMEOUT_MILLIS);
       return 0;
     }
   }
