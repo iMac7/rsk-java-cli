@@ -17,6 +17,7 @@ import java.util.List;
 
 public class Helpers {
   private static final ObjectMapper OBJECT_MAPPER = Json.ObjectMapperFactory.create();
+  static final String ALCHEMY_API_KEY_ENV = "RSK_CLI_ALCHEMY_API_KEY";
 
   private final com.rsk.commands.config.Helpers configHelpers;
 
@@ -38,10 +39,16 @@ public class Helpers {
     if (explicitApiKey != null && !explicitApiKey.isBlank()) {
       return explicitApiKey;
     }
+    String envApiKey = System.getenv(ALCHEMY_API_KEY_ENV);
+    if (envApiKey != null && !envApiKey.isBlank()) {
+      return envApiKey;
+    }
     String key = configHelpers.loadConfig().getApiKeys().getAlchemyApiKey();
     if (key == null || key.isBlank()) {
       throw new IllegalArgumentException(
-          "Alchemy API key is required. Provide --apikey or set config.apiKeys.alchemyApiKey.");
+          "Alchemy API key is required. Provide --apikey, set "
+              + ALCHEMY_API_KEY_ENV
+              + ", or set config.apiKeys.alchemyApiKey.");
     }
     return key;
   }

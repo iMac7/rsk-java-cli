@@ -7,15 +7,23 @@ import com.rsk.commands.wallet.Helpers.WalletMetadata;
 import com.rsk.commands.wallet.Helpers.WalletPort;
 import com.rsk.commands.wallet.Helpers.WalletRegistry;
 import com.rsk.commands.wallet.Helpers.WalletUnlockPort;
+import java.io.File;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.AclEntry;
+import java.nio.file.attribute.AclEntryPermission;
+import java.nio.file.attribute.AclEntryType;
+import java.nio.file.attribute.AclFileAttributeView;
+import java.nio.file.attribute.PosixFilePermission;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.web3j.crypto.ECKeyPair;
 import org.web3j.crypto.Keys;
@@ -64,6 +72,7 @@ public final class Storage {
       try {
         Files.createDirectories(configPath.getParent());
         objectMapper.writerWithDefaultPrettyPrinter().writeValue(configPath.toFile(), config);
+        restrictConfigFileToOwner(configPath);
       } catch (IOException ex) {
         LOGGER.error("Unable to save config to {}", configPath, ex);
         throw new IllegalStateException("Unable to save config", ex);
@@ -72,6 +81,52 @@ public final class Storage {
 
     private static CliConfig defaultConfig() {
       return com.rsk.commands.config.Helpers.defaultConfig();
+    }
+
+    private static void restrictConfigFileToOwner(Path configPath) throws IOException {
+      try {
+        Set<PosixFilePermission> ownerOnly =
+            EnumSet.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE);
+        Files.setPosixFilePermissions(configPath, ownerOnly);
+        return;
+      } catch (UnsupportedOperationException ignored) {
+        // Fall back to ACL or basic File APIs below.
+      }
+
+      AclFileAttributeView aclView = Files.getFileAttributeView(configPath, AclFileAttributeView.class);
+      if (aclView != null) {
+        try {
+          aclView.setAcl(
+              List.of(
+                  AclEntry.newBuilder()
+                      .setType(AclEntryType.ALLOW)
+                      .setPrincipal(Files.getOwner(configPath))
+                      .setPermissions(
+                          EnumSet.of(
+                              AclEntryPermission.READ_DATA,
+                              AclEntryPermission.WRITE_DATA,
+                              AclEntryPermission.APPEND_DATA,
+                              AclEntryPermission.READ_ATTRIBUTES,
+                              AclEntryPermission.WRITE_ATTRIBUTES,
+                              AclEntryPermission.READ_NAMED_ATTRS,
+                              AclEntryPermission.WRITE_NAMED_ATTRS,
+                              AclEntryPermission.READ_ACL,
+                              AclEntryPermission.WRITE_ACL,
+                              AclEntryPermission.SYNCHRONIZE))
+                      .build()));
+          return;
+        } catch (IOException | UnsupportedOperationException ex) {
+          LOGGER.warn("Unable to set ACLs on {}, falling back to basic file permissions", configPath, ex);
+        }
+      }
+
+      File configFile = configPath.toFile();
+      boolean readableRestricted = configFile.setReadable(false, false) && configFile.setReadable(true, true);
+      boolean writableRestricted = configFile.setWritable(false, false) && configFile.setWritable(true, true);
+      configFile.setExecutable(false, false);
+      if (!readableRestricted || !writableRestricted) {
+        LOGGER.warn("Unable to fully restrict permissions on {}", configPath);
+      }
     }
   }
 
