@@ -6,6 +6,7 @@ import com.rsk.commands.wallet.Helpers.WalletMetadata;
 import com.rsk.utils.Chain;
 import com.rsk.utils.Chain.ChainProfile;
 import com.rsk.utils.Json;
+import com.rsk.utils.Rpc;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.file.Files;
@@ -31,7 +32,6 @@ import org.web3j.protocol.core.methods.response.EthEstimateGas;
 import org.web3j.protocol.core.methods.response.EthGetTransactionCount;
 import org.web3j.protocol.core.methods.response.EthGetTransactionReceipt;
 import org.web3j.protocol.core.methods.response.EthSendTransaction;
-import org.web3j.protocol.http.HttpService;
 import org.web3j.utils.Numeric;
 
 public class Helpers {
@@ -117,7 +117,8 @@ public class Helpers {
       ChainProfile chainProfile, String privateKeyHex, String deploymentData) {
     Chain.validateChainId(chainProfile, "Contract deployment");
     Credentials credentials = Credentials.create(privateKeyHex);
-    try (Web3j web3j = Web3j.build(new HttpService(chainProfile.rpcUrl()))) {
+    try {
+      Web3j web3j = Rpc.web3j(chainProfile);
       EthGetTransactionCount nonceResponse =
           web3j
               .ethGetTransactionCount(credentials.getAddress(), DefaultBlockParameterName.PENDING)

@@ -2,11 +2,11 @@ package com.rsk.commands.simulate;
 
 import com.rsk.commands.wallet.Helpers.WalletMetadata;
 import com.rsk.utils.Chain.ChainProfile;
+import com.rsk.utils.Rpc;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.concurrent.Callable;
 import org.web3j.protocol.Web3j;
-import org.web3j.protocol.http.HttpService;
 import picocli.CommandLine.ArgGroup;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -67,7 +67,8 @@ public class Subcommands {
       WalletMetadata walletMeta = HELPERS.resolveWallet(wallet);
       String toAddress = HELPERS.resolveAddressInput(chainProfile, address);
 
-      try (Web3j web3j = Web3j.build(new HttpService(chainProfile.rpcUrl()))) {
+      try {
+        Web3j web3j = Rpc.web3j(chainProfile);
         if (token == null || token.isBlank()) {
           HELPERS.simulateRbtc(
               chainProfile, web3j, walletMeta, toAddress, value, gasLimit, gasPriceRbtc, data);

@@ -17,7 +17,6 @@ import org.web3j.abi.datatypes.generated.Uint8;
 import org.web3j.protocol.Web3j;
 import org.web3j.protocol.core.methods.request.Transaction;
 import org.web3j.protocol.core.methods.response.EthEstimateGas;
-import org.web3j.protocol.http.HttpService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -117,7 +116,8 @@ public final class Contract {
       String tokenAddress,
       String encodedData,
       BigInteger gasPriceWei) {
-    try (Web3j web3j = Web3j.build(new HttpService(chainProfile.rpcUrl()))) {
+    try {
+      Web3j web3j = Rpc.web3j(chainProfile);
       EthEstimateGas estimate =
           web3j
               .ethEstimateGas(

@@ -24,7 +24,6 @@ import org.web3j.protocol.Web3j;
 import org.web3j.protocol.core.DefaultBlockParameterName;
 import org.web3j.protocol.core.methods.request.Transaction;
 import org.web3j.protocol.core.methods.response.EthCall;
-import org.web3j.protocol.http.HttpService;
 import org.web3j.utils.Numeric;
 
 public final class Rns {
@@ -39,7 +38,8 @@ public final class Rns {
   private Rns() {}
 
   public static Optional<String> lookup(String rpcUrl, String name) {
-    try (Web3j web3j = Web3j.build(new HttpService(rpcUrl))) {
+    try {
+      Web3j web3j = Rpc.web3j(rpcUrl);
       String registry = resolveRegistryAddress(web3j);
       byte[] node = namehash(name);
       String resolver = registryResolver(web3j, registry, node);
@@ -58,7 +58,8 @@ public final class Rns {
   }
 
   public static Optional<String> reverseLookup(String rpcUrl, String address) {
-    try (Web3j web3j = Web3j.build(new HttpService(rpcUrl))) {
+    try {
+      Web3j web3j = Rpc.web3j(rpcUrl);
       String registry = resolveRegistryAddress(web3j);
       String normalized = normalizeAddress(address);
       String reverseName = normalized.substring(2).toLowerCase(Locale.ROOT) + ".addr.reverse";

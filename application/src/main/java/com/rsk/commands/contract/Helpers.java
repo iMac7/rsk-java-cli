@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rsk.utils.Chain;
 import com.rsk.utils.Chain.ChainProfile;
 import com.rsk.utils.Json;
+import com.rsk.utils.Rpc;
 import com.rsk.utils.Rns;
 import java.math.BigInteger;
 import java.net.URI;
@@ -31,7 +32,6 @@ import org.web3j.abi.datatypes.generated.Uint8;
 import org.web3j.protocol.Web3j;
 import org.web3j.protocol.core.DefaultBlockParameterName;
 import org.web3j.protocol.core.methods.request.Transaction;
-import org.web3j.protocol.http.HttpService;
 import org.web3j.utils.Numeric;
 
 public class Helpers {
@@ -103,7 +103,8 @@ public class Helpers {
   public List<Type> executeReadFunction(
       ChainProfile chainProfile, String contractAddress, String functionName, List<Type> inputs, List<TypeReference<?>> outputRefs) {
     Function function = new Function(functionName, inputs, outputRefs);
-    try (Web3j web3j = Web3j.build(new HttpService(chainProfile.rpcUrl()))) {
+    try {
+      Web3j web3j = Rpc.web3j(chainProfile);
       return ethCall(web3j, null, contractAddress, function);
     } catch (Exception ex) {
       throw new IllegalStateException("Failed to call read function.", ex);

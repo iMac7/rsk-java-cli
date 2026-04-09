@@ -28,7 +28,10 @@ public final class Rpc {
   private Rpc() {}
 
   public static Web3j web3j(ChainProfile chainProfile) {
-    String rpcUrl = chainProfile.rpcUrl();
+    return web3j(chainProfile.rpcUrl());
+  }
+
+  public static Web3j web3j(String rpcUrl) {
     if (rpcUrl == null || rpcUrl.isBlank()) {
       throw new IllegalArgumentException("RPC URL is required.");
     }
