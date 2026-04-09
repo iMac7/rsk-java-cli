@@ -30,8 +30,8 @@ import org.web3j.protocol.core.DefaultBlockParameterName;
 import org.web3j.protocol.core.methods.request.Transaction;
 import org.web3j.protocol.core.methods.response.EthEstimateGas;
 import org.web3j.protocol.core.methods.response.EthGetTransactionCount;
-import org.web3j.protocol.core.methods.response.EthGetTransactionReceipt;
 import org.web3j.protocol.core.methods.response.EthSendTransaction;
+import org.web3j.protocol.core.methods.response.TransactionReceipt;
 import org.web3j.utils.Numeric;
 
 public class Helpers {
@@ -139,30 +139,13 @@ public class Helpers {
       }
 
       String txHash = sent.getTransactionHash();
-      String contractAddress = null;
-      String status = null;
-      for (int i = 0; i < 120; i++) {
-        EthGetTransactionReceipt receiptResponse = web3j.ethGetTransactionReceipt(txHash).send();
-        if (receiptResponse.getTransactionReceipt().isPresent()) {
-          var receipt = receiptResponse.getTransactionReceipt().get();
-          status = receipt.getStatus();
-          contractAddress = receipt.getContractAddress();
-          break;
-        }
-        Thread.sleep(2000L);
+      TransactionReceipt receipt =
+          com.rsk.utils.Transaction.waitForSuccessfulReceipt(web3j, txHash, 120, 2000L);
+      String contractAddress = receipt.getContractAddress();
+      if (contractAddress == null || contractAddress.isBlank()) {
+        throw new IllegalStateException("Deployment receipt did not include a contract address.");
       }
-
-      if (contractAddress == null || status == null) {
-        throw new IllegalStateException("Timed out waiting for deployment receipt.");
-      }
-      if (!"0x1".equalsIgnoreCase(status)) {
-        throw new IllegalStateException("Deployment failed. Receipt status: " + status);
-      }
-
       return new DeploymentResult(txHash, contractAddress, explorerAddressUrl(chainProfile, contractAddress));
-    } catch (InterruptedException ex) {
-      Thread.currentThread().interrupt();
-      throw new IllegalStateException("Interrupted while waiting for deployment receipt.", ex);
     } catch (Exception ex) {
       throw new IllegalStateException("Unable to deploy contract.", ex);
     }

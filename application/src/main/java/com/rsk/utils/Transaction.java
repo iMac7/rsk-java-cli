@@ -64,19 +64,7 @@ public final class Transaction {
       ChainProfile chainProfile, String txHash, int maxPolls, long sleepMs) {
     try {
       Web3j web3j = Rpc.web3j(chainProfile);
-      for (int i = 0; i < maxPolls; i++) {
-        var receiptResponse = web3j.ethGetTransactionReceipt(txHash).send();
-        if (receiptResponse.getTransactionReceipt().isPresent()) {
-          return receiptResponse.getTransactionReceipt().get();
-        }
-        Thread.sleep(sleepMs);
-      }
-      LOGGER.warn(
-          "Timed out waiting for transaction receipt {} on chain {} after {} polls",
-          txHash,
-          chainProfile.chainId(),
-          maxPolls);
-      throw new IllegalStateException("Timed out waiting for transaction receipt: " + txHash);
+      return waitForReceipt(web3j, txHash, maxPolls, sleepMs);
     } catch (IllegalStateException ex) {
       throw ex;
     } catch (Exception ex) {
@@ -89,6 +77,29 @@ public final class Transaction {
     }
   }
 
+  public static TransactionReceipt waitForReceipt(
+      Web3j web3j, String txHash, int maxPolls, long sleepMs) {
+    try {
+      for (int i = 0; i < maxPolls; i++) {
+        var receiptResponse = web3j.ethGetTransactionReceipt(txHash).send();
+        if (receiptResponse.getTransactionReceipt().isPresent()) {
+          return receiptResponse.getTransactionReceipt().get();
+        }
+        Thread.sleep(sleepMs);
+      }
+      LOGGER.warn("Timed out waiting for transaction receipt {} after {} polls", txHash, maxPolls);
+      throw new IllegalStateException("Timed out waiting for transaction receipt: " + txHash);
+    } catch (InterruptedException ex) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException("Interrupted while waiting for transaction receipt", ex);
+    } catch (IllegalStateException ex) {
+      throw ex;
+    } catch (Exception ex) {
+      LOGGER.error("Unable to fetch transaction receipt {}", txHash, ex);
+      throw new IllegalStateException("Unable to fetch transaction receipt", ex);
+    }
+  }
+
   public static TransactionReceipt waitForSuccessfulReceipt(
       ChainProfile chainProfile, String txHash, int maxPolls, long sleepMs) {
     TransactionReceipt receipt = waitForReceipt(chainProfile, txHash, maxPolls, sleepMs);
@@ -97,6 +108,19 @@ public final class Transaction {
           "Transaction {} on chain {} completed with status {}",
           txHash,
           chainProfile.chainId(),
+          receipt.getStatus());
+      throw new IllegalStateException("Transaction failed. Receipt status: " + receipt.getStatus());
+    }
+    return receipt;
+  }
+
+  public static TransactionReceipt waitForSuccessfulReceipt(
+      Web3j web3j, String txHash, int maxPolls, long sleepMs) {
+    TransactionReceipt receipt = waitForReceipt(web3j, txHash, maxPolls, sleepMs);
+    if (!"0x1".equalsIgnoreCase(receipt.getStatus())) {
+      LOGGER.warn(
+          "Transaction {} completed with status {}",
+          txHash,
           receipt.getStatus());
       throw new IllegalStateException("Transaction failed. Receipt status: " + receipt.getStatus());
     }

@@ -192,15 +192,13 @@ public class Helpers {
       throw new IllegalStateException(sent.getError().getMessage());
     }
     String txHash = sent.getTransactionHash();
-    TransactionReceipt receipt = waitForReceipt(web3j, txHash, 120, 2000L);
-    if (!"0x1".equalsIgnoreCase(receipt.getStatus())) {
-      throw new IllegalStateException("Transaction failed. Receipt status: " + receipt.getStatus());
-    }
-    return new WriteResult(
-        credentials.getAddress(),
-        txHash,
-        receipt.getBlockNumber().toString(),
-        receipt.getGasUsed().toString());
+      TransactionReceipt receipt =
+          com.rsk.utils.Transaction.waitForSuccessfulReceipt(web3j, txHash, 120, 2000L);
+      return new WriteResult(
+          credentials.getAddress(),
+          txHash,
+          receipt.getBlockNumber().toString(),
+          receipt.getGasUsed().toString());
   }
 
   public String readableTypeValue(Type type) {
@@ -224,18 +222,6 @@ public class Helpers {
       throw new IllegalArgumentException(
           "Too many decimal places for token decimals=" + decimals + ": " + value, ex);
     }
-  }
-
-  private static TransactionReceipt waitForReceipt(
-      Web3j web3j, String txHash, int maxPolls, long sleepMs) throws Exception {
-    for (int i = 0; i < maxPolls; i++) {
-      var receiptResponse = web3j.ethGetTransactionReceipt(txHash).send();
-      if (receiptResponse.getTransactionReceipt().isPresent()) {
-        return receiptResponse.getTransactionReceipt().get();
-      }
-      Thread.sleep(sleepMs);
-    }
-    throw new IllegalStateException("Timed out waiting for transaction receipt: " + txHash);
   }
 
 }
