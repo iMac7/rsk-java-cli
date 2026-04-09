@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
-  <property name="LOG_FILE" value="${rsk.cli.log.file}" />
+  <property name="LOG_FILE" value="${rsk.cli.log.file:-${user.home}/.rsk-java-cli/logs.txt}" />
   <property name="ROOT_LEVEL" value="${rsk.cli.log.root.level:-INFO}" />
   <property name="APP_LEVEL" value="${rsk.cli.log.app.level:-DEBUG}" />
   <property name="CONSOLE_LEVEL" value="${rsk.cli.log.console.level:-OFF}" />
@@ -9,7 +9,7 @@
     <file>${LOG_FILE}</file>
     <append>true</append>
     <encoder>
-      <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger - %msg%n%ex</pattern>
+      <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger - %msg%n%ex%n</pattern>
     </encoder>
   </appender>
 
