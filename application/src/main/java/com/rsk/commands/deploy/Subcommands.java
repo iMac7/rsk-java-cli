@@ -59,7 +59,9 @@ public class Subcommands {
           walletName != null && !walletName.isBlank() ? walletName.trim() : HELPERS.activeWalletName();
 
       System.out.println(cInfo("Wallet: ") + selectedWallet);
-      char[] password = readPassword("Enter your password to decrypt the wallet: ");
+      char[] password =
+          com.rsk.utils.Terminal.readPasswordWithStatus(
+              "Enter your password to decrypt the wallet: ", "Deployment cancelled.");
       String privateKeyHex = HELPERS.dumpPrivateKey(selectedWallet, password);
       String walletAddress = org.web3j.crypto.Credentials.create(privateKeyHex).getAddress();
       System.out.println(cInfo("Wallet account: ") + walletAddress);
@@ -139,10 +141,6 @@ public class Subcommands {
       }
       return requireText(bytecodePath, "Path to bytecode file");
     }
-  }
-
-  static char[] readPassword(String prompt) {
-    return com.rsk.utils.Terminal.readPassword(cOk("✔" + prompt), "Deployment cancelled.");
   }
 
   static String promptRequiredText(String label) {

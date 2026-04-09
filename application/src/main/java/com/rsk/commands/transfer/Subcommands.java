@@ -105,7 +105,9 @@ public class Subcommands {
 
       while (true) {
         try {
-          char[] password = readPassword("Enter your password to decrypt the wallet: ");
+          char[] password =
+              com.rsk.utils.Terminal.readPasswordWithStatus(
+                  "Enter your password to decrypt the wallet: ", "Transfer cancelled.");
           printWalletContext(chainProfile, walletAddress);
 
           for (Helpers.TransferRequest request : requests) {
@@ -202,10 +204,6 @@ public class Subcommands {
       System.out.println(cInfo("📦 Block Number: ") + receipt.getBlockNumber());
       System.out.println(cInfo("⛽ Gas Used: ") + receipt.getGasUsed());
     }
-  }
-
-  static char[] readPassword(String prompt) {
-    return com.rsk.utils.Terminal.readPassword(cOk("✔" + prompt), "Transfer cancelled.");
   }
 
   private static String promptRequiredText(String label) {

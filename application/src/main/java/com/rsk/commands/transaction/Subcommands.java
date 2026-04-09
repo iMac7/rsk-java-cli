@@ -8,7 +8,6 @@ import com.rsk.utils.Chain.ChainProfile;
 import com.rsk.utils.Contract;
 import com.rsk.utils.Loader;
 import com.rsk.utils.Transaction;
-import java.io.Console;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
@@ -105,9 +104,8 @@ public class Subcommands {
           TransactionInput input = collectTransactionInput(chainProfile, selectedType);
           printTransactionPreview(chainProfile, walletAddress, input);
           char[] password =
-              com.rsk.utils.Terminal.readPassword(
-                  cOk("Enter your password to decrypt the wallet: "),
-                  "Transaction cancelled.");
+              com.rsk.utils.Terminal.readPasswordWithStatus(
+                  "Enter your password to decrypt the wallet: ", "Transaction cancelled.");
           Helpers.PendingTransfer pendingTransfer =
               Loader.runWithSpinner(
                   "⏳ Preparing transaction...",
@@ -345,35 +343,6 @@ public class Subcommands {
         }
       }
       return null;
-    }
-
-    private char[] promptPassword() {
-      while (true) {
-        try {
-          Console console = System.console();
-          if (console != null) {
-            char[] password = console.readPassword(cOk("✔ Enter your password to decrypt the wallet: "));
-            if (password == null) {
-              throw new PromptCancelledException();
-            }
-            if (password.length > 0) {
-              return password;
-            }
-          } else {
-            String password =
-                READER.readLine(cOk("✔ Enter your password to decrypt the wallet: "), '\0');
-            if (password == null) {
-              throw new PromptCancelledException();
-            }
-            if (!password.isBlank()) {
-              return password.toCharArray();
-            }
-          }
-          System.out.println(cError("❌ Password is required."));
-        } catch (UserInterruptException ex) {
-          throw new PromptCancelledException();
-        }
-      }
     }
 
     private String promptRequired(String label) {

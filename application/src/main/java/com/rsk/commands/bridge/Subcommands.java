@@ -133,7 +133,8 @@ public class Subcommands {
           printReadResult(chainProfile, contractAddress, selected, results);
         } else {
           String walletName = HELPERS.resolveWalletName(wallet);
-          char[] password = readPassword("Wallet password: ");
+          char[] password =
+              com.rsk.utils.Terminal.readPassword("Wallet password: ", "Bridge interaction cancelled.");
           Helpers.WriteResult result =
               HELPERS.executeWrite(
                   chainProfile,
@@ -239,10 +240,6 @@ public class Subcommands {
       }
       return chainProfile.name();
     }
-  }
-
-  static char[] readPassword(String prompt) {
-    return com.rsk.utils.Terminal.readPassword(prompt, "Bridge interaction cancelled.");
   }
 
   static String readTextPrompt(String label, String defaultValue) {

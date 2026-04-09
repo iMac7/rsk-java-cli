@@ -5,6 +5,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Supplier;
 import org.fusesource.jansi.Ansi;
 import org.jline.reader.LineReader;
 import org.jline.reader.LineReaderBuilder;
@@ -69,6 +70,27 @@ public final class Terminal {
         throw ex;
       }
     }
+  }
+
+  public static char[] readPasswordWithStatus(String prompt, String cancelMessage) {
+    return readPassword(cOk("✔" + prompt), cancelMessage);
+  }
+
+  public static <X extends RuntimeException> char[] readPasswordOrThrow(
+      String prompt, String cancelMessage, Supplier<X> cancelledExceptionFactory) {
+    try {
+      return readPassword(prompt, cancelMessage);
+    } catch (IllegalStateException ex) {
+      if (cancelMessage.equals(ex.getMessage())) {
+        throw cancelledExceptionFactory.get();
+      }
+      throw ex;
+    }
+  }
+
+  public static <X extends RuntimeException> char[] readPasswordWithStatusOrThrow(
+      String prompt, String cancelMessage, Supplier<X> cancelledExceptionFactory) {
+    return readPasswordOrThrow(cOk("✔" + prompt), cancelMessage, cancelledExceptionFactory);
   }
 
   public static void revealSensitiveValue(String value, long timeoutMillis) {

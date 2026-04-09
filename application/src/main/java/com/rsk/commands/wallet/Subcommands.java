@@ -134,7 +134,9 @@ public class Subcommands {
 
     private void runCreateFlow() {
       String walletName = readRequiredText("Wallet name");
-      char[] password = readPassword("Wallet password: ");
+      char[] password =
+          com.rsk.utils.Terminal.readPasswordOrThrow(
+              "Wallet password: ", INPUT_CANCELLED_MESSAGE, InteractiveCancelledException::new);
       WalletMetadata wallet = HELPERS.createWallet(walletName, password);
       System.out.printf("Created wallet %s (%s)%n", cOk(wallet.name()), wallet.address());
     }
@@ -156,7 +158,9 @@ public class Subcommands {
       printWalletChoices();
       String selectedWallet = readRequiredText("Wallet name");
       warnBeforePrivateKeyReveal(selectedWallet);
-      char[] password = readPassword("Wallet password: ");
+      char[] password =
+          com.rsk.utils.Terminal.readPasswordOrThrow(
+              "Wallet password: ", INPUT_CANCELLED_MESSAGE, InteractiveCancelledException::new);
       String privateKey = HELPERS.dumpPrivateKey(selectedWallet, password);
       Terminal.revealSensitiveValue(privateKey, PRIVATE_KEY_REVEAL_TIMEOUT_MILLIS);
     }
@@ -348,7 +352,9 @@ public class Subcommands {
 
     @Override
     public Integer call() {
-      char[] password = readPassword("Wallet password: ");
+      char[] password =
+          com.rsk.utils.Terminal.readPasswordOrThrow(
+              "Wallet password: ", INPUT_CANCELLED_MESSAGE, InteractiveCancelledException::new);
       WalletMetadata wallet = HELPERS.createWallet(walletName, password);
       System.out.printf("Created wallet %s (%s)%n", cOk(wallet.name()), wallet.address());
       return 0;
@@ -423,7 +429,9 @@ public class Subcommands {
                     () -> new IllegalArgumentException("No active wallet found. Provide --wallet."));
       }
       warnBeforePrivateKeyReveal(selectedWallet);
-      char[] password = readPassword("Wallet password: ");
+      char[] password =
+          com.rsk.utils.Terminal.readPasswordOrThrow(
+              "Wallet password: ", INPUT_CANCELLED_MESSAGE, InteractiveCancelledException::new);
       String privateKey = HELPERS.dumpPrivateKey(selectedWallet, password);
       Terminal.revealSensitiveValue(privateKey, PRIVATE_KEY_REVEAL_TIMEOUT_MILLIS);
       return 0;
@@ -486,20 +494,13 @@ public class Subcommands {
     }
   }
 
-  static char[] readPassword(String prompt) {
-    try {
-      return com.rsk.utils.Terminal.readPassword(prompt, INPUT_CANCELLED_MESSAGE);
-    } catch (IllegalStateException ex) {
-      if (INPUT_CANCELLED_MESSAGE.equals(ex.getMessage())) {
-        throw new InteractiveCancelledException();
-      }
-      throw ex;
-    }
-  }
-
   private static void importWallet(String walletName) {
-    char[] privateKeyChars = readPassword("Private key (hex): ");
-    char[] password = readPassword("Wallet password: ");
+    char[] privateKeyChars =
+        com.rsk.utils.Terminal.readPasswordOrThrow(
+            "Private key (hex): ", INPUT_CANCELLED_MESSAGE, InteractiveCancelledException::new);
+    char[] password =
+        com.rsk.utils.Terminal.readPasswordOrThrow(
+            "Wallet password: ", INPUT_CANCELLED_MESSAGE, InteractiveCancelledException::new);
     try {
       WalletMetadata wallet = HELPERS.importWallet(walletName, new String(privateKeyChars), password);
       System.out.printf("Imported wallet %s (%s)%n", cOk(wallet.name()), wallet.address());
