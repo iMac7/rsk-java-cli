@@ -38,6 +38,52 @@ public final class Storage {
 
   private Storage() {}
 
+  static void restrictFileToOwner(Path path) throws IOException {
+    try {
+      Set<PosixFilePermission> ownerOnly =
+          EnumSet.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE);
+      Files.setPosixFilePermissions(path, ownerOnly);
+      return;
+    } catch (UnsupportedOperationException ignored) {
+      // Fall back to ACL or basic File APIs below.
+    }
+
+    AclFileAttributeView aclView = Files.getFileAttributeView(path, AclFileAttributeView.class);
+    if (aclView != null) {
+      try {
+        aclView.setAcl(
+            List.of(
+                AclEntry.newBuilder()
+                    .setType(AclEntryType.ALLOW)
+                    .setPrincipal(Files.getOwner(path))
+                    .setPermissions(
+                        EnumSet.of(
+                            AclEntryPermission.READ_DATA,
+                            AclEntryPermission.WRITE_DATA,
+                            AclEntryPermission.APPEND_DATA,
+                            AclEntryPermission.READ_ATTRIBUTES,
+                            AclEntryPermission.WRITE_ATTRIBUTES,
+                            AclEntryPermission.READ_NAMED_ATTRS,
+                            AclEntryPermission.WRITE_NAMED_ATTRS,
+                            AclEntryPermission.READ_ACL,
+                            AclEntryPermission.WRITE_ACL,
+                            AclEntryPermission.SYNCHRONIZE))
+                    .build()));
+        return;
+      } catch (IOException | UnsupportedOperationException ex) {
+        LOGGER.warn("Unable to set ACLs on {}, falling back to basic file permissions", path, ex);
+      }
+    }
+
+    File file = path.toFile();
+    boolean readableRestricted = file.setReadable(false, false) && file.setReadable(true, true);
+    boolean writableRestricted = file.setWritable(false, false) && file.setWritable(true, true);
+    file.setExecutable(false, false);
+    if (!readableRestricted || !writableRestricted) {
+      LOGGER.warn("Unable to fully restrict permissions on {}", path);
+    }
+  }
+
   public static class JsonConfigRepository implements ConfigPort {
     private final Path configPath;
     private final ObjectMapper objectMapper;
@@ -72,7 +118,7 @@ public final class Storage {
       try {
         Files.createDirectories(configPath.getParent());
         objectMapper.writerWithDefaultPrettyPrinter().writeValue(configPath.toFile(), config);
-        restrictConfigFileToOwner(configPath);
+        restrictFileToOwner(configPath);
       } catch (IOException ex) {
         LOGGER.error("Unable to save config to {}", configPath, ex);
         throw new IllegalStateException("Unable to save config", ex);
@@ -81,52 +127,6 @@ public final class Storage {
 
     private static CliConfig defaultConfig() {
       return com.rsk.commands.config.Helpers.defaultConfig();
-    }
-
-    private static void restrictConfigFileToOwner(Path configPath) throws IOException {
-      try {
-        Set<PosixFilePermission> ownerOnly =
-            EnumSet.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE);
-        Files.setPosixFilePermissions(configPath, ownerOnly);
-        return;
-      } catch (UnsupportedOperationException ignored) {
-        // Fall back to ACL or basic File APIs below.
-      }
-
-      AclFileAttributeView aclView = Files.getFileAttributeView(configPath, AclFileAttributeView.class);
-      if (aclView != null) {
-        try {
-          aclView.setAcl(
-              List.of(
-                  AclEntry.newBuilder()
-                      .setType(AclEntryType.ALLOW)
-                      .setPrincipal(Files.getOwner(configPath))
-                      .setPermissions(
-                          EnumSet.of(
-                              AclEntryPermission.READ_DATA,
-                              AclEntryPermission.WRITE_DATA,
-                              AclEntryPermission.APPEND_DATA,
-                              AclEntryPermission.READ_ATTRIBUTES,
-                              AclEntryPermission.WRITE_ATTRIBUTES,
-                              AclEntryPermission.READ_NAMED_ATTRS,
-                              AclEntryPermission.WRITE_NAMED_ATTRS,
-                              AclEntryPermission.READ_ACL,
-                              AclEntryPermission.WRITE_ACL,
-                              AclEntryPermission.SYNCHRONIZE))
-                      .build()));
-          return;
-        } catch (IOException | UnsupportedOperationException ex) {
-          LOGGER.warn("Unable to set ACLs on {}, falling back to basic file permissions", configPath, ex);
-        }
-      }
-
-      File configFile = configPath.toFile();
-      boolean readableRestricted = configFile.setReadable(false, false) && configFile.setReadable(true, true);
-      boolean writableRestricted = configFile.setWritable(false, false) && configFile.setWritable(true, true);
-      configFile.setExecutable(false, false);
-      if (!readableRestricted || !writableRestricted) {
-        LOGGER.warn("Unable to fully restrict permissions on {}", configPath);
-      }
     }
   }
 
@@ -270,6 +270,7 @@ public final class Storage {
       Files.createDirectories(walletsDir);
       Path keystorePath = walletsDir.resolve(walletId + ".json");
       objectMapper.writerWithDefaultPrettyPrinter().writeValue(keystorePath.toFile(), walletFile);
+      restrictFileToOwner(keystorePath);
 
       String address = "0x" + Keys.getAddress(keyPair.getPublicKey());
       WalletMetadata metadata =
@@ -312,6 +313,7 @@ public final class Storage {
       try {
         Files.createDirectories(registryPath.getParent());
         objectMapper.writerWithDefaultPrettyPrinter().writeValue(registryPath.toFile(), registry);
+        restrictFileToOwner(registryPath);
       } catch (IOException ex) {
         LOGGER.error("Unable to save wallet registry to {}", registryPath, ex);
         throw new IllegalStateException("Unable to save wallet registry", ex);
