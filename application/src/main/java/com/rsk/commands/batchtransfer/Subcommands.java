@@ -4,7 +4,9 @@ import static com.rsk.utils.Terminal.*;
 import static com.rsk.utils.Format.formatAmount;
 
 import com.rsk.commands.transfer.Helpers.TransferRequest;
+import com.rsk.utils.Chain.ChainProfile;
 import com.rsk.utils.Loader;
+import com.rsk.utils.Terminal;
 import java.math.BigDecimal;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -95,13 +97,13 @@ public class Subcommands {
                     () -> HELPERS.waitForConfirmation(chainProfile, pendingTransfer));
             printTransferResult(receipt);
           } catch (Exception ex) {
-            System.out.println(cError(HELPERS.rootMessage(ex)));
+            System.out.println(cError(Terminal.rootMessage(ex)));
             return 0;
           }
         }
         return 0;
       } catch (IllegalArgumentException | IllegalStateException ex) {
-        System.out.println(cError(HELPERS.rootMessage(ex)));
+        System.out.println(cError(Terminal.rootMessage(ex)));
         return 0;
       }
     }
@@ -109,18 +111,17 @@ public class Subcommands {
     private String promptForUnlockedKey(String walletName) {
       while (true) {
         char[] password =
-            com.rsk.utils.Terminal.readPasswordWithStatus(
+            Terminal.readPasswordWithStatus(
                 "Enter your password to decrypt the wallet: ", "Batch transfer cancelled.");
         try {
           return HELPERS.unlockWalletPrivateKeyHex(walletName, password);
         } catch (IllegalArgumentException ex) {
-          System.out.println(cError(HELPERS.rootMessage(ex)));
+          System.out.println(cError(Terminal.rootMessage(ex)));
         }
       }
     }
 
-    private List<TransferRequest> collectInteractiveRequests(
-        com.rsk.utils.Chain.ChainProfile chainProfile) {
+    private List<TransferRequest> collectInteractiveRequests(ChainProfile chainProfile) {
       List<TransferRequest> requests = new ArrayList<>();
       while (true) {
         String target = promptRequiredText("Enter address");
@@ -133,12 +134,11 @@ public class Subcommands {
       }
     }
 
-    private List<TransferRequest> loadRequestsFromFile(
-        com.rsk.utils.Chain.ChainProfile chainProfile, Path filePath) {
+    private List<TransferRequest> loadRequestsFromFile(ChainProfile chainProfile, Path filePath) {
       return HELPERS.loadRequestsFromFile(chainProfile, filePath);
     }
 
-    private void printWalletContext(com.rsk.utils.Chain.ChainProfile chainProfile, String walletAddress) {
+    private void printWalletContext(ChainProfile chainProfile, String walletAddress) {
       System.out.println(cInfo("📄 Wallet Address: ") + walletAddress);
       System.out.println(
           cInfo("💰 Current Balance: ")
@@ -154,53 +154,28 @@ public class Subcommands {
     }
   }
 
-  private static String promptRequiredText(String label) {
-    while (true) {
-      try {
-        String value = READER.readLine(cOk("✔ " + label + ": "));
-        if (value != null && !value.isBlank()) {
-          return value.trim();
-        }
-        System.out.println(cError("Value is required."));
-      } catch (UserInterruptException ex) {
-        throw new IllegalStateException("Batch transfer cancelled.");
-      }
-    }
+  private static BigDecimal promptAmount(String label) {
+    return Terminal.promptPositiveAmount(
+        READER,
+        cOk("✔ " + label + ": "),
+        "Enter a valid positive amount.",
+        () -> new IllegalStateException("Batch transfer cancelled."));
   }
 
-  private static BigDecimal promptAmount(String label) {
-    while (true) {
-      String raw = promptRequiredText(label);
-      try {
-        BigDecimal amount = new BigDecimal(raw);
-        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
-          throw new IllegalArgumentException();
-        }
-        return amount;
-      } catch (Exception ex) {
-        System.out.println(cError("Enter a valid positive amount."));
-      }
-    }
+  private static String promptRequiredText(String label) {
+    return Terminal.promptRequiredText(
+        READER,
+        cOk("✔ " + label + ": "),
+        "Value is required.",
+        () -> new IllegalStateException("Batch transfer cancelled."));
   }
 
   private static boolean promptYesNo(String label, boolean defaultValue) {
-    while (true) {
-      try {
-        String suffix = defaultValue ? "Y/n" : "y/N";
-        String raw = READER.readLine(label + " (" + suffix + "): ");
-        if (raw == null || raw.isBlank()) {
-          return defaultValue;
-        }
-        if ("y".equalsIgnoreCase(raw) || "yes".equalsIgnoreCase(raw)) {
-          return true;
-        }
-        if ("n".equalsIgnoreCase(raw) || "no".equalsIgnoreCase(raw)) {
-          return false;
-        }
-        System.out.println(cError("Please answer y or n."));
-      } catch (UserInterruptException ex) {
-        throw new IllegalStateException("Batch transfer cancelled.");
-      }
-    }
+    return Terminal.promptYesNo(
+        READER,
+        label + " (" + (defaultValue ? "Y/n" : "y/N") + "): ",
+        defaultValue,
+        "Please answer y or n.",
+        () -> new IllegalStateException("Batch transfer cancelled."));
   }
 }

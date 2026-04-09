@@ -1,6 +1,7 @@
 package com.rsk.utils;
 
 import com.rsk.commands.config.CliConfig;
+import com.rsk.commands.config.Helpers;
 import com.rsk.utils.Chain.ChainProfile;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -127,17 +128,9 @@ public final class Transaction {
     return receipt;
   }
 
-  public static String explorerTxUrl(ChainProfile chainProfile, String txHash) {
-    return Chain.explorerUrl(chainProfile, txHash, true);
-  }
-
-  public static String networkDisplayName(ChainProfile chainProfile) {
-    return Chain.networkDisplayName(chainProfile);
-  }
-
   private static CliConfig loadConfig() {
     Path homeDir = Path.of(System.getProperty("user.home"), ".rsk-java-cli");
-    return new com.rsk.commands.config.Helpers(new Storage.JsonConfigRepository(homeDir)).loadConfig();
+    return new Helpers(new Storage.JsonConfigRepository(homeDir)).loadConfig();
   }
 
   public record SendRequest(

@@ -3,6 +3,8 @@ package com.rsk.commands.contract;
 import static com.rsk.utils.Terminal.*;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.rsk.utils.Chain;
+import com.rsk.utils.Chain.ChainProfile;
 import com.rsk.utils.Terminal;
 import java.util.ArrayList;
 import java.util.List;
@@ -81,7 +83,7 @@ public class Subcommands {
           System.out.println(cMuted("Contract: " + address));
           System.out.println(cMuted("Function: " + functionSignature(selectedFunction)));
           printResults(results);
-          System.out.println(cMuted("Explorer: " + HELPERS.blockscoutAddressUrl(chainProfile, address)));
+          System.out.println(cMuted("Explorer: " + Chain.blockscoutAddressUrl(chainProfile, address)));
           System.out.println(cMuted("────────────────────────────────────────"));
           System.out.println();
         } catch (IllegalArgumentException | IllegalStateException ex) {
@@ -183,7 +185,7 @@ public class Subcommands {
       return builder.append(")").toString();
     }
 
-    private String networkLabel(com.rsk.utils.Chain.ChainProfile chainProfile) {
+    private String networkLabel(ChainProfile chainProfile) {
       if (chainProfile.chainId() == 31L) {
         return "testnet";
       }

@@ -1,26 +1,21 @@
 package com.rsk.commands.resolve;
 
+import com.rsk.commands.config.Helpers.ChainResolutionSupport;
 import com.rsk.utils.Chain;
 import com.rsk.utils.Chain.ChainProfile;
 import com.rsk.utils.Rns;
 import com.rsk.utils.Storage;
 import java.nio.file.Path;
 
-public class Helpers {
-  private final com.rsk.commands.config.Helpers configHelpers;
+public class Helpers extends ChainResolutionSupport {
 
   public Helpers(com.rsk.commands.config.Helpers configHelpers) {
-    this.configHelpers = configHelpers;
+    super(configHelpers);
   }
 
   public static Helpers defaultHelpers() {
     Path homeDir = Path.of(System.getProperty("user.home"), ".rsk-java-cli");
     return new Helpers(new com.rsk.commands.config.Helpers(new Storage.JsonConfigRepository(homeDir)));
-  }
-
-  public ChainProfile resolveChain(
-      boolean mainnet, boolean testnet, String chain, String chainUrl) {
-    return Chain.resolveChain(configHelpers.loadConfig(), mainnet, testnet, chain, chainUrl);
   }
 
   public String resolveName(ChainProfile chainProfile, String name) {

@@ -1,5 +1,6 @@
 package com.rsk.commands.config;
 
+import com.rsk.utils.Chain;
 import com.rsk.utils.Storage.JsonConfigRepository;
 import com.rsk.utils.Chain.ChainFeatures;
 import com.rsk.utils.Chain.ChainProfile;
@@ -23,6 +24,23 @@ public class Helpers {
   public static Helpers defaultHelpers() {
     Path homeDir = Path.of(System.getProperty("user.home"), ".rsk-java-cli");
     return new Helpers(new JsonConfigRepository(homeDir));
+  }
+
+  public ChainProfile resolveChain(boolean mainnet, boolean testnet, String chain, String chainUrl) {
+    return Chain.resolveChain(loadConfig(), mainnet, testnet, chain, chainUrl);
+  }
+
+  public abstract static class ChainResolutionSupport {
+    protected final Helpers configHelpers;
+
+    protected ChainResolutionSupport(Helpers configHelpers) {
+      this.configHelpers = configHelpers;
+    }
+
+    public final ChainProfile resolveChain(
+        boolean mainnet, boolean testnet, String chain, String chainUrl) {
+      return configHelpers.resolveChain(mainnet, testnet, chain, chainUrl);
+    }
   }
 
   public CliConfig loadConfig() {

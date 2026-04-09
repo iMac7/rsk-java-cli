@@ -134,7 +134,7 @@ public class Subcommands {
     private void runCreateFlow() {
       String walletName = readRequiredText("Wallet name");
       char[] password =
-          com.rsk.utils.Terminal.readPasswordOrThrow(
+          Terminal.readPasswordOrThrow(
               "Wallet password: ", INPUT_CANCELLED_MESSAGE, InteractiveCancelledException::new);
       WalletMetadata wallet = HELPERS.createWallet(walletName, password);
       System.out.printf("Created wallet %s (%s)%n", cOk(wallet.name()), wallet.address());
@@ -158,7 +158,7 @@ public class Subcommands {
       String selectedWallet = readRequiredText("Wallet name");
       warnBeforePrivateKeyReveal(selectedWallet);
       char[] password =
-          com.rsk.utils.Terminal.readPasswordOrThrow(
+          Terminal.readPasswordOrThrow(
               "Wallet password: ", INPUT_CANCELLED_MESSAGE, InteractiveCancelledException::new);
       String privateKey = HELPERS.dumpPrivateKey(selectedWallet, password);
       copyPrivateKeyToClipboard(selectedWallet, privateKey);
@@ -352,7 +352,7 @@ public class Subcommands {
     @Override
     public Integer call() {
       char[] password =
-          com.rsk.utils.Terminal.readPasswordOrThrow(
+          Terminal.readPasswordOrThrow(
               "Wallet password: ", INPUT_CANCELLED_MESSAGE, InteractiveCancelledException::new);
       WalletMetadata wallet = HELPERS.createWallet(walletName, password);
       System.out.printf("Created wallet %s (%s)%n", cOk(wallet.name()), wallet.address());
@@ -429,7 +429,7 @@ public class Subcommands {
       }
       warnBeforePrivateKeyReveal(selectedWallet);
       char[] password =
-          com.rsk.utils.Terminal.readPasswordOrThrow(
+          Terminal.readPasswordOrThrow(
               "Wallet password: ", INPUT_CANCELLED_MESSAGE, InteractiveCancelledException::new);
       String privateKey = HELPERS.dumpPrivateKey(selectedWallet, password);
       copyPrivateKeyToClipboard(selectedWallet, privateKey);
@@ -495,10 +495,10 @@ public class Subcommands {
 
   private static void importWallet(String walletName) {
     char[] privateKeyChars =
-        com.rsk.utils.Terminal.readPasswordOrThrow(
+        Terminal.readPasswordOrThrow(
             "Private key (hex): ", INPUT_CANCELLED_MESSAGE, InteractiveCancelledException::new);
     char[] password =
-        com.rsk.utils.Terminal.readPasswordOrThrow(
+        Terminal.readPasswordOrThrow(
             "Wallet password: ", INPUT_CANCELLED_MESSAGE, InteractiveCancelledException::new);
     try {
       WalletMetadata wallet = HELPERS.importWallet(walletName, new String(privateKeyChars), password);

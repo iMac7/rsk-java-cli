@@ -3,6 +3,7 @@ package com.rsk.commands.bridge;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rsk.commands.wallet.Helpers.WalletMetadata;
+import com.rsk.commands.config.Helpers.ChainResolutionSupport;
 import com.rsk.utils.Chain;
 import com.rsk.utils.Chain.ChainProfile;
 import com.rsk.utils.Json;
@@ -30,12 +31,11 @@ import org.web3j.protocol.core.methods.response.EthSendTransaction;
 import org.web3j.protocol.core.methods.response.TransactionReceipt;
 import org.web3j.utils.Numeric;
 
-public class Helpers {
+public class Helpers extends ChainResolutionSupport {
   private static final String RSK_BRIDGE_CONTRACT = "0x0000000000000000000000000000000001000006";
   private static final String BRIDGE_ABI_RESOURCE = "bridge_abi.json";
   private static final ObjectMapper OBJECT_MAPPER = Json.ObjectMapperFactory.create();
 
-  private final com.rsk.commands.config.Helpers configHelpers;
   private final com.rsk.commands.wallet.Helpers walletHelpers;
   private final com.rsk.commands.contract.Helpers contractHelpers;
 
@@ -43,7 +43,7 @@ public class Helpers {
       com.rsk.commands.config.Helpers configHelpers,
       com.rsk.commands.wallet.Helpers walletHelpers,
       com.rsk.commands.contract.Helpers contractHelpers) {
-    this.configHelpers = configHelpers;
+    super(configHelpers);
     this.walletHelpers = walletHelpers;
     this.contractHelpers = contractHelpers;
   }
@@ -54,11 +54,6 @@ public class Helpers {
         new com.rsk.commands.config.Helpers(new Storage.JsonConfigRepository(homeDir)),
         com.rsk.commands.wallet.Helpers.defaultHelpers(),
         com.rsk.commands.contract.Helpers.defaultHelpers());
-  }
-
-  public ChainProfile resolveChain(
-      boolean mainnet, boolean testnet, String chain, String chainUrl) {
-    return Chain.resolveChain(configHelpers.loadConfig(), mainnet, testnet, chain, chainUrl);
   }
 
   public String bridgeAddress() {
@@ -192,25 +187,17 @@ public class Helpers {
       throw new IllegalStateException(sent.getError().getMessage());
     }
     String txHash = sent.getTransactionHash();
-      TransactionReceipt receipt =
-          com.rsk.utils.Transaction.waitForSuccessfulReceipt(web3j, txHash, 120, 2000L);
-      return new WriteResult(
-          credentials.getAddress(),
-          txHash,
-          receipt.getBlockNumber().toString(),
-          receipt.getGasUsed().toString());
+    TransactionReceipt receipt =
+        com.rsk.utils.Transaction.waitForSuccessfulReceipt(web3j, txHash, 120, 2000L);
+    return new WriteResult(
+        credentials.getAddress(),
+        txHash,
+        receipt.getBlockNumber().toString(),
+        receipt.getGasUsed().toString());
   }
 
   public String readableTypeValue(Type type) {
     return contractHelpers.readableTypeValue(type);
-  }
-
-  public String explorerTxUrl(ChainProfile chainProfile, String txHash) {
-    return Chain.explorerUrl(chainProfile, txHash, true);
-  }
-
-  public String explorerAddressUrl(ChainProfile chainProfile, String address) {
-    return contractHelpers.blockscoutAddressUrl(chainProfile, address);
   }
 
   public record WriteResult(String walletAddress, String txHash, String blockNumber, String gasUsed) {}

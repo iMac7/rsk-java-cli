@@ -1,5 +1,6 @@
 package com.rsk.commands.transfer;
 
+import com.rsk.commands.config.Helpers.ChainResolutionSupport;
 import com.rsk.commands.wallet.Helpers.WalletMetadata;
 import com.rsk.commands.wallet.Helpers.WalletUnlockPort;
 import com.rsk.utils.Chain;
@@ -7,13 +8,13 @@ import com.rsk.utils.Chain.ChainProfile;
 import com.rsk.utils.Contract;
 import com.rsk.utils.Rpc;
 import com.rsk.utils.Storage;
+import com.rsk.utils.Transaction;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
 import java.nio.file.Path;
 
-public class Helpers {
-  private final com.rsk.commands.config.Helpers configHelpers;
+public class Helpers extends ChainResolutionSupport {
   private final com.rsk.commands.wallet.Helpers walletHelpers;
   private final WalletUnlockPort walletUnlockPort;
   private final Rpc.RpcPort rpcPort;
@@ -23,7 +24,7 @@ public class Helpers {
       com.rsk.commands.wallet.Helpers walletHelpers,
       WalletUnlockPort walletUnlockPort,
       Rpc.RpcPort rpcPort) {
-    this.configHelpers = configHelpers;
+    super(configHelpers);
     this.walletHelpers = walletHelpers;
     this.walletUnlockPort = walletUnlockPort;
     this.rpcPort = rpcPort;
@@ -37,11 +38,6 @@ public class Helpers {
         com.rsk.commands.wallet.Helpers.defaultHelpers(),
         walletRepository,
         new Rpc.Web3jRpcGateway());
-  }
-
-  public ChainProfile resolveChain(
-      boolean mainnet, boolean testnet, String chain, String chainUrl) {
-    return Chain.resolveChain(configHelpers.loadConfig(), mainnet, testnet, chain, chainUrl);
   }
 
   public String resolveWalletName(String walletName) {
@@ -90,11 +86,11 @@ public class Helpers {
       BigInteger gasPriceWei,
       String data) {
     try {
-      com.rsk.utils.Transaction.PendingTransaction pending =
-          com.rsk.utils.Transaction.submit(
+      Transaction.PendingTransaction pending =
+          Transaction.submit(
               chainProfile,
               privateKeyHex,
-              new com.rsk.utils.Transaction.SendRequest(to, valueWei, gasLimit, gasPriceWei, data));
+              new Transaction.SendRequest(to, valueWei, gasLimit, gasPriceWei, data));
       return new PendingTransfer(pending.fromAddress(), pending.txHash());
     } catch (Exception ex) {
       throw new IllegalStateException("Unable to send transfer", ex);
@@ -125,11 +121,11 @@ public class Helpers {
             Contract.estimateTokenTransferGas(
                 chainProfile, walletAddress(walletName), tokenAddress, encodedData, gasPriceWei);
       }
-      com.rsk.utils.Transaction.PendingTransaction pending =
-          com.rsk.utils.Transaction.submit(
+      Transaction.PendingTransaction pending =
+          Transaction.submit(
               chainProfile,
               privateKeyHex,
-              new com.rsk.utils.Transaction.SendRequest(
+              new Transaction.SendRequest(
                   tokenAddress, BigInteger.ZERO, resolvedGasLimit, gasPriceWei, encodedData));
       return new PendingTransfer(pending.fromAddress(), pending.txHash());
     } catch (ArithmeticException ex) {

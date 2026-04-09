@@ -2,6 +2,7 @@ package com.rsk.commands.deploy;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rsk.commands.config.Helpers.ChainResolutionSupport;
 import com.rsk.commands.wallet.Helpers.WalletMetadata;
 import com.rsk.utils.Chain;
 import com.rsk.utils.Chain.ChainProfile;
@@ -34,16 +35,15 @@ import org.web3j.protocol.core.methods.response.EthSendTransaction;
 import org.web3j.protocol.core.methods.response.TransactionReceipt;
 import org.web3j.utils.Numeric;
 
-public class Helpers {
+public class Helpers extends ChainResolutionSupport {
   private static final ObjectMapper OBJECT_MAPPER = Json.ObjectMapperFactory.create();
 
-  private final com.rsk.commands.config.Helpers configHelpers;
   private final com.rsk.commands.wallet.Helpers walletHelpers;
 
   public Helpers(
       com.rsk.commands.config.Helpers configHelpers,
       com.rsk.commands.wallet.Helpers walletHelpers) {
-    this.configHelpers = configHelpers;
+    super(configHelpers);
     this.walletHelpers = walletHelpers;
   }
 
@@ -52,11 +52,6 @@ public class Helpers {
     return new Helpers(
         new com.rsk.commands.config.Helpers(new com.rsk.utils.Storage.JsonConfigRepository(homeDir)),
         com.rsk.commands.wallet.Helpers.defaultHelpers());
-  }
-
-  public ChainProfile resolveChain(
-      boolean mainnet, boolean testnet, String chain, String chainUrl) {
-    return Chain.resolveChain(configHelpers.loadConfig(), mainnet, testnet, chain, chainUrl);
   }
 
   public String activeWalletName() {
@@ -145,7 +140,7 @@ public class Helpers {
       if (contractAddress == null || contractAddress.isBlank()) {
         throw new IllegalStateException("Deployment receipt did not include a contract address.");
       }
-      return new DeploymentResult(txHash, contractAddress, explorerAddressUrl(chainProfile, contractAddress));
+      return new DeploymentResult(txHash, contractAddress, Chain.explorerAddressUrl(chainProfile, contractAddress));
     } catch (Exception ex) {
       throw new IllegalStateException("Unable to deploy contract.", ex);
     }
@@ -217,10 +212,6 @@ public class Helpers {
     } catch (Exception ex) {
       return BigInteger.valueOf(3_000_000L);
     }
-  }
-
-  private static String explorerAddressUrl(ChainProfile chainProfile, String address) {
-    return Chain.explorerUrl(chainProfile, address, false);
   }
 
 }

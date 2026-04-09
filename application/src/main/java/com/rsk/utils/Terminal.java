@@ -4,6 +4,8 @@ import java.awt.GraphicsEnvironment;
 import java.awt.Toolkit;
 import java.awt.datatransfer.StringSelection;
 import java.io.Console;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -107,6 +109,127 @@ public final class Terminal {
     } catch (Exception ex) {
       throw new IllegalStateException("Unable to copy to clipboard. Clipboard access is unavailable.", ex);
     }
+  }
+
+  public static <X extends RuntimeException> String promptRequiredText(
+      LineReader reader,
+      String prompt,
+      String requiredMessage,
+      Supplier<X> cancelledExceptionFactory) {
+    while (true) {
+      try {
+        String value = reader.readLine(prompt);
+        if (value != null && !value.isBlank()) {
+          return value.trim();
+        }
+        System.out.println(cError(requiredMessage));
+      } catch (UserInterruptException ex) {
+        throw cancelledExceptionFactory.get();
+      }
+    }
+  }
+
+  public static <X extends RuntimeException> String promptOptionalText(
+      LineReader reader, String prompt, Supplier<X> cancelledExceptionFactory) {
+    try {
+      String value = reader.readLine(prompt);
+      return value == null ? "" : value.trim();
+    } catch (UserInterruptException ex) {
+      throw cancelledExceptionFactory.get();
+    }
+  }
+
+  public static <X extends RuntimeException> BigDecimal promptPositiveAmount(
+      LineReader reader,
+      String prompt,
+      String invalidMessage,
+      Supplier<X> cancelledExceptionFactory) {
+    while (true) {
+      try {
+        String value = reader.readLine(prompt);
+        BigDecimal amount = new BigDecimal(value.trim());
+        if (amount.compareTo(BigDecimal.ZERO) > 0) {
+          return amount;
+        }
+      } catch (UserInterruptException ex) {
+        throw cancelledExceptionFactory.get();
+      } catch (Exception ignored) {
+      }
+      System.out.println(cError(invalidMessage));
+    }
+  }
+
+  public static <X extends RuntimeException> BigInteger promptOptionalInteger(
+      LineReader reader,
+      String prompt,
+      String invalidMessage,
+      Supplier<X> cancelledExceptionFactory) {
+    while (true) {
+      try {
+        String value = reader.readLine(prompt);
+        if (value == null || value.isBlank()) {
+          return null;
+        }
+        return new BigInteger(value.trim());
+      } catch (UserInterruptException ex) {
+        throw cancelledExceptionFactory.get();
+      } catch (Exception ignored) {
+        System.out.println(cError(invalidMessage));
+      }
+    }
+  }
+
+  public static <X extends RuntimeException> BigDecimal promptOptionalDecimal(
+      LineReader reader,
+      String prompt,
+      String invalidMessage,
+      Supplier<X> cancelledExceptionFactory) {
+    while (true) {
+      try {
+        String value = reader.readLine(prompt);
+        if (value == null || value.isBlank()) {
+          return null;
+        }
+        return new BigDecimal(value.trim());
+      } catch (UserInterruptException ex) {
+        throw cancelledExceptionFactory.get();
+      } catch (Exception ignored) {
+        System.out.println(cError(invalidMessage));
+      }
+    }
+  }
+
+  public static <X extends RuntimeException> boolean promptYesNo(
+      LineReader reader,
+      String prompt,
+      boolean defaultValue,
+      String invalidMessage,
+      Supplier<X> cancelledExceptionFactory) {
+    while (true) {
+      try {
+        String raw = reader.readLine(prompt);
+        if (raw == null || raw.isBlank()) {
+          return defaultValue;
+        }
+        if ("y".equalsIgnoreCase(raw) || "yes".equalsIgnoreCase(raw)) {
+          return true;
+        }
+        if ("n".equalsIgnoreCase(raw) || "no".equalsIgnoreCase(raw)) {
+          return false;
+        }
+      } catch (UserInterruptException ex) {
+        throw cancelledExceptionFactory.get();
+      }
+      System.out.println(cError(invalidMessage));
+    }
+  }
+
+  public static String rootMessage(Throwable ex) {
+    Throwable current = ex;
+    while (current.getCause() != null) {
+      current = current.getCause();
+    }
+    return current.getMessage() == null ? ex.getMessage() : current.getMessage();
   }
 
   public static String cInfo(String text) {

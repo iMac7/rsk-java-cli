@@ -1,5 +1,6 @@
 package com.rsk.commands.balance;
 
+import com.rsk.commands.config.Helpers.ChainResolutionSupport;
 import com.rsk.commands.wallet.Helpers.WalletMetadata;
 import com.rsk.utils.Chain;
 import com.rsk.utils.Chain.ChainProfile;
@@ -19,10 +20,9 @@ import org.web3j.abi.datatypes.Utf8String;
 import org.web3j.abi.datatypes.generated.Uint256;
 import org.web3j.abi.datatypes.generated.Uint8;
 
-public class Helpers {
+public class Helpers extends ChainResolutionSupport {
   private static final BigDecimal WEI = new BigDecimal("1000000000000000000");
 
-  private final com.rsk.commands.config.Helpers configHelpers;
   private final com.rsk.commands.wallet.Helpers walletHelpers;
   private final Rpc.RpcPort rpcPort;
 
@@ -30,7 +30,7 @@ public class Helpers {
       com.rsk.commands.config.Helpers configHelpers,
       com.rsk.commands.wallet.Helpers walletHelpers,
       Rpc.RpcPort rpcPort) {
-    this.configHelpers = configHelpers;
+    super(configHelpers);
     this.walletHelpers = walletHelpers;
     this.rpcPort = rpcPort;
   }
@@ -41,11 +41,6 @@ public class Helpers {
         new com.rsk.commands.config.Helpers(new JsonConfigRepository(homeDir)),
         com.rsk.commands.wallet.Helpers.defaultHelpers(),
         new Rpc.Web3jRpcGateway());
-  }
-
-  public ChainProfile resolveChain(
-      boolean mainnet, boolean testnet, String chain, String chainUrl) {
-    return Chain.resolveChain(configHelpers.loadConfig(), mainnet, testnet, chain, chainUrl);
   }
 
   public String resolveWalletAddress(String walletName) {

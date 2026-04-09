@@ -2,6 +2,7 @@ package com.rsk.utils;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rsk.commands.config.CliConfig;
+import com.rsk.commands.config.Helpers;
 import com.rsk.commands.config.Helpers.ConfigPort;
 import com.rsk.commands.wallet.Helpers.WalletMetadata;
 import com.rsk.commands.wallet.Helpers.WalletPort;
@@ -126,7 +127,7 @@ public final class Storage {
     }
 
     private static CliConfig defaultConfig() {
-      return com.rsk.commands.config.Helpers.defaultConfig();
+      return Helpers.defaultConfig();
     }
   }
 

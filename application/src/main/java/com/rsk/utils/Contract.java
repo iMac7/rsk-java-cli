@@ -1,5 +1,6 @@
 package com.rsk.utils;
 
+import com.rsk.commands.contract.Helpers;
 import com.rsk.utils.Chain.ChainProfile;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -67,7 +68,7 @@ public final class Contract {
 
   public static TokenMetadata readTokenMetadata(ChainProfile chainProfile, String tokenAddress) {
     try {
-      com.rsk.commands.contract.Helpers helpers = com.rsk.commands.contract.Helpers.defaultHelpers();
+      Helpers helpers = Helpers.defaultHelpers();
       List<Type> symbolOut =
           helpers.executeReadFunction(
               chainProfile,

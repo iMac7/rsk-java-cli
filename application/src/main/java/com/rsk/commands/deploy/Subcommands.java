@@ -2,6 +2,8 @@ package com.rsk.commands.deploy;
 
 import static com.rsk.utils.Terminal.*;
 
+import com.rsk.utils.Chain.ChainProfile;
+import com.rsk.utils.Terminal;
 import java.io.BufferedReader;
 import java.io.Console;
 import java.io.IOException;
@@ -60,7 +62,7 @@ public class Subcommands {
 
       System.out.println(cInfo("Wallet: ") + selectedWallet);
       char[] password =
-          com.rsk.utils.Terminal.readPasswordWithStatus(
+          Terminal.readPasswordWithStatus(
               "Enter your password to decrypt the wallet: ", "Deployment cancelled.");
       String privateKeyHex = HELPERS.dumpPrivateKey(selectedWallet, password);
       String walletAddress = org.web3j.crypto.Credentials.create(privateKeyHex).getAddress();
@@ -118,7 +120,7 @@ public class Subcommands {
       System.out.println(cRule());
     }
 
-    private String networkLabel(com.rsk.utils.Chain.ChainProfile chainProfile) {
+    private String networkLabel(ChainProfile chainProfile) {
       if (chainProfile.chainId() == 31L) {
         return "testnet";
       }

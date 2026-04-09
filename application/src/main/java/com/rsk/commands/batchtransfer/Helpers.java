@@ -114,14 +114,6 @@ public class Helpers {
     return Transaction.waitForSuccessfulReceipt(chainProfile, pendingTransfer.txHash(), 120, 2000L);
   }
 
-  public String rootMessage(Throwable ex) {
-    Throwable current = ex;
-    while (current.getCause() != null) {
-      current = current.getCause();
-    }
-    return current.getMessage() == null ? ex.getMessage() : current.getMessage();
-  }
-
   private record BatchFileEntry(String to, BigDecimal value) {}
 
   public record TransferDefaults(BigInteger gasLimit, BigInteger gasPriceWei) {}

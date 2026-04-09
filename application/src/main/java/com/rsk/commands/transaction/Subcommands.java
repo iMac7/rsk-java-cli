@@ -4,9 +4,11 @@ import static com.rsk.utils.Terminal.*;
 
 import com.rsk.commands.transfer.Helpers;
 import com.rsk.java_cli.WelcomeScreen;
+import com.rsk.utils.Chain;
 import com.rsk.utils.Chain.ChainProfile;
 import com.rsk.utils.Contract;
 import com.rsk.utils.Loader;
+import com.rsk.utils.Terminal;
 import com.rsk.utils.Transaction;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -16,7 +18,6 @@ import org.jline.reader.LineReader;
 import org.jline.reader.LineReaderBuilder;
 import org.jline.reader.UserInterruptException;
 import org.jline.terminal.Attributes;
-import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
 import org.jline.utils.NonBlockingReader;
 import picocli.CommandLine.ArgGroup;
@@ -27,7 +28,7 @@ public class Subcommands {
   private static final Helpers HELPERS = Helpers.defaultHelpers();
   private static final com.rsk.commands.balance.Helpers BALANCE_HELPERS =
       com.rsk.commands.balance.Helpers.defaultHelpers();
-  private static final Terminal MENU_TERMINAL = createTerminal();
+  private static final org.jline.terminal.Terminal MENU_TERMINAL = createTerminal();
   private static final LineReader READER = createReader();
   private static final String[] TX_TYPES = {
     "Simple Transfer (RBTC or Token)",
@@ -38,7 +39,7 @@ public class Subcommands {
 
   private Subcommands() {}
 
-  private static Terminal createTerminal() {
+  private static org.jline.terminal.Terminal createTerminal() {
     try {
       return TerminalBuilder.builder().system(true).encoding(StandardCharsets.UTF_8).build();
     } catch (Exception ignored) {
@@ -91,7 +92,7 @@ public class Subcommands {
       String selectedWallet = HELPERS.resolveWalletName(walletName);
       String walletAddress = HELPERS.walletAddress(selectedWallet);
 
-      System.out.println(cInfo("📊 Network: ") + Transaction.networkDisplayName(chainProfile));
+      System.out.println(cInfo("📊 Network: ") + Chain.networkDisplayName(chainProfile));
 
       while (true) {
         Integer selectedType = selectTransactionType();
@@ -104,7 +105,7 @@ public class Subcommands {
           TransactionInput input = collectTransactionInput(chainProfile, selectedType);
           printTransactionPreview(chainProfile, walletAddress, input);
           char[] password =
-              com.rsk.utils.Terminal.readPasswordWithStatus(
+              readPasswordWithStatus(
                   "Enter your password to decrypt the wallet: ", "Transaction cancelled.");
           Helpers.PendingTransfer pendingTransfer =
               Loader.runWithSpinner(
@@ -123,14 +124,14 @@ public class Subcommands {
           System.out.println(cInfo("📊 Gas Used: ") + receipt.getGasUsed());
           System.out.println(
               cInfo("📊 View on Explorer: ")
-                  + Transaction.explorerTxUrl(chainProfile, pendingTransfer.txHash()));
+                  + Chain.explorerTxUrl(chainProfile, pendingTransfer.txHash()));
         } catch (PromptCancelledException ex) {
           System.out.println(cError("❌ Error during transaction, please check the transaction details."));
           System.out.println(cError("❌ Error details: User force closed the prompt with SIGINT"));
         } catch (Exception ex) {
           System.out.println(cError("❌ Error during transaction, please check the transaction details."));
-          System.out.println(cError("❌ Error details: " + rootMessage(ex)));
-          if (rootMessage(ex).toLowerCase().contains("gas")) {
+          System.out.println(cError("❌ Error details: " + Terminal.rootMessage(ex)));
+          if (Terminal.rootMessage(ex).toLowerCase().contains("gas")) {
             System.out.println(cWarn("⚠️  Tip: Try increasing the gas limit or gas price."));
           }
         }
@@ -182,7 +183,7 @@ public class Subcommands {
             Contract.readTokenMetadata(chainProfile, tokenAddress);
             break;
           } catch (Exception ex) {
-            System.out.println(cError("❌ " + rootMessage(ex)));
+            System.out.println(cError("❌ " + Terminal.rootMessage(ex)));
           }
         }
       }
@@ -227,7 +228,7 @@ public class Subcommands {
       System.out.println(cInfo("📊 Checking balance for address: ") + walletAddress);
       System.out.println(
           cInfo("📊 Wallet Balance: ") + balance.toPlainString() + " " + chainProfile.nativeSymbol());
-      System.out.println(cInfo("📊 Network RPC: ") + Transaction.networkDisplayName(chainProfile));
+      System.out.println(cInfo("📊 Network RPC: ") + Chain.networkDisplayName(chainProfile));
       System.out.println(
           cInfo("📊 " + (input.tokenAddress() == null ? "RBTC Transfer Details:" : "Token Transfer Details:")));
       System.out.println(cInfo("📊 From: ") + walletAddress);
@@ -346,106 +347,50 @@ public class Subcommands {
     }
 
     private String promptRequired(String label) {
-      while (true) {
-        try {
-          String value = READER.readLine(cOk("✔ " + label + ": "));
-          if (value != null && !value.isBlank()) {
-            return value.trim();
-          }
-          System.out.println(cError("❌ Value is required."));
-        } catch (UserInterruptException ex) {
-          throw new PromptCancelledException();
-        }
-      }
+      return Terminal.promptRequiredText(
+          READER, cOk("✔ " + label + ": "), "❌ Value is required.", PromptCancelledException::new);
     }
 
     private String promptOptionalText(String label) {
-      try {
-        String value = READER.readLine(cOk("✔ " + label + ": "));
-        return value == null ? "" : value.trim();
-      } catch (UserInterruptException ex) {
-        throw new PromptCancelledException();
-      }
+      return Terminal.promptOptionalText(
+          READER, cOk("✔ " + label + ": "), PromptCancelledException::new);
     }
 
     private BigDecimal promptAmount(String label) {
-      while (true) {
-        try {
-          String value = READER.readLine(cOk("✔ " + label + ": "));
-          BigDecimal amount = new BigDecimal(value.trim());
-          if (amount.compareTo(BigDecimal.ZERO) > 0) {
-            return amount;
-          }
-        } catch (UserInterruptException ex) {
-          throw new PromptCancelledException();
-        } catch (Exception ignored) {
-        }
-        System.out.println(cError("❌ Enter a valid positive amount."));
-      }
+      return Terminal.promptPositiveAmount(
+          READER,
+          cOk("✔ " + label + ": "),
+          "❌ Enter a valid positive amount.",
+          PromptCancelledException::new);
     }
 
     private BigInteger promptOptionalInteger(String label) {
-      while (true) {
-        try {
-          String value = READER.readLine(cOk("✔ " + label + ": "));
-          if (value == null || value.isBlank()) {
-            return null;
-          }
-          return new BigInteger(value.trim());
-        } catch (UserInterruptException ex) {
-          throw new PromptCancelledException();
-        } catch (Exception ignored) {
-          System.out.println(cError("❌ Enter a valid integer."));
-        }
-      }
+      return Terminal.promptOptionalInteger(
+          READER,
+          cOk("✔ " + label + ": "),
+          "❌ Enter a valid integer.",
+          PromptCancelledException::new);
     }
 
     private BigDecimal promptOptionalDecimal(String label) {
-      while (true) {
-        try {
-          String value = READER.readLine(cOk("✔ " + label + ": "));
-          if (value == null || value.isBlank()) {
-            return null;
-          }
-          return new BigDecimal(value.trim());
-        } catch (UserInterruptException ex) {
-          throw new PromptCancelledException();
-        } catch (Exception ignored) {
-          System.out.println(cError("❌ Enter a valid decimal value."));
-        }
-      }
+      return Terminal.promptOptionalDecimal(
+          READER,
+          cOk("✔ " + label + ": "),
+          "❌ Enter a valid decimal value.",
+          PromptCancelledException::new);
     }
 
     private boolean promptYesNo(String label, boolean defaultValue) {
-      while (true) {
-        try {
-          String raw = READER.readLine(cOk("✔ " + label + " " + (defaultValue ? "(Y/n)" : "(y/N)") + ": "));
-          if (raw == null || raw.isBlank()) {
-            return defaultValue;
-          }
-          if ("y".equalsIgnoreCase(raw) || "yes".equalsIgnoreCase(raw)) {
-            return true;
-          }
-          if ("n".equalsIgnoreCase(raw) || "no".equalsIgnoreCase(raw)) {
-            return false;
-          }
-        } catch (UserInterruptException ex) {
-          throw new PromptCancelledException();
-        }
-        System.out.println(cError("❌ Please answer yes or no."));
-      }
+      return Terminal.promptYesNo(
+          READER,
+          cOk("✔ " + label + " " + (defaultValue ? "(Y/n)" : "(y/N)") + ": "),
+          defaultValue,
+          "❌ Please answer yes or no.",
+          PromptCancelledException::new);
     }
 
     private String resolveRecipient(ChainProfile chainProfile, String rawValue) {
       return BALANCE_HELPERS.resolveAddressInput(chainProfile, rawValue);
-    }
-
-    private String rootMessage(Throwable ex) {
-      Throwable current = ex;
-      while (current.getCause() != null) {
-        current = current.getCause();
-      }
-      return current.getMessage() == null ? ex.getMessage() : current.getMessage();
     }
 
     private void redrawWelcome() {

@@ -3,6 +3,7 @@ package com.rsk.commands.bridge;
 import static com.rsk.utils.Terminal.*;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.rsk.utils.Chain;
 import com.rsk.utils.Chain.ChainProfile;
 import com.rsk.utils.Terminal;
 import java.io.BufferedReader;
@@ -134,7 +135,7 @@ public class Subcommands {
         } else {
           String walletName = HELPERS.resolveWalletName(wallet);
           char[] password =
-              com.rsk.utils.Terminal.readPassword("Wallet password: ", "Bridge interaction cancelled.");
+              Terminal.readPassword("Wallet password: ", "Bridge interaction cancelled.");
           Helpers.WriteResult result =
               HELPERS.executeWrite(
                   chainProfile,
@@ -187,7 +188,7 @@ public class Subcommands {
         }
       }
       System.out.println();
-      System.out.println(cMuted("Explorer: " + HELPERS.explorerAddressUrl(chainProfile, contractAddress)));
+      System.out.println(cMuted("Explorer: " + Chain.blockscoutAddressUrl(chainProfile, contractAddress)));
       System.out.println(cRule());
       System.out.println();
     }
@@ -211,8 +212,8 @@ public class Subcommands {
       System.out.println(cPlain("  Block: " + result.blockNumber()));
       System.out.println(cPlain("  Gas Used: " + result.gasUsed()));
       System.out.println();
-      System.out.println(cMuted("Tx Explorer: " + HELPERS.explorerTxUrl(chainProfile, result.txHash())));
-      System.out.println(cMuted("Contract Explorer: " + HELPERS.explorerAddressUrl(chainProfile, contractAddress)));
+      System.out.println(cMuted("Tx Explorer: " + Chain.explorerTxUrl(chainProfile, result.txHash())));
+      System.out.println(cMuted("Contract Explorer: " + Chain.blockscoutAddressUrl(chainProfile, contractAddress)));
       System.out.println(cRule());
       System.out.println();
     }

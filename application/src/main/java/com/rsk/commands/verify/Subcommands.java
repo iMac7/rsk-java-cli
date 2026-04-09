@@ -2,6 +2,7 @@ package com.rsk.commands.verify;
 
 import static com.rsk.utils.Terminal.*;
 
+import com.rsk.utils.Chain;
 import com.rsk.utils.Chain.ChainProfile;
 import java.nio.file.Path;
 import java.util.concurrent.Callable;
@@ -62,7 +63,7 @@ public class Subcommands {
       System.out.println(cRule());
       System.out.println(cOk("Contract verification request sent."));
       System.out.println(cOk("Verification submitted successfully."));
-      System.out.println(cMuted("Explorer: " + HELPERS.blockscoutAddressUrl(chainProfile, address)));
+      System.out.println(cMuted("Explorer: " + Chain.blockscoutAddressUrl(chainProfile, address)));
       System.out.println(cRule());
       return 0;
     }

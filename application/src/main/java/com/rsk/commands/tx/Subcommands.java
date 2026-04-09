@@ -5,16 +5,16 @@ import static com.rsk.utils.Terminal.*;
 import com.rsk.utils.Chain;
 import com.rsk.utils.Chain.ChainProfile;
 import com.rsk.utils.Loader;
-import com.rsk.utils.Storage;
 import com.rsk.utils.Rpc.TxReceiptDetails;
 import java.math.BigInteger;
-import java.nio.file.Path;
 import java.util.concurrent.Callable;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
 public class Subcommands {
   private static final Helpers HELPERS = Helpers.defaultHelpers();
+  private static final com.rsk.commands.config.Helpers CONFIG_HELPERS =
+      com.rsk.commands.config.Helpers.defaultHelpers();
 
   private Subcommands() {}
 
@@ -63,7 +63,8 @@ public class Subcommands {
 
     @Override
     public Integer call() {
-      ChainProfile chainProfile = resolveChain(mainnet, testnet, chain, chainUrl);
+      ChainProfile chainProfile =
+          CONFIG_HELPERS.resolveChain(mainnet, testnet, chain, chainUrl);
       TxReceiptDetails details =
           HELPERS
               .receiptDetails(chainProfile, txid)
@@ -167,11 +168,4 @@ public class Subcommands {
     }
   }
 
-  private static ChainProfile resolveChain(
-      boolean mainnet, boolean testnet, String chain, String chainUrl) {
-    Path homeDir = Path.of(System.getProperty("user.home"), ".rsk-java-cli");
-    com.rsk.commands.config.CliConfig config =
-        new com.rsk.commands.config.Helpers(new Storage.JsonConfigRepository(homeDir)).loadConfig();
-    return Chain.resolveChain(config, mainnet, testnet, chain, chainUrl);
-  }
 }

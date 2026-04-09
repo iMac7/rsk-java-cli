@@ -2,6 +2,7 @@ package com.rsk.commands.verify;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rsk.commands.config.Helpers.ChainResolutionSupport;
 import com.rsk.utils.Chain;
 import com.rsk.utils.Chain.ChainProfile;
 import com.rsk.utils.Json;
@@ -20,23 +21,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-public class Helpers {
+public class Helpers extends ChainResolutionSupport {
   private static final ObjectMapper OBJECT_MAPPER = Json.ObjectMapperFactory.create();
 
-  private final com.rsk.commands.config.Helpers configHelpers;
-
   public Helpers(com.rsk.commands.config.Helpers configHelpers) {
-    this.configHelpers = configHelpers;
+    super(configHelpers);
   }
 
   public static Helpers defaultHelpers() {
     Path homeDir = Path.of(System.getProperty("user.home"), ".rsk-java-cli");
     return new Helpers(new com.rsk.commands.config.Helpers(new Storage.JsonConfigRepository(homeDir)));
-  }
-
-  public ChainProfile resolveChain(
-      boolean mainnet, boolean testnet, String chain, String chainUrl) {
-    return Chain.resolveChain(configHelpers.loadConfig(), mainnet, testnet, chain, chainUrl);
   }
 
   public void validateVerifyInput(String address) {
@@ -61,10 +55,7 @@ public class Helpers {
   }
 
   public String blockscoutAddressUrl(ChainProfile chainProfile, String address) {
-    if (chainProfile.chainId() == 30L || chainProfile.chainId() == 31L) {
-      return Chain.blockscoutUrl(chainProfile) + "/address/" + address;
-    }
-    return Chain.explorerUrl(chainProfile, address, false);
+    return Chain.blockscoutAddressUrl(chainProfile, address);
   }
 
   public void submitVerification(

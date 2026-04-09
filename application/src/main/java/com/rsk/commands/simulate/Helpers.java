@@ -4,6 +4,7 @@ import static com.rsk.utils.Terminal.*;
 
 import com.rsk.commands.wallet.Helpers.WalletMetadata;
 import com.rsk.utils.Chain.ChainProfile;
+import com.rsk.utils.Rns;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.file.Path;
@@ -168,7 +169,7 @@ public class Helpers {
       BigDecimal gasPriceRbtc,
       String data)
       throws Exception {
-    if (!com.rsk.utils.Rns.isHexAddress(token)) {
+    if (!Rns.isHexAddress(token)) {
       throw new IllegalArgumentException("Invalid token address: " + token);
     }
 

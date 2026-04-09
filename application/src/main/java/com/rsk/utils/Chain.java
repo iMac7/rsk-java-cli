@@ -1,5 +1,6 @@
 package com.rsk.utils;
 
+import com.rsk.commands.config.CliConfig;
 import java.net.URI;
 import java.net.URISyntaxException;
 
@@ -29,7 +30,7 @@ public final class Chain {
       ChainFeatures features) {}
 
   public static ChainProfile resolveChain(
-      com.rsk.commands.config.CliConfig config,
+      CliConfig config,
       boolean mainnet,
       boolean testnet,
       String chain,
@@ -62,7 +63,7 @@ public final class Chain {
   }
 
   public static ChainProfile resolve(
-      com.rsk.commands.config.CliConfig config, ChainSelection selection) {
+      CliConfig config, ChainSelection selection) {
     if (selection.chain() != null && !selection.chain().isBlank()) {
       ChainProfile custom = config.getChains().getCustom().get(selection.chain());
       if (custom == null) {
@@ -109,6 +110,14 @@ public final class Chain {
     return template.endsWith("/") ? template + value : template + "/" + value;
   }
 
+  public static String explorerTxUrl(ChainProfile chainProfile, String txHash) {
+    return explorerUrl(chainProfile, txHash, true);
+  }
+
+  public static String explorerAddressUrl(ChainProfile chainProfile, String address) {
+    return explorerUrl(chainProfile, address, false);
+  }
+
   public static String blockscoutUrl(ChainProfile chainProfile) {
     if (chainProfile.chainId() == 30L) {
       return Constants.ROOTSTOCK_MAINNET_BLOCKSCOUT_URL;
@@ -118,6 +127,13 @@ public final class Chain {
     }
     throw new IllegalArgumentException(
         "Blockscout API is only supported on Rootstock mainnet/testnet.");
+  }
+
+  public static String blockscoutAddressUrl(ChainProfile chainProfile, String address) {
+    if (chainProfile.chainId() == 30L || chainProfile.chainId() == 31L) {
+      return blockscoutUrl(chainProfile) + "/address/" + address;
+    }
+    return explorerAddressUrl(chainProfile, address);
   }
 
   public static String networkDisplayName(ChainProfile chainProfile) {
