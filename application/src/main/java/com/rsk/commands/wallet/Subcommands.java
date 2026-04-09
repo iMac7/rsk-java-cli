@@ -521,7 +521,7 @@ public class Subcommands {
             .bold()
             .a("WARNING: Your private key controls all funds in wallet ")
             .a(walletName)
-            .a(". Never share it.")
+            .a(". Never share it. It will be copied to your clipboard.")
             .reset());
     String confirmation = readRequiredText("Type REVEAL to continue");
     if (!"REVEAL".equals(confirmation)) {

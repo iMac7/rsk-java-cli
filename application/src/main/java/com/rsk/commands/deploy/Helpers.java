@@ -61,10 +61,6 @@ public class Helpers extends ChainResolutionSupport {
         .orElseThrow(() -> new IllegalArgumentException("No active wallet found. Provide --wallet."));
   }
 
-  public String dumpPrivateKey(String walletName, char[] password) {
-    return walletHelpers.dumpPrivateKey(walletName, password);
-  }
-
   public String readRequiredFile(String path, String label) {
     try {
       String content = Files.readString(Path.of(path));
@@ -146,7 +142,17 @@ public class Helpers extends ChainResolutionSupport {
     }
   }
 
+  public DeploymentExecution deployContractFromWallet(
+      ChainProfile chainProfile, String walletName, char[] password, String deploymentData) {
+    String privateKeyHex = walletHelpers.dumpPrivateKey(walletName, password);
+    Credentials credentials = Credentials.create(privateKeyHex);
+    DeploymentResult deploymentResult = deployContract(chainProfile, privateKeyHex, deploymentData);
+    return new DeploymentExecution(credentials.getAddress(), deploymentResult);
+  }
+
   public record DeploymentResult(String txHash, String contractAddress, String explorerUrl) {}
+
+  public record DeploymentExecution(String walletAddress, DeploymentResult deploymentResult) {}
 
   public record ConstructorInput(String name, String type) {}
 

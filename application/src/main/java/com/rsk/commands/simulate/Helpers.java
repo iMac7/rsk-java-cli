@@ -10,6 +10,8 @@ import java.math.BigInteger;
 import java.nio.file.Path;
 import java.util.List;
 import org.fusesource.jansi.Ansi;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.web3j.abi.FunctionEncoder;
 import org.web3j.abi.TypeReference;
 import org.web3j.abi.datatypes.Address;
@@ -25,6 +27,7 @@ import org.web3j.protocol.core.methods.request.Transaction;
 import org.web3j.protocol.core.methods.response.EthEstimateGas;
 
 public class Helpers {
+  private static final Logger LOGGER = LoggerFactory.getLogger(Helpers.class);
   private final com.rsk.commands.balance.Helpers balanceHelpers;
   private final com.rsk.commands.wallet.Helpers walletHelpers;
   private final com.rsk.commands.contract.Helpers contractHelpers;
@@ -195,21 +198,24 @@ public class Helpers {
       if (!nameOut.isEmpty()) {
         tokenName = ((Utf8String) nameOut.get(0)).getValue();
       }
-    } catch (Exception ignored) {
+    } catch (Exception ex) {
+      logTokenReadFallback("name", token, ex);
     }
     try {
       List<Type> symbolOut = contractHelpers.executeReadFunction(chainProfile, token, "symbol", List.of(), List.of(TypeReference.create(Utf8String.class)));
       if (!symbolOut.isEmpty()) {
         tokenSymbol = ((Utf8String) symbolOut.get(0)).getValue();
       }
-    } catch (Exception ignored) {
+    } catch (Exception ex) {
+      logTokenReadFallback("symbol", token, ex);
     }
     try {
       List<Type> decOut = contractHelpers.executeReadFunction(chainProfile, token, "decimals", List.of(), List.of(TypeReference.create(Uint8.class)));
       if (!decOut.isEmpty()) {
         decimals = ((Uint8) decOut.get(0)).getValue().intValue();
       }
-    } catch (Exception ignored) {
+    } catch (Exception ex) {
+      logTokenReadFallback("decimals", token, ex);
     }
     try {
       List<Type> balOut = contractHelpers.executeReadFunction(
@@ -221,7 +227,8 @@ public class Helpers {
       if (!balOut.isEmpty()) {
         tokenBalanceUnits = ((Uint256) balOut.get(0)).getValue();
       }
-    } catch (Exception ignored) {
+    } catch (Exception ex) {
+      logTokenReadFallback("balanceOf", token, ex);
     }
 
     BigInteger amountUnits = decimalToUnits(value, decimals);
@@ -367,6 +374,15 @@ public class Helpers {
 
   private static BigDecimal unitsToDecimal(BigInteger units, int decimals) {
     return new BigDecimal(units).movePointLeft(decimals);
+  }
+
+  private static void logTokenReadFallback(String functionName, String tokenAddress, Exception ex) {
+    LOGGER.warn(
+        "Unable to read token {} via {}. Falling back to default simulation values.",
+        tokenAddress,
+        functionName,
+        ex);
+    System.err.println("Unable to read token " + ex);
   }
 
 }

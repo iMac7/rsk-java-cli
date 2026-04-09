@@ -1,5 +1,6 @@
 package com.rsk.commands.wallet;
 
+import com.rsk.utils.Storage;
 import com.rsk.utils.Storage.JsonWalletRepository;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -130,6 +131,7 @@ public class Helpers {
     try {
       Files.copy(
           Path.of(wallet.keystorePath()), targetPath, StandardCopyOption.REPLACE_EXISTING);
+      Storage.restrictFileToOwner(targetPath);
       return targetPath.toAbsolutePath().normalize();
     } catch (IOException ex) {
       throw new IllegalStateException("Unable to back up wallet " + walletName, ex);
@@ -143,7 +145,7 @@ public class Helpers {
 
     String sanitizedPath = stripWrappingQuotes(targetPathInput.trim());
     Path rawPath = Path.of(sanitizedPath);
-    if (!rawPath.isAbsolute() && !looksLikeWindowsAbsolutePath(sanitizedPath)) {
+    if (!isCrossPlatformAbsolutePath(rawPath, sanitizedPath)) {
       throw new IllegalArgumentException("Backup path must be an absolute directory path.");
     }
     Path resolvedPath = rawPath.normalize();
@@ -226,7 +228,7 @@ public class Helpers {
     return value;
   }
 
-  private static boolean looksLikeWindowsAbsolutePath(String value) {
-    return value.matches("^[a-zA-Z]:[\\\\/].*") || value.startsWith("\\\\");
+  private static boolean isCrossPlatformAbsolutePath(Path rawPath, String value) {
+    return rawPath.isAbsolute() || value.startsWith("/") || value.matches("^[a-zA-Z]:[\\\\/].*") || value.startsWith("\\\\");
   }
 }

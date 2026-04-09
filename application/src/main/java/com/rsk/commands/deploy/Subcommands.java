@@ -9,6 +9,7 @@ import java.io.Console;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -64,23 +65,24 @@ public class Subcommands {
       char[] password =
           Terminal.readPasswordWithStatus(
               "Enter your password to decrypt the wallet: ", "Deployment cancelled.");
-      String privateKeyHex = HELPERS.dumpPrivateKey(selectedWallet, password);
-      String walletAddress = org.web3j.crypto.Credentials.create(privateKeyHex).getAddress();
-      System.out.println(cInfo("Wallet account: ") + walletAddress);
+      try {
+        System.out.println(cInfo("Reading ABI from ") + resolvedAbiPath + "...");
+        String abiContent = HELPERS.readRequiredFile(resolvedAbiPath, "ABI");
 
-      System.out.println(cInfo("Reading ABI from ") + resolvedAbiPath + "...");
-      String abiContent = HELPERS.readRequiredFile(resolvedAbiPath, "ABI");
+        System.out.println(cInfo("Reading bytecode from ") + resolvedBytecodePath + "...");
+        String bytecodeContent = HELPERS.readRequiredFile(resolvedBytecodePath, "bytecode");
 
-      System.out.println(cInfo("Reading bytecode from ") + resolvedBytecodePath + "...");
-      String bytecodeContent = HELPERS.readRequiredFile(resolvedBytecodePath, "bytecode");
+        List<String> resolvedArgs = resolveConstructorArgs(abiContent, constructorArgs);
+        String deploymentData = HELPERS.buildDeploymentData(bytecodeContent, abiContent, resolvedArgs);
+        Helpers.DeploymentExecution deployment =
+            HELPERS.deployContractFromWallet(chainProfile, selectedWallet, password, deploymentData);
 
-      List<String> resolvedArgs = resolveConstructorArgs(abiContent, constructorArgs);
-      String deploymentData = HELPERS.buildDeploymentData(bytecodeContent, abiContent, resolvedArgs);
-      Helpers.DeploymentResult result =
-          HELPERS.deployContract(chainProfile, privateKeyHex, deploymentData);
-
-      printDeploymentResult(chainProfile.name(), walletAddress, result);
-      return 0;
+        System.out.println(cInfo("Wallet account: ") + deployment.walletAddress());
+        printDeploymentResult(chainProfile.name(), deployment.walletAddress(), deployment.deploymentResult());
+        return 0;
+      } finally {
+        Arrays.fill(password, '\0');
+      }
     }
 
     private List<String> resolveConstructorArgs(String abiContent, List<String> providedArgs) {

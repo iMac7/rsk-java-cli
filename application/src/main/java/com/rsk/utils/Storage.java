@@ -39,7 +39,7 @@ public final class Storage {
 
   private Storage() {}
 
-  static void restrictFileToOwner(Path path) throws IOException {
+  public static void restrictFileToOwner(Path path) throws IOException {
     try {
       Set<PosixFilePermission> ownerOnly =
           EnumSet.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE);
