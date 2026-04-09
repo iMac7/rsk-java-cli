@@ -5,6 +5,7 @@ import static com.rsk.utils.Terminal.cOk;
 import com.rsk.commands.wallet.Helpers.WalletMetadata;
 import com.rsk.utils.Terminal;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -139,10 +140,7 @@ public class Subcommands {
 
     private void runImportFlow() {
       String walletName = readRequiredText("Wallet name");
-      String privateKey = readRequiredText("Private key (hex)");
-      char[] password = readPassword("Wallet password: ");
-      WalletMetadata wallet = HELPERS.importWallet(walletName, privateKey, password);
-      System.out.printf("Imported wallet %s (%s)%n", cOk(wallet.name()), wallet.address());
+      importWallet(walletName);
     }
 
     private void runSwitchFlow() {
@@ -156,6 +154,7 @@ public class Subcommands {
       printCurrentWallet();
       printWalletChoices();
       String selectedWallet = readRequiredText("Wallet name");
+      warnBeforePrivateKeyReveal(selectedWallet);
       char[] password = readPassword("Wallet password: ");
       String privateKey = HELPERS.dumpPrivateKey(selectedWallet, password);
       System.out.println(privateKey);
@@ -367,14 +366,9 @@ public class Subcommands {
         description = "Wallet name")
     String walletName;
 
-    @Option(names = "--privkey", required = true, description = "Hex private key")
-    String privateKey;
-
     @Override
     public Integer call() {
-      char[] password = readPassword("Wallet password: ");
-      WalletMetadata wallet = HELPERS.importWallet(walletName, privateKey, password);
-      System.out.printf("Imported wallet %s (%s)%n", cOk(wallet.name()), wallet.address());
+      importWallet(walletName);
       return 0;
     }
   }
@@ -427,6 +421,7 @@ public class Subcommands {
                 .orElseThrow(
                     () -> new IllegalArgumentException("No active wallet found. Provide --wallet."));
       }
+      warnBeforePrivateKeyReveal(selectedWallet);
       char[] password = readPassword("Wallet password: ");
       String privateKey = HELPERS.dumpPrivateKey(selectedWallet, password);
       System.out.println(privateKey);
@@ -498,6 +493,32 @@ public class Subcommands {
         throw new InteractiveCancelledException();
       }
       throw ex;
+    }
+  }
+
+  private static void importWallet(String walletName) {
+    char[] privateKeyChars = readPassword("Private key (hex): ");
+    char[] password = readPassword("Wallet password: ");
+    try {
+      WalletMetadata wallet = HELPERS.importWallet(walletName, new String(privateKeyChars), password);
+      System.out.printf("Imported wallet %s (%s)%n", cOk(wallet.name()), wallet.address());
+    } finally {
+      Arrays.fill(privateKeyChars, '\0');
+    }
+  }
+
+  private static void warnBeforePrivateKeyReveal(String walletName) {
+    System.out.println(
+        Ansi.ansi()
+            .fg(Ansi.Color.RED)
+            .bold()
+            .a("WARNING: Your private key controls all funds in wallet ")
+            .a(walletName)
+            .a(". Never share it.")
+            .reset());
+    String confirmation = readRequiredText("Type REVEAL to continue");
+    if (!"REVEAL".equals(confirmation)) {
+      throw new IllegalArgumentException("Private key display cancelled.");
     }
   }
 
