@@ -20,7 +20,6 @@ import picocli.CommandLine.Option;
 public class Subcommands {
   private static final Helpers HELPERS = Helpers.defaultHelpers();
   private static final String INPUT_CANCELLED_MESSAGE = "Input cancelled.";
-  private static final long PRIVATE_KEY_REVEAL_TIMEOUT_MILLIS = 5L * 60L * 1000L;
   private static final LineReader PROMPT_READER = createPromptReader();
 
   private Subcommands() {}
@@ -162,7 +161,7 @@ public class Subcommands {
           com.rsk.utils.Terminal.readPasswordOrThrow(
               "Wallet password: ", INPUT_CANCELLED_MESSAGE, InteractiveCancelledException::new);
       String privateKey = HELPERS.dumpPrivateKey(selectedWallet, password);
-      Terminal.revealSensitiveValue(privateKey, PRIVATE_KEY_REVEAL_TIMEOUT_MILLIS);
+      copyPrivateKeyToClipboard(selectedWallet, privateKey);
     }
 
     private void runRenameFlow() {
@@ -433,7 +432,7 @@ public class Subcommands {
           com.rsk.utils.Terminal.readPasswordOrThrow(
               "Wallet password: ", INPUT_CANCELLED_MESSAGE, InteractiveCancelledException::new);
       String privateKey = HELPERS.dumpPrivateKey(selectedWallet, password);
-      Terminal.revealSensitiveValue(privateKey, PRIVATE_KEY_REVEAL_TIMEOUT_MILLIS);
+      copyPrivateKeyToClipboard(selectedWallet, privateKey);
       return 0;
     }
   }
@@ -507,6 +506,12 @@ public class Subcommands {
     } finally {
       Arrays.fill(privateKeyChars, '\0');
     }
+  }
+
+  private static void copyPrivateKeyToClipboard(String walletName, String privateKey) {
+    Terminal.copyToClipboard(privateKey);
+    System.out.println("Private key for wallet " + cOk(walletName) + " copied to your clipboard.");
+    System.out.println("Paste it only into a secure location.");
   }
 
   private static void warnBeforePrivateKeyReveal(String walletName) {

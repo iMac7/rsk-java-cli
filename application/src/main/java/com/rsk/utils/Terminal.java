@@ -1,5 +1,8 @@
 package com.rsk.utils;
 
+import java.awt.GraphicsEnvironment;
+import java.awt.Toolkit;
+import java.awt.datatransfer.StringSelection;
 import java.io.Console;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -93,13 +96,17 @@ public final class Terminal {
     return readPasswordOrThrow(cOk("✔" + prompt), cancelMessage, cancelledExceptionFactory);
   }
 
-  public static void revealSensitiveValue(String value, long timeoutMillis) {
-    System.out.println(value);
-    System.out.println(
-        cMuted("Press any key to clear this secret now. It will be removed from the screen in 5 minutes."));
-    waitForAnyKeyOrTimeout(timeoutMillis);
-    clearScreenAndScrollback();
-    System.out.println(cMuted("Sensitive output cleared from the visible terminal."));
+  public static void copyToClipboard(String value) {
+    try {
+      if (GraphicsEnvironment.isHeadless()) {
+        throw new IllegalStateException("Clipboard access is unavailable in this environment.");
+      }
+      Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(value), null);
+    } catch (IllegalStateException ex) {
+      throw ex;
+    } catch (Exception ex) {
+      throw new IllegalStateException("Unable to copy to clipboard. Clipboard access is unavailable.", ex);
+    }
   }
 
   public static String cInfo(String text) {
@@ -136,16 +143,6 @@ public final class Terminal {
         .a("────────────────────────────────────────")
         .reset()
         .toString();
-  }
-
-  public static void clearScreenAndScrollback() {
-    String clearSequence = "\u001b[3J\u001b[2J\u001b[H";
-    System.out.print(clearSequence);
-    System.out.flush();
-    if (MENU_TERMINAL != null) {
-      MENU_TERMINAL.writer().print(clearSequence);
-      MENU_TERMINAL.writer().flush();
-    }
   }
 
   public static int selectMenu(
@@ -369,38 +366,6 @@ public final class Terminal {
 
     Charset charset = Charset.defaultCharset();
     return StandardCharsets.UTF_8.equals(charset);
-  }
-
-  private static void waitForAnyKeyOrTimeout(long timeoutMillis) {
-    if (timeoutMillis <= 0L) {
-      return;
-    }
-
-    if (MENU_TERMINAL == null) {
-      sleepQuietly(timeoutMillis);
-      return;
-    }
-
-    Attributes originalAttributes = MENU_TERMINAL.enterRawMode();
-    try {
-      MENU_TERMINAL.puts(org.jline.utils.InfoCmp.Capability.cursor_invisible);
-      MENU_TERMINAL.writer().flush();
-      MENU_TERMINAL.reader().read(timeoutMillis);
-    } catch (Exception ex) {
-      sleepQuietly(timeoutMillis);
-    } finally {
-      MENU_TERMINAL.puts(org.jline.utils.InfoCmp.Capability.cursor_visible);
-      MENU_TERMINAL.setAttributes(originalAttributes);
-      MENU_TERMINAL.writer().flush();
-    }
-  }
-
-  private static void sleepQuietly(long timeoutMillis) {
-    try {
-      Thread.sleep(timeoutMillis);
-    } catch (InterruptedException ex) {
-      Thread.currentThread().interrupt();
-    }
   }
 
   private static String cTitle(String text) {
