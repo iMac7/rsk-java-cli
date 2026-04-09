@@ -94,6 +94,7 @@ public final class Rpc {
         BigInteger gasPriceWei,
         String data) {
       try {
+        Chain.validateChainId(chainProfile, "Transaction submission");
         Web3j web3j = web3j(chainProfile);
         Credentials credentials = Credentials.create(privateKeyHex);
         EthGetTransactionCount nonceResponse =

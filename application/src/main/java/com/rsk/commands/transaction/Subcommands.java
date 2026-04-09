@@ -104,7 +104,10 @@ public class Subcommands {
         try {
           TransactionInput input = collectTransactionInput(chainProfile, selectedType);
           printTransactionPreview(chainProfile, walletAddress, input);
-          char[] password = promptPassword();
+          char[] password =
+              com.rsk.utils.Terminal.readPassword(
+                  cOk("Enter your password to decrypt the wallet: "),
+                  "Transaction cancelled.");
           Helpers.PendingTransfer pendingTransfer =
               Loader.runWithSpinner(
                   "⏳ Preparing transaction...",

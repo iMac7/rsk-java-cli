@@ -21,6 +21,27 @@ class ChainTest {
   }
 
   @Test
+  void resolveChainRejectsCustomUrlWithNonHttpScheme() {
+    CliConfig config = com.rsk.commands.config.Helpers.defaultConfig();
+
+    assertThatThrownBy(() -> Chain.resolveChain(config, false, false, null, "file:///tmp/rpc"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Custom RPC URL must use http:// or https://");
+  }
+
+  @Test
+  void validateChainIdRejectsZeroChainId() {
+    Chain.ChainProfile custom =
+        new Chain.ChainProfile(
+            "custom-url", "http://localhost:4444", 0L, "NATIVE", "", "", Chain.ChainFeatures.defaults());
+
+    assertThatThrownBy(() -> Chain.validateChainId(custom, "Transaction submission"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("requires a positive chain ID")
+        .hasMessageContaining("disables EIP-155 replay protection");
+  }
+
+  @Test
   void resolveChainReturnsConfiguredCustomChain() {
     CliConfig config = com.rsk.commands.config.Helpers.defaultConfig();
     Chain.ChainProfile custom =

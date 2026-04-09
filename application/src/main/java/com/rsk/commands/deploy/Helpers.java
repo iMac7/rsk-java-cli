@@ -115,6 +115,7 @@ public class Helpers {
 
   public DeploymentResult deployContract(
       ChainProfile chainProfile, String privateKeyHex, String deploymentData) {
+    Chain.validateChainId(chainProfile, "Contract deployment");
     Credentials credentials = Credentials.create(privateKeyHex);
     try (Web3j web3j = Web3j.build(new HttpService(chainProfile.rpcUrl()))) {
       EthGetTransactionCount nonceResponse =

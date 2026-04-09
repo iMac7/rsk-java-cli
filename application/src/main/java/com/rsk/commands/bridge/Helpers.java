@@ -156,6 +156,7 @@ public class Helpers {
       BigInteger gasPrice,
       java.util.function.BiFunction<String, String, String> prompt)
       throws Exception {
+    Chain.validateChainId(chainProfile, "Bridge write");
     String privateKeyHex = dumpPrivateKey(walletName, password);
     Credentials credentials = Credentials.create(privateKeyHex);
     List<Type> inputs = parseFunctionInputs(functionNode, prompt);

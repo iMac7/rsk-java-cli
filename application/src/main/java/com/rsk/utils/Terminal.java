@@ -45,6 +45,10 @@ public final class Terminal {
           }
           return password;
         }
+        if (PASSWORD_READER == null) {
+          throw new IllegalStateException(
+              "Secure password entry requires a real terminal.");
+        }
 
         String password = PASSWORD_READER.readLine(prompt, '*');
         if (password == null) {
@@ -189,7 +193,7 @@ public final class Terminal {
     if (interactiveTerminal() != null) {
       return LineReaderBuilder.builder().terminal(interactiveTerminal()).build();
     }
-    return LineReaderBuilder.builder().build();
+    return null;
   }
 
   private static void renderMenu(

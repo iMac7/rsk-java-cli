@@ -1,5 +1,8 @@
 package com.rsk.utils;
 
+import java.net.URI;
+import java.net.URISyntaxException;
+
 public final class Chain {
   private Chain() {}
 
@@ -32,7 +35,14 @@ public final class Chain {
       String chain,
       String chainUrl) {
     if (chainUrl != null && !chainUrl.isBlank()) {
-      return new ChainProfile("custom-url", chainUrl, 0L, "NATIVE", "", "", ChainFeatures.defaults());
+      return new ChainProfile(
+          "custom-url",
+          validateCustomRpcUrl(chainUrl),
+          0L,
+          "NATIVE",
+          "",
+          "",
+          ChainFeatures.defaults());
     }
 
     String chainOption = normalizeChainOption(chain);
@@ -118,6 +128,32 @@ public final class Chain {
       return "Rootstock Testnet";
     }
     return chainProfile.name();
+  }
+
+  public static void validateChainId(ChainProfile chainProfile, String operation) {
+    if (chainProfile.chainId() <= 0L) {
+      throw new IllegalArgumentException(
+          operation
+              + " requires a positive chain ID. Custom RPC URLs currently resolve with chainId=0, "
+              + "which disables EIP-155 replay protection.");
+    }
+  }
+
+  private static String validateCustomRpcUrl(String chainUrl) {
+    String value = chainUrl.trim();
+    try {
+      URI uri = new URI(value);
+      String scheme = uri.getScheme();
+      if (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme)) {
+        throw new IllegalArgumentException("Custom RPC URL must use http:// or https://");
+      }
+      if (uri.getHost() == null || uri.getHost().isBlank()) {
+        throw new IllegalArgumentException("Custom RPC URL must include a hostname");
+      }
+      return uri.toString();
+    } catch (URISyntaxException ex) {
+      throw new IllegalArgumentException("Invalid custom RPC URL: " + chainUrl, ex);
+    }
   }
 
   private static String normalizeChainOption(String chainOption) {
