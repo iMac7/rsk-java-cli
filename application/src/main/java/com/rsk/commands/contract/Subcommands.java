@@ -12,7 +12,6 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import org.fusesource.jansi.Ansi;
 import org.jline.reader.LineReader;
-import org.jline.reader.LineReaderBuilder;
 import org.jline.reader.UserInterruptException;
 import org.web3j.abi.TypeReference;
 import org.web3j.abi.datatypes.Type;
@@ -22,16 +21,9 @@ import picocli.CommandLine.Option;
 import picocli.CommandLine.Spec;
 
 public class Subcommands {
-  private static final LineReader PROMPT_READER = createPromptReader();
+  private static final LineReader PROMPT_READER = Terminal.createPromptReader();
 
   private Subcommands() {}
-
-  private static LineReader createPromptReader() {
-    if (Terminal.interactiveTerminal() != null) {
-      return LineReaderBuilder.builder().terminal(Terminal.interactiveTerminal()).build();
-    }
-    return LineReaderBuilder.builder().build();
-  }
 
   @Command(name = "contract", description = "Interact with a contract", mixinStandardHelpOptions = true)
   public static class ContractCommand implements Callable<Integer> {

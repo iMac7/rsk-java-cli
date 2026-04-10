@@ -14,7 +14,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import org.jline.reader.LineReader;
-import org.jline.reader.LineReaderBuilder;
 import picocli.CommandLine.ArgGroup;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
@@ -22,7 +21,7 @@ import picocli.CommandLine.Option;
 import picocli.CommandLine.Spec;
 
 public class Subcommands {
-  private static final LineReader READER = LineReaderBuilder.builder().build();
+  private static final LineReader READER = Terminal.createPromptReader();
 
   private Subcommands() {}
 

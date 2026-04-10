@@ -10,7 +10,6 @@ import java.math.BigInteger;
 import java.util.concurrent.Callable;
 import org.fusesource.jansi.Ansi;
 import org.jline.reader.LineReader;
-import org.jline.reader.LineReaderBuilder;
 import org.jline.reader.UserInterruptException;
 import picocli.CommandLine.ArgGroup;
 import picocli.CommandLine.Command;
@@ -19,17 +18,10 @@ import picocli.CommandLine.Option;
 import picocli.CommandLine.Spec;
 
 public class Subcommands {
-  private static final LineReader PROMPT_READER = createPromptReader();
+  private static final LineReader PROMPT_READER = Terminal.createPromptReader();
   private static final String[] TOKEN_MENU_ITEMS = {"rBTC", "RIF", "USDRIF", "DoC", "Custom Token"};
 
   private Subcommands() {}
-
-  private static LineReader createPromptReader() {
-    if (Terminal.interactiveTerminal() != null) {
-      return LineReaderBuilder.builder().terminal(Terminal.interactiveTerminal()).build();
-    }
-    return LineReaderBuilder.builder().build();
-  }
 
   @Command(name = "balance", description = "Get native balance", mixinStandardHelpOptions = true)
   public static class BalanceCommand implements Callable<Integer> {

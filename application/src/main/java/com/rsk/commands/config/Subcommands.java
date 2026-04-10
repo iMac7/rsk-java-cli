@@ -10,14 +10,13 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import org.fusesource.jansi.Ansi;
 import org.jline.reader.LineReader;
-import org.jline.reader.LineReaderBuilder;
 import org.jline.reader.UserInterruptException;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Spec;
 
 public class Subcommands {
-  private static final LineReader PROMPT_READER = createPromptReader();
+  private static final LineReader PROMPT_READER = Terminal.createPromptReader();
   private static final String[] MAIN_MENU_ITEMS = {
     Terminal.pick("\uD83D\uDCCB View Current Configuration", "View Current Configuration"),
     Terminal.pick("\uD83C\uDF10 Configure Network Settings", "Configure Network Settings"),
@@ -44,13 +43,6 @@ public class Subcommands {
   private static final int API_BACK_INDEX = API_MENU_ITEMS.length - 1;
 
   private Subcommands() {}
-
-  private static LineReader createPromptReader() {
-    if (Terminal.interactiveTerminal() != null) {
-      return LineReaderBuilder.builder().terminal(Terminal.interactiveTerminal()).build();
-    }
-    return LineReaderBuilder.builder().build();
-  }
 
   @Command(name = "config", description = "Config UI", mixinStandardHelpOptions = true)
   public static class ConfigCommand implements Callable<Integer> {

@@ -14,6 +14,7 @@ import java.util.function.Supplier;
 import org.fusesource.jansi.Ansi;
 import org.jline.reader.LineReader;
 import org.jline.reader.LineReaderBuilder;
+import org.jline.reader.Parser;
 import org.jline.reader.UserInterruptException;
 import org.jline.terminal.Attributes;
 import org.jline.terminal.TerminalBuilder;
@@ -24,6 +25,7 @@ import org.jline.utils.NonBlockingReader;
 public final class Terminal {
   private static final boolean UNICODE_SYMBOLS = detectUnicodeSymbols();
   private static final org.jline.terminal.Terminal MENU_TERMINAL = createInteractiveTerminal();
+  private static final org.jline.terminal.Terminal PROMPT_TERMINAL = createPromptTerminal();
   private static final LineReader PASSWORD_READER = createPasswordReader();
 
   private Terminal() {}
@@ -34,6 +36,25 @@ public final class Terminal {
 
   public static org.jline.terminal.Terminal interactiveTerminal() {
     return MENU_TERMINAL;
+  }
+
+  public static org.jline.terminal.Terminal promptTerminal() {
+    return PROMPT_TERMINAL;
+  }
+
+  public static LineReader createPromptReader() {
+    return createPromptReader(null);
+  }
+
+  public static LineReader createPromptReader(Parser parser) {
+    LineReaderBuilder builder = LineReaderBuilder.builder();
+    if (promptTerminal() != null) {
+      builder.terminal(promptTerminal());
+    }
+    if (parser != null) {
+      builder.parser(parser);
+    }
+    return builder.build();
   }
 
   public static char[] readPassword(String prompt, String cancelMessage) {
@@ -344,7 +365,27 @@ public final class Terminal {
 
   private static org.jline.terminal.Terminal createInteractiveTerminal() {
     try {
-      return TerminalBuilder.builder().system(true).encoding(StandardCharsets.UTF_8).build();
+      return TerminalBuilder.builder()
+          .system(true)
+          .dumb(false)
+          .encoding(StandardCharsets.UTF_8)
+          .build();
+    } catch (Exception ignored) {
+      return null;
+    }
+  }
+
+  private static org.jline.terminal.Terminal createPromptTerminal() {
+    if (interactiveTerminal() != null) {
+      return interactiveTerminal();
+    }
+    try {
+      return TerminalBuilder.builder()
+          .system(false)
+          .streams(System.in, System.out)
+          .dumb(true)
+          .encoding(StandardCharsets.UTF_8)
+          .build();
     } catch (Exception ignored) {
       return null;
     }

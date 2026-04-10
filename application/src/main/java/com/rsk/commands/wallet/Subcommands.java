@@ -12,7 +12,6 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 import org.fusesource.jansi.Ansi;
 import org.jline.reader.LineReader;
-import org.jline.reader.LineReaderBuilder;
 import org.jline.reader.UserInterruptException;
 import org.jline.reader.impl.DefaultParser;
 import picocli.CommandLine.Command;
@@ -29,13 +28,7 @@ public class Subcommands {
   private static LineReader createPromptReader() {
     DefaultParser parser = new DefaultParser();
     parser.setEscapeChars(null);
-    if (Terminal.interactiveTerminal() != null) {
-      return LineReaderBuilder.builder()
-          .terminal(Terminal.interactiveTerminal())
-          .parser(parser)
-          .build();
-    }
-    return LineReaderBuilder.builder().parser(parser).build();
+    return Terminal.createPromptReader(parser);
   }
 
   @Command(
