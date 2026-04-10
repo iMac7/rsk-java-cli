@@ -49,11 +49,11 @@ tasks.register('runCli', JavaExec) {
     mainClass.set('com.rsk.java_cli.Cli')
 }
 
-tasks.named('test') {
-    useJUnitPlatform()
-    testLogging {
-        events 'passed', 'failed', 'skipped'
-        showStandardStreams = true
-        exceptionFormat = 'short'
-    }
-}
+// tasks.named('test') {
+//     useJUnitPlatform()
+//     testLogging {
+//         events 'passed', 'failed', 'skipped'
+//         showStandardStreams = true
+//         exceptionFormat = 'short'
+//     }
+// }

@@ -229,6 +229,19 @@ Use --example for `contract` and `deploy` commands to use the example artifacts 
 
 Install globally on your system by adding one of the run scripts to `PATH`
 
+Change test logging in application\build.gradle by uncommenting this
+```
+// tasks.named('test') {
+//     useJUnitPlatform()
+//     testLogging {
+//         events 'passed', 'failed', 'skipped'
+//         showStandardStreams = true
+//         exceptionFormat = 'short'
+//     }
+// }
+```
+
+
 ## Disclaimer
 The software provided in this GitHub repository is offered "as is," without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, and non-infringement.
 
