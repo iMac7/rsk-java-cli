@@ -91,7 +91,9 @@ public class Helpers {
         web3j.ethGetBalance(walletMeta.address(), DefaultBlockParameterName.LATEST).send().getBalance();
     BigInteger gasPriceWei = resolveGasPriceWei(web3j, gasPriceRbtc);
 
+    boolean standardTransfer = data == null || data.isBlank();
     boolean txValid = true;
+    String estimationWarning = null;
     BigInteger estimatedGas;
     try {
       EthEstimateGas estimate =
@@ -107,16 +109,22 @@ public class Helpers {
       estimatedGas = estimate.getAmountUsed();
     } catch (Exception ex) {
       estimatedGas = gasLimit != null ? gasLimit : BigInteger.valueOf(21_000L);
-      txValid = false;
+      estimationWarning = rootMessage(ex);
+      txValid = standardTransfer;
     }
     if (gasLimit != null) {
       estimatedGas = gasLimit;
+    }
+    if (standardTransfer && estimatedGas.compareTo(BigInteger.valueOf(21_000L)) < 0) {
+      txValid = false;
+      estimationWarning = "Provided gas limit is below the standard 21000 gas required for RBTC transfers.";
     }
 
     BigInteger gasCostWei = estimatedGas.multiply(gasPriceWei);
     BigInteger totalCostWei = valueWei.add(gasCostWei);
     boolean sufficientBalance = balanceWei.compareTo(totalCostWei) >= 0;
     BigInteger balanceAfterWei = balanceWei.subtract(totalCostWei);
+    boolean simulationWarning = sufficientBalance && txValid && estimationWarning != null;
 
     printHeader(walletMeta.address(), toAddress, value.toPlainString() + " " + chainProfile.nativeSymbol());
     System.out.println(cInfo("Network: ") + chainProfile.name());
@@ -153,12 +161,25 @@ public class Helpers {
         sufficientBalance,
         "Enough RBTC for transfer + gas",
         "Insufficient RBTC for transfer + gas");
-    printValidation(
-        "Transaction Validity",
-        txValid,
-        "Transaction simulation successful",
-        "Gas estimation failed; using fallback gas");
-    printFooter(sufficientBalance && txValid);
+    if (simulationWarning) {
+      printValidationWarning(
+          "Transaction Validity",
+          "Node gas estimation unavailable; using "
+              + estimatedGas
+              + " gas fallback"
+              + (estimationWarning == null || estimationWarning.isBlank()
+                  ? "."
+                  : " (" + estimationWarning + ")"));
+    } else {
+      printValidation(
+          "Transaction Validity",
+          txValid,
+          "Transaction simulation successful",
+          estimationWarning == null || estimationWarning.isBlank()
+              ? "Gas estimation failed; unable to validate transaction."
+              : estimationWarning);
+    }
+    printFooter(sufficientBalance && txValid, simulationWarning);
   }
 
   public void simulateErc20(
@@ -328,7 +349,7 @@ public class Helpers {
         txValid,
         "Transaction simulation successful",
         "Simulation call or gas estimation failed");
-    printFooter(sufficientToken && sufficientGas && txValid);
+    printFooter(sufficientToken && sufficientGas && txValid, false);
   }
 
   private static void printHeader(String from, String to, String amount) {
@@ -347,10 +368,13 @@ public class Helpers {
     System.out.println();
   }
 
-  private static void printFooter(boolean ok) {
+  private static void printFooter(boolean ok, boolean warning) {
     System.out.println();
-    if (ok) {
+    if (ok && !warning) {
       System.out.println(cOk("Transaction simulation successful! Transaction is ready to execute."));
+    } else if (ok) {
+      System.out.println(
+          cWarn("Transaction simulation completed with warnings. Review the gas fallback before executing."));
     } else {
       System.out.println(
           Ansi.ansi().fg(Ansi.Color.RED).a("Simulation indicates this transaction may fail.").reset());
@@ -361,6 +385,10 @@ public class Helpers {
     System.out.println(
         cInfo(label + ": ")
             + (ok ? cOk(okText) : Ansi.ansi().fg(Ansi.Color.RED).a(failText).reset()));
+  }
+
+  private static void printValidationWarning(String label, String warningText) {
+    System.out.println(cInfo(label + ": ") + cWarn(warningText));
   }
 
   private static BigInteger decimalToUnits(BigDecimal value, int decimals) {
