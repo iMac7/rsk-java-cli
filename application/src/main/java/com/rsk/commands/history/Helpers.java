@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rsk.commands.config.Helpers.ChainResolutionSupport;
 import com.rsk.utils.Chain.ChainProfile;
 import com.rsk.utils.Constants;
+import com.rsk.utils.Format;
 import com.rsk.utils.Json;
 import com.rsk.utils.Storage;
 import java.math.BigInteger;
@@ -92,7 +93,7 @@ public class Helpers extends ChainResolutionSupport {
       params.put("toAddress", toAddress);
     }
     if (excludeZeroValue != null && !excludeZeroValue.isBlank()) {
-      params.put("excludeZeroValue", Boolean.parseBoolean(excludeZeroValue));
+      params.put("excludeZeroValue", Format.parseBooleanStrict(excludeZeroValue));
     }
     if (maxCountHex != null && !maxCountHex.isBlank()) {
       params.put("maxCount", maxCountHex);
@@ -163,5 +164,4 @@ public class Helpers extends ChainResolutionSupport {
     }
     return List.of(value.split(",")).stream().map(String::trim).filter(s -> !s.isBlank()).toList();
   }
-
 }

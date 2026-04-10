@@ -135,11 +135,7 @@ public class Subcommands {
 
     private void runCreateFlow() {
       String walletName = readRequiredText("Wallet name");
-      char[] password =
-          Terminal.readPasswordOrThrow(
-              "Wallet password: ", INPUT_CANCELLED_MESSAGE, InteractiveCancelledException::new);
-      WalletMetadata wallet = helpers().createWallet(walletName, password);
-      System.out.printf("Created wallet %s (%s)%n", cOk(wallet.name()), wallet.address());
+      createWallet(walletName);
     }
 
     private void runImportFlow() {
@@ -150,8 +146,7 @@ public class Subcommands {
     private void runSwitchFlow() {
       printWalletChoices();
       String walletName = readRequiredText("Wallet name");
-      helpers().switchWallet(walletName);
-      System.out.println("Active wallet switched to " + cOk(walletName));
+      switchWallet(walletName);
     }
 
     private void runDumpFlow() {
@@ -172,8 +167,7 @@ public class Subcommands {
         return;
       }
       String newName = readRequiredText("New wallet name");
-      helpers().renameWallet(walletName, newName);
-      System.out.printf("Renamed wallet %s -> %s%n", cOk(walletName), cOk(newName));
+      renameWallet(walletName, newName);
     }
 
     private void runDeleteFlow() {
@@ -184,8 +178,7 @@ public class Subcommands {
         System.out.println("Delete cancelled.");
         return;
       }
-      helpers().deleteWallet(walletName);
-      System.out.println("Deleted wallet " + cOk(walletName));
+      deleteWallet(walletName);
     }
 
     private void runBackupFlow() {
@@ -194,10 +187,7 @@ public class Subcommands {
       String walletName = readRequiredText("Wallet name");
       String backupPathInput =
           readRequiredText("Enter an absolute directory path where you want to save the backup");
-      Path savedPath = helpers().backupWallet(walletName, backupPathInput);
-      System.out.println("Changes saved at " + savedPath);
-      System.out.println("Wallet backup created successfully!");
-      System.out.println("Backup saved successfully at: " + savedPath);
+      backupWallet(walletName, backupPathInput);
     }
 
     private void runAddressBookFlow() {
@@ -236,18 +226,11 @@ public class Subcommands {
     private void runAddAddressFlow() {
       String label = readRequiredText("Address label");
       String address = readRequiredText("Address");
-      helpers().addAddressBookEntry(label, address);
-      System.out.printf("Saved address %s -> %s%n", cOk(label), address);
+      addAddressBookEntry(label, address);
     }
 
     private void runViewAddressBookFlow() {
-      Map<String, String> addressBook = helpers().listAddressBook();
-      if (addressBook.isEmpty()) {
-        System.out.println("Address book is empty.");
-        return;
-      }
-
-      addressBook.forEach((label, address) -> System.out.printf("%s: %s%n", cOk(label), address));
+      printAddressBook();
     }
 
     private void runUpdateAddressFlow() {
@@ -257,8 +240,7 @@ public class Subcommands {
       }
 
       String newAddress = readRequiredText("New address");
-      helpers().updateAddressBookEntry(label, newAddress);
-      System.out.printf("Updated address %s -> %s%n", cOk(label), newAddress);
+      updateAddressBookEntry(label, newAddress);
     }
 
     private void runDeleteAddressFlow() {
@@ -267,12 +249,11 @@ public class Subcommands {
         return;
       }
 
-      helpers().deleteAddressBookEntry(label);
-      System.out.println("Deleted address " + cOk(label));
+      deleteAddressBookEntry(label);
     }
 
     private String selectAddressBookLabel(String title) {
-      Map<String, String> addressBook = helpers().listAddressBook();
+      Map<String, String> addressBook = addressBookEntries();
       if (addressBook.isEmpty()) {
         System.out.println("Address book is empty.");
         return null;
@@ -287,23 +268,14 @@ public class Subcommands {
     }
 
     private String selectWalletName(String title) {
-      List<WalletMetadata> wallets = helpers().listWallets();
+      List<WalletMetadata> wallets = walletList();
       if (wallets.isEmpty()) {
         System.out.println("No wallets found.");
         return null;
       }
 
-      String activeWallet = helpers().activeWallet().map(WalletMetadata::name).orElse("");
-      String activeMarker = Terminal.pick("\u2B50", "*");
-      String inactiveMarker = Terminal.pick("\u2022", "-");
       String[] options =
-          wallets.stream()
-              .map(
-                  wallet -> {
-                    String marker = wallet.name().equals(activeWallet) ? activeMarker : inactiveMarker;
-                    return marker + " " + wallet.name() + " " + wallet.address();
-                  })
-              .toArray(String[]::new);
+          wallets.stream().map(wallet -> walletDisplayLine(wallet, true, false)).toArray(String[]::new);
       int selectedIndex = selectMenu(title, options, -1);
       if (selectedIndex < 0) {
         return null;
@@ -312,20 +284,13 @@ public class Subcommands {
     }
 
     private void printWalletChoices() {
-      List<WalletMetadata> wallets = helpers().listWallets();
+      List<WalletMetadata> wallets = walletList();
       if (wallets.isEmpty()) {
         throw new IllegalArgumentException("No wallets found.");
       }
 
-      String active = helpers().activeWallet().map(WalletMetadata::name).orElse("");
-      String activeMarker = Terminal.pick("\u2B50", "*");
-      String inactiveMarker = Terminal.pick("\u2022", "-");
       System.out.println("Available wallets:");
-      wallets.forEach(
-          wallet -> {
-            String marker = wallet.name().equals(active) ? activeMarker : inactiveMarker;
-            System.out.printf("%s %s %s%n", marker, cOk(wallet.name()), wallet.address());
-          });
+      wallets.forEach(wallet -> System.out.println(walletDisplayLine(wallet, true, true)));
       System.out.println();
     }
 
@@ -336,17 +301,15 @@ public class Subcommands {
     }
 
     private void runListFlow() {
-      List<WalletMetadata> wallets = helpers().listWallets();
-      if (wallets.isEmpty()) {
-        System.out.println("No wallets found.");
-        return;
-      }
-      String active = helpers().activeWallet().map(WalletMetadata::name).orElse("");
-      wallets.forEach(
-          wallet -> {
-            String marker = wallet.name().equals(active) ? "*" : " ";
-            System.out.printf("%s %s %s%n", marker, cOk(wallet.name()), wallet.address());
-          });
+      listWallets();
+    }
+
+    private List<WalletMetadata> walletList() {
+      return helpers().listWallets();
+    }
+
+    private Map<String, String> addressBookEntries() {
+      return helpers().listAddressBook();
     }
   }
 
@@ -367,11 +330,7 @@ public class Subcommands {
 
     @Override
     public Integer call() {
-      char[] password =
-          Terminal.readPasswordOrThrow(
-              "Wallet password: ", INPUT_CANCELLED_MESSAGE, InteractiveCancelledException::new);
-      WalletMetadata wallet = helpers().createWallet(walletName, password);
-      System.out.printf("Created wallet %s (%s)%n", cOk(wallet.name()), wallet.address());
+      createWallet(walletName);
       return 0;
     }
   }
@@ -399,17 +358,7 @@ public class Subcommands {
   static class ListCmd extends WalletScopedCommand {
     @Override
     public Integer call() {
-      List<WalletMetadata> wallets = helpers().listWallets();
-      if (wallets.isEmpty()) {
-        System.out.println("No wallets found.");
-        return 0;
-      }
-      String active = helpers().activeWallet().map(WalletMetadata::name).orElse("");
-      wallets.forEach(
-          wallet -> {
-            String marker = wallet.name().equals(active) ? "*" : " ";
-            System.out.printf("%s %s %s%n", marker, cOk(wallet.name()), wallet.address());
-          });
+      listWallets();
       return 0;
     }
   }
@@ -460,8 +409,7 @@ public class Subcommands {
 
     @Override
     public Integer call() {
-      helpers().switchWallet(walletName);
-      System.out.println("Active wallet switched to " + cOk(walletName));
+      switchWallet(walletName);
       return 0;
     }
   }
@@ -480,8 +428,7 @@ public class Subcommands {
 
     @Override
     public Integer call() {
-      helpers().renameWallet(walletName, newName);
-      System.out.printf("Renamed wallet %s -> %s%n", cOk(walletName), cOk(newName));
+      renameWallet(walletName, newName);
       return 0;
     }
   }
@@ -493,10 +440,7 @@ public class Subcommands {
       String walletName = readRequiredText("Wallet name");
       String backupPathInput =
           readRequiredText("Enter an absolute directory path where you want to save the backup");
-      Path savedPath = helpers().backupWallet(walletName, backupPathInput);
-      System.out.println("Changes saved at " + savedPath);
-      System.out.println("Wallet backup created successfully!");
-      System.out.println("Backup saved successfully at: " + savedPath);
+      backupWallet(walletName, backupPathInput);
       return 0;
     }
   }
@@ -508,8 +452,7 @@ public class Subcommands {
 
     @Override
     public Integer call() {
-      helpers().deleteWallet(walletName);
-      System.out.println("Deleted wallet " + cOk(walletName));
+      deleteWallet(walletName);
       return 0;
     }
   }
@@ -535,6 +478,79 @@ public class Subcommands {
       } finally {
         Arrays.fill(privateKeyChars, '\0');
       }
+    }
+
+    protected final void createWallet(String walletName) {
+      char[] password =
+          Terminal.readPasswordOrThrow(
+              "Wallet password: ", INPUT_CANCELLED_MESSAGE, InteractiveCancelledException::new);
+      WalletMetadata wallet = helpers().createWallet(walletName, password);
+      System.out.printf("Created wallet %s (%s)%n", cOk(wallet.name()), wallet.address());
+    }
+
+    protected final void listWallets() {
+      List<WalletMetadata> wallets = helpers().listWallets();
+      if (wallets.isEmpty()) {
+        System.out.println("No wallets found.");
+        return;
+      }
+      wallets.forEach(wallet -> System.out.println(walletDisplayLine(wallet, false, true)));
+    }
+
+    protected final void switchWallet(String walletName) {
+      helpers().switchWallet(walletName);
+      System.out.println("Active wallet switched to " + cOk(walletName));
+    }
+
+    protected final void renameWallet(String walletName, String newName) {
+      helpers().renameWallet(walletName, newName);
+      System.out.printf("Renamed wallet %s -> %s%n", cOk(walletName), cOk(newName));
+    }
+
+    protected final void backupWallet(String walletName, String backupPathInput) {
+      Path savedPath = helpers().backupWallet(walletName, backupPathInput);
+      System.out.println("Changes saved at " + savedPath);
+      System.out.println("Wallet backup created successfully!");
+      System.out.println("Backup saved successfully at: " + savedPath);
+    }
+
+    protected final void deleteWallet(String walletName) {
+      helpers().deleteWallet(walletName);
+      System.out.println("Deleted wallet " + cOk(walletName));
+    }
+
+    protected final void addAddressBookEntry(String label, String address) {
+      helpers().addAddressBookEntry(label, address);
+      System.out.printf("Saved address %s -> %s%n", cOk(label), address);
+    }
+
+    protected final void updateAddressBookEntry(String label, String newAddress) {
+      helpers().updateAddressBookEntry(label, newAddress);
+      System.out.printf("Updated address %s -> %s%n", cOk(label), newAddress);
+    }
+
+    protected final void deleteAddressBookEntry(String label) {
+      helpers().deleteAddressBookEntry(label);
+      System.out.println("Deleted address " + cOk(label));
+    }
+
+    protected final void printAddressBook() {
+      Map<String, String> addressBook = helpers().listAddressBook();
+      if (addressBook.isEmpty()) {
+        System.out.println("Address book is empty.");
+        return;
+      }
+      addressBook.forEach((label, address) -> System.out.printf("%s: %s%n", cOk(label), address));
+    }
+
+    protected final String walletDisplayLine(
+        WalletMetadata wallet, boolean useInteractiveMarker, boolean colorizeName) {
+      String active = helpers().activeWallet().map(WalletMetadata::name).orElse("");
+      String activeMarker = useInteractiveMarker ? Terminal.pick("\u2B50", "*") : "*";
+      String inactiveMarker = useInteractiveMarker ? Terminal.pick("\u2022", "-") : " ";
+      String marker = wallet.name().equals(active) ? activeMarker : inactiveMarker;
+      String name = colorizeName ? cOk(wallet.name()) : wallet.name();
+      return marker + " " + name + " " + wallet.address();
     }
   }
 

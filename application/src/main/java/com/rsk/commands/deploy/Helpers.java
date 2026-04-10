@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rsk.commands.config.Helpers.ChainResolutionSupport;
 import com.rsk.commands.wallet.Helpers.WalletMetadata;
 import com.rsk.utils.Chain;
+import com.rsk.utils.Format;
 import com.rsk.utils.Chain.ChainProfile;
 import com.rsk.utils.Json;
 import com.rsk.utils.Rpc;
@@ -190,7 +191,7 @@ public class Helpers extends ChainResolutionSupport {
   private static Type<?> toAbiType(String solidityType, String value) {
     return switch (solidityType) {
       case "address" -> new Address(value);
-      case "bool" -> new Bool(Boolean.parseBoolean(value));
+      case "bool" -> new Bool(Format.parseBooleanStrict(value));
       case "string" -> new Utf8String(value);
       case "bytes" -> new DynamicBytes(Numeric.hexStringToByteArray(value));
       case "bytes32" -> new Bytes32(Numeric.toBytesPadded(Numeric.toBigInt(value), 32));

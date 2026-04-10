@@ -12,4 +12,14 @@ public final class Format {
     }
     return stripped.toPlainString();
   }
+
+  public static boolean parseBooleanStrict(String value) {
+    if ("true".equalsIgnoreCase(value)) {
+      return true;
+    }
+    if ("false".equalsIgnoreCase(value)) {
+      return false;
+    }
+    throw new IllegalArgumentException("Invalid boolean value: " + value + ". Expected true or false.");
+  }
 }

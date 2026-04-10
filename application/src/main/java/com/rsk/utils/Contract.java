@@ -150,7 +150,14 @@ public final class Contract {
   }
 
   public static String networkKey(ChainProfile chainProfile) {
-    return chainProfile.chainId() == 31L ? "testnet" : "mainnet";
+    if (chainProfile.chainId() == 30L) {
+      return "mainnet";
+    }
+    if (chainProfile.chainId() == 31L) {
+      return "testnet";
+    }
+    throw new IllegalArgumentException(
+        "Known token symbols are only supported on Rootstock mainnet (30) and testnet (31).");
   }
 
   public record TokenMetadata(String symbol, int decimals) {}

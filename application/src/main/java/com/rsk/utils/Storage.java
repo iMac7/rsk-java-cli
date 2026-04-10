@@ -212,6 +212,10 @@ public final class Storage {
     public void renameWallet(String oldName, String newName) {
       WalletRegistry registry = loadRegistry();
       ensureNameAvailable(newName);
+      boolean walletExists = registry.getWallets().stream().anyMatch(w -> w.name().equals(oldName));
+      if (!walletExists) {
+        throw new IllegalArgumentException("Wallet not found: " + oldName);
+      }
       List<WalletMetadata> updated =
           registry.getWallets().stream()
               .map(
@@ -234,18 +238,27 @@ public final class Storage {
 
     @Override
     public void deleteWallet(String name) {
-      WalletRegistry registry = loadRegistry();
+      WalletRegistry currentRegistry = loadRegistry();
+      WalletMetadata wallet =
+          currentRegistry.getWallets().stream()
+              .filter(w -> w.name().equals(name))
+              .findFirst()
+              .orElseThrow(() -> new IllegalArgumentException("Wallet not found: " + name));
       List<WalletMetadata> remaining =
-          registry.getWallets().stream().filter(w -> !w.name().equals(name)).toList();
-      if (remaining.size() == registry.getWallets().size()) {
-        throw new IllegalArgumentException("Wallet not found: " + name);
+          currentRegistry.getWallets().stream().filter(w -> !w.name().equals(name)).toList();
+
+      WalletRegistry updatedRegistry = copyRegistry(currentRegistry);
+      updatedRegistry.setWallets(remaining);
+      if (updatedRegistry.getActiveWalletId() != null
+          && remaining.stream().noneMatch(w -> w.walletId().equals(updatedRegistry.getActiveWalletId()))) {
+        updatedRegistry.setActiveWalletId(null);
       }
-      registry.setWallets(remaining);
-      if (registry.getActiveWalletId() != null
-          && remaining.stream().noneMatch(w -> w.walletId().equals(registry.getActiveWalletId()))) {
-        registry.setActiveWalletId(null);
+      saveRegistry(updatedRegistry);
+      try {
+        deleteKeystore(Path.of(wallet.keystorePath()));
+      } catch (RuntimeException ex) {
+        restoreRegistry(currentRegistry, ex);
       }
-      saveRegistry(registry);
     }
 
     @Override
@@ -319,6 +332,33 @@ public final class Storage {
         LOGGER.error("Unable to save wallet registry to {}", registryPath, ex);
         throw new IllegalStateException("Unable to save wallet registry", ex);
       }
+    }
+
+    private void deleteKeystore(Path keystorePath) {
+      try {
+        Files.deleteIfExists(keystorePath);
+      } catch (IOException ex) {
+        LOGGER.error("Unable to delete wallet keystore {}", keystorePath, ex);
+        throw new IllegalStateException("Unable to delete wallet keystore", ex);
+      }
+    }
+
+    private WalletRegistry copyRegistry(WalletRegistry registry) {
+      WalletRegistry copy = new WalletRegistry();
+      copy.setActiveWalletId(registry.getActiveWalletId());
+      copy.setWallets(new ArrayList<>(registry.getWallets()));
+      return copy;
+    }
+
+    private void restoreRegistry(WalletRegistry previousRegistry, RuntimeException originalFailure) {
+      try {
+        saveRegistry(copyRegistry(previousRegistry));
+      } catch (RuntimeException rollbackFailure) {
+        rollbackFailure.addSuppressed(originalFailure);
+        throw new IllegalStateException(
+            "Unable to delete wallet keystore and failed to restore wallet registry.", rollbackFailure);
+      }
+      throw originalFailure;
     }
 
     private static String cleanHex(String value) {

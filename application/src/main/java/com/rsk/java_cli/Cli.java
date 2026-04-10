@@ -184,7 +184,11 @@ public class Cli {
       }
 
       if (c == '\\') {
-        escaping = true;
+        if (i + 1 < line.length() && isEscapable(line.charAt(i + 1))) {
+          escaping = true;
+          continue;
+        }
+        current.append(c);
         continue;
       }
 
@@ -213,5 +217,9 @@ public class Cli {
       args.add(current.toString());
     }
     return args.toArray(String[]::new);
+  }
+
+  private static boolean isEscapable(char c) {
+    return Character.isWhitespace(c) || c == '"' || c == '\'' || c == '\\';
   }
 }
