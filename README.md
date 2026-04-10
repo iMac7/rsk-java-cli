@@ -273,6 +273,16 @@ An NVD API Key was not provided - it is highly recommended to use an NVD API key
 > IDLE
 ```
 
+To disable, comment this out in `application/build.gradle`
+```
+// dependencyCheck {
+//     analyzers {
+//         assemblyEnabled = false
+//     }
+//     formats = ['HTML', 'JSON']
+//     failBuildOnCVSS = 7.0f
+// }
+```
 
 ## Disclaimer
 The software provided in this GitHub repository is offered "as is," without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, and non-infringement.
