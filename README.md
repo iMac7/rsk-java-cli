@@ -241,6 +241,38 @@ Change test logging in application\build.gradle by uncommenting this
 // }
 ```
 
+## Dependency chacking
+Check for vulnerabilities in your dependencies with `.\gradlew.bat :application:dependencyCheckAnalyze`.
+However, this takes too long without an NVD api key
+
+```bash
+.\gradlew.bat :application:dependencyCheckAnalyze
+
+
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+Starting a Gradle Daemon, 2 busy and 2 incompatible Daemons could not be reused, use --status for details
+
+> Task :application:dependencyCheckAnalyze
+Verifying dependencies for project application
+Checking for updates and analyzing dependencies for vulnerabilities
+An NVD API Key was not provided - it is highly recommended to use an NVD API key as the update can take a VERY long time without an API Key
+<-------------> 0% EXECUTING [6m 30s]
+> :application:dependencyCheckAnalyze
+> IDLE
+> IDLE
+> IDLE
+> IDLE
+> IDLE
+> IDLE
+> IDLE
+> IDLE
+> IDLE
+> IDLE
+> IDLE
+```
+
 
 ## Disclaimer
 The software provided in this GitHub repository is offered "as is," without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, and non-infringement.

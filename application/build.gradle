@@ -1,6 +1,7 @@
 plugins {
     id 'java-library'
     id 'com.gradleup.shadow' version '8.3.6'
+    id 'org.owasp.dependencycheck' version '12.2.0'
 }
 
 sourceSets {
@@ -47,6 +48,14 @@ tasks.register('runCli', JavaExec) {
     dependsOn tasks.named('classes')
     classpath = sourceSets.main.runtimeClasspath
     mainClass.set('com.rsk.java_cli.Cli')
+}
+
+dependencyCheck {
+    analyzers {
+        assemblyEnabled = false
+    }
+    formats = ['HTML', 'JSON']
+    failBuildOnCVSS = 7.0f
 }
 
 // tasks.named('test') {
