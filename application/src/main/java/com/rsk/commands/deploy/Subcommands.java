@@ -2,6 +2,7 @@ package com.rsk.commands.deploy;
 
 import static com.rsk.utils.Terminal.*;
 
+import com.rsk.java_cli.CliHelpers;
 import com.rsk.utils.Chain.ChainProfile;
 import com.rsk.utils.Terminal;
 import java.io.BufferedReader;
@@ -15,10 +16,11 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import org.jline.reader.UserInterruptException;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
+import picocli.CommandLine.Spec;
 
 public class Subcommands {
-  private static final Helpers HELPERS = Helpers.defaultHelpers();
   private static final Path EXAMPLE_ABI_PATH =
       Path.of("application", "src", "main", "resources", "owner_contract", "Owner.abi")
           .toAbsolutePath()
@@ -32,6 +34,8 @@ public class Subcommands {
 
   @Command(name = "deploy", description = "Deploy a contract", mixinStandardHelpOptions = true)
   public static class DeployCommand implements Callable<Integer> {
+    @Spec CommandSpec spec;
+
     @Option(names = "--abi", paramLabel = "<path>", description = "Path to the ABI file")
     String abiPath;
 
@@ -52,14 +56,14 @@ public class Subcommands {
 
     @Override
     public Integer call() {
-      var chainProfile = HELPERS.resolveChain(false, testnet, null, null);
+      var chainProfile = helpers().resolveChain(false, testnet, null, null);
       System.out.println();
       System.out.println(cEmph("Initializing deployment for " + networkLabel(chainProfile) + "..."));
 
       String resolvedAbiPath = resolveAbiPath();
       String resolvedBytecodePath = resolveBytecodePath();
       String selectedWallet =
-          walletName != null && !walletName.isBlank() ? walletName.trim() : HELPERS.activeWalletName();
+          walletName != null && !walletName.isBlank() ? walletName.trim() : helpers().activeWalletName();
 
       System.out.println(cInfo("Wallet: ") + selectedWallet);
       char[] password =
@@ -67,15 +71,15 @@ public class Subcommands {
               "Enter your password to decrypt the wallet: ", "Deployment cancelled.");
       try {
         System.out.println(cInfo("Reading ABI from ") + resolvedAbiPath + "...");
-        String abiContent = HELPERS.readRequiredFile(resolvedAbiPath, "ABI");
+        String abiContent = helpers().readRequiredFile(resolvedAbiPath, "ABI");
 
         System.out.println(cInfo("Reading bytecode from ") + resolvedBytecodePath + "...");
-        String bytecodeContent = HELPERS.readRequiredFile(resolvedBytecodePath, "bytecode");
+        String bytecodeContent = helpers().readRequiredFile(resolvedBytecodePath, "bytecode");
 
         List<String> resolvedArgs = resolveConstructorArgs(abiContent, constructorArgs);
-        String deploymentData = HELPERS.buildDeploymentData(bytecodeContent, abiContent, resolvedArgs);
+        String deploymentData = helpers().buildDeploymentData(bytecodeContent, abiContent, resolvedArgs);
         Helpers.DeploymentExecution deployment =
-            HELPERS.deployContractFromWallet(chainProfile, selectedWallet, password, deploymentData);
+            helpers().deployContractFromWallet(chainProfile, selectedWallet, password, deploymentData);
 
         System.out.println(cInfo("Wallet account: ") + deployment.walletAddress());
         printDeploymentResult(chainProfile.name(), deployment.walletAddress(), deployment.deploymentResult());
@@ -86,7 +90,7 @@ public class Subcommands {
     }
 
     private List<String> resolveConstructorArgs(String abiContent, List<String> providedArgs) {
-      List<Helpers.ConstructorInput> constructorInputs = HELPERS.constructorInputs(abiContent);
+      List<Helpers.ConstructorInput> constructorInputs = helpers().constructorInputs(abiContent);
       if (constructorInputs.isEmpty()) {
         return List.of();
       }
@@ -144,6 +148,10 @@ public class Subcommands {
         return EXAMPLE_BYTECODE_PATH.toString();
       }
       return requireText(bytecodePath, "Path to bytecode file");
+    }
+
+    private Helpers helpers() {
+      return CliHelpers.deps(spec).deployHelpers();
     }
   }
 

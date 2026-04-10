@@ -3,6 +3,7 @@ package com.rsk.commands.transfer;
 import static com.rsk.utils.Terminal.*;
 import static com.rsk.utils.Format.formatAmount;
 
+import com.rsk.java_cli.CliHelpers;
 import com.rsk.utils.Terminal;
 import com.rsk.utils.Chain.ChainProfile;
 import com.rsk.utils.Loader;
@@ -16,12 +17,11 @@ import org.jline.reader.LineReader;
 import org.jline.reader.LineReaderBuilder;
 import picocli.CommandLine.ArgGroup;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
+import picocli.CommandLine.Spec;
 
 public class Subcommands {
-  private static final Helpers HELPERS = Helpers.defaultHelpers();
-  private static final com.rsk.commands.balance.Helpers BALANCE_HELPERS =
-      com.rsk.commands.balance.Helpers.defaultHelpers();
   private static final LineReader READER = LineReaderBuilder.builder().build();
 
   private Subcommands() {}
@@ -31,6 +31,8 @@ public class Subcommands {
       description = "Transfer RBTC or ERC20 tokens to the provided address",
       mixinStandardHelpOptions = true)
   public static class TransferCommand implements Callable<Integer> {
+    @Spec CommandSpec spec;
+
     @Option(names = "--wallet", paramLabel = "<wallet>", description = "Name of the wallet")
     String walletName;
 
@@ -84,14 +86,14 @@ public class Subcommands {
     @Override
     public Integer call() {
       ChainProfile chainProfile =
-          HELPERS.resolveChain(
+          helpers().resolveChain(
               networkOptions.mainnet,
               networkOptions.testnet,
               networkOptions.chain,
               networkOptions.chainUrl);
-      String selectedWallet = HELPERS.resolveWalletName(walletName);
-      String walletAddress = HELPERS.walletAddress(selectedWallet);
-      String tokenContract = HELPERS.resolveTokenAddress(chainProfile, tokenAddress);
+      String selectedWallet = helpers().resolveWalletName(walletName);
+      String walletAddress = helpers().walletAddress(selectedWallet);
+      String tokenContract = helpers().resolveTokenAddress(chainProfile, tokenAddress);
       BigInteger resolvedGasPrice =
           gasPriceRbtc == null
               ? Transaction.defaultGasPriceWei(chainProfile)
@@ -113,7 +115,7 @@ public class Subcommands {
           for (Helpers.TransferRequest request : requests) {
             Helpers.PendingTransfer pendingTransfer =
                 tokenContract == null
-                    ? HELPERS.sendNative(
+                    ? helpers().sendNative(
                         chainProfile,
                         selectedWallet,
                         password,
@@ -122,7 +124,7 @@ public class Subcommands {
                         gasLimit == null ? Transaction.defaultGasLimit() : gasLimit,
                         resolvedGasPrice,
                         data)
-                    : HELPERS.sendToken(
+                    : helpers().sendToken(
                         chainProfile,
                         selectedWallet,
                         password,
@@ -187,16 +189,24 @@ public class Subcommands {
     }
 
     private String resolveTarget(ChainProfile chainProfile, String rawTarget) {
-      return BALANCE_HELPERS.resolveAddressInput(chainProfile, rawTarget);
+      return balanceHelpers().resolveAddressInput(chainProfile, rawTarget);
     }
 
     private void printWalletContext(ChainProfile chainProfile, String walletAddress) {
       System.out.println(cInfo("📄 Wallet Address: ") + walletAddress);
       System.out.println(
           cInfo("💰 Current Balance: ")
-              + formatAmount(HELPERS.nativeBalance(chainProfile, walletAddress))
+              + formatAmount(helpers().nativeBalance(chainProfile, walletAddress))
               + " "
               + chainProfile.nativeSymbol());
+    }
+
+    private Helpers helpers() {
+      return CliHelpers.deps(spec).transferHelpers();
+    }
+
+    private com.rsk.commands.balance.Helpers balanceHelpers() {
+      return CliHelpers.deps(spec).balanceHelpers();
     }
 
     private void printTransferResult(org.web3j.protocol.core.methods.response.TransactionReceipt receipt) {

@@ -2,15 +2,17 @@ package com.rsk.commands.verify;
 
 import static com.rsk.utils.Terminal.*;
 
+import com.rsk.java_cli.CliHelpers;
 import com.rsk.utils.Chain;
 import com.rsk.utils.Chain.ChainProfile;
 import java.nio.file.Path;
 import java.util.concurrent.Callable;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
+import picocli.CommandLine.Spec;
 
 public class Subcommands {
-  private static final Helpers HELPERS = Helpers.defaultHelpers();
   private static final Path EXAMPLE_JSON_PATH =
       Path.of(
               "application",
@@ -26,6 +28,8 @@ public class Subcommands {
 
   @Command(name = "verify", description = "Verify a contract", mixinStandardHelpOptions = true)
   public static class VerifyCommand implements Callable<Integer> {
+    @Spec CommandSpec spec;
+
     @Option(
         names = "--json",
         paramLabel = "<path>",
@@ -47,17 +51,17 @@ public class Subcommands {
 
     @Override
     public Integer call() {
-      HELPERS.validateVerifyInput(address);
+      helpers().validateVerifyInput(address);
       String resolvedJsonPath = resolveJsonPath();
 
-      ChainProfile chainProfile = HELPERS.resolveChain(false, false, null, null);
+      ChainProfile chainProfile = helpers().resolveChain(false, false, null, null);
 
       System.out.println();
       System.out.println(cEmph("Initializing verification on " + chainProfile.name() + "..."));
       System.out.println(cInfo("Reading JSON Standard Input from ") + resolvedJsonPath + "...");
       System.out.println(cInfo("Verifying contract ") + contractName + cInfo(" deployed at ") + address + "...");
 
-      HELPERS.submitVerification(chainProfile, resolvedJsonPath, contractName, address);
+      helpers().submitVerification(chainProfile, resolvedJsonPath, contractName, address);
 
       System.out.println();
       System.out.println(cRule());
@@ -76,6 +80,10 @@ public class Subcommands {
         throw new IllegalArgumentException("Provide --json <path> or use --example.");
       }
       return jsonPath.trim();
+    }
+
+    private Helpers helpers() {
+      return CliHelpers.deps(spec).verifyHelpers();
     }
   }
 }

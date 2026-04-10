@@ -1,5 +1,6 @@
 package com.rsk.commands.simulate;
 
+import com.rsk.java_cli.CliHelpers;
 import com.rsk.commands.wallet.Helpers.WalletMetadata;
 import com.rsk.utils.Chain.ChainProfile;
 import com.rsk.utils.Rpc;
@@ -9,15 +10,17 @@ import java.util.concurrent.Callable;
 import org.web3j.protocol.Web3j;
 import picocli.CommandLine.ArgGroup;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
+import picocli.CommandLine.Spec;
 
 public class Subcommands {
-  private static final Helpers HELPERS = Helpers.defaultHelpers();
-
   private Subcommands() {}
 
   @Command(name = "simulate", description = "Simulation builder", mixinStandardHelpOptions = true)
   public static class SimulateCommand implements Callable<Integer> {
+    @Spec CommandSpec spec;
+
     @Option(names = {"-a", "--address"}, required = true, description = "Recipient address or RNS")
     String address;
 
@@ -59,27 +62,31 @@ public class Subcommands {
         throw new IllegalArgumentException("--value must be greater than zero.");
       }
       ChainProfile chainProfile =
-          HELPERS.resolveChain(
+          helpers().resolveChain(
               networkOptions.mainnet,
               networkOptions.testnet,
               networkOptions.chain,
               networkOptions.chainUrl);
-      WalletMetadata walletMeta = HELPERS.resolveWallet(wallet);
-      String toAddress = HELPERS.resolveAddressInput(chainProfile, address);
+      WalletMetadata walletMeta = helpers().resolveWallet(wallet);
+      String toAddress = helpers().resolveAddressInput(chainProfile, address);
 
       try {
         Web3j web3j = Rpc.web3j(chainProfile);
         if (token == null || token.isBlank()) {
-          HELPERS.simulateRbtc(
+          helpers().simulateRbtc(
               chainProfile, web3j, walletMeta, toAddress, value, gasLimit, gasPriceRbtc, data);
         } else {
-          HELPERS.simulateErc20(
+          helpers().simulateErc20(
               chainProfile, web3j, walletMeta, toAddress, token, value, gasLimit, gasPriceRbtc, data);
         }
       } catch (Exception ex) {
         throw new IllegalStateException("Simulation failed.", ex);
       }
       return 0;
+    }
+
+    private Helpers helpers() {
+      return CliHelpers.deps(spec).simulateHelpers();
     }
   }
 }

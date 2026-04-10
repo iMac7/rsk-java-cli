@@ -4,6 +4,7 @@ import static com.rsk.utils.Terminal.*;
 import static com.rsk.utils.Format.formatAmount;
 
 import com.rsk.commands.transfer.Helpers.TransferRequest;
+import com.rsk.java_cli.CliHelpers;
 import com.rsk.utils.Chain.ChainProfile;
 import com.rsk.utils.Loader;
 import com.rsk.utils.Terminal;
@@ -16,10 +17,11 @@ import org.jline.reader.LineReader;
 import org.jline.reader.LineReaderBuilder;
 import picocli.CommandLine.ArgGroup;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
+import picocli.CommandLine.Spec;
 
 public class Subcommands {
-  private static final Helpers HELPERS = Helpers.defaultHelpers();
   private static final LineReader READER = LineReaderBuilder.builder().build();
 
   private Subcommands() {}
@@ -29,6 +31,8 @@ public class Subcommands {
       description = "Execute batch transactions interactively or from a JSON file",
       mixinStandardHelpOptions = true)
   public static class BatchTransferCommand implements Callable<Integer> {
+    @Spec CommandSpec spec;
+
     @Option(names = {"-t", "--testnet"}, description = "Execute on the testnet")
     boolean testnet;
 
@@ -68,10 +72,10 @@ public class Subcommands {
     @Override
     public Integer call() {
       try {
-        var chainProfile = HELPERS.resolveChain(testnet);
-        String selectedWallet = HELPERS.resolveWalletName();
-        String walletAddress = HELPERS.walletAddress(selectedWallet);
-        Helpers.TransferDefaults defaults = HELPERS.transferDefaults(chainProfile);
+        var chainProfile = helpers().resolveChain(testnet);
+        String selectedWallet = helpers().resolveWalletName();
+        String walletAddress = helpers().walletAddress(selectedWallet);
+        Helpers.TransferDefaults defaults = helpers().transferDefaults(chainProfile);
 
         List<TransferRequest> requests =
             inputOptions.interactive
@@ -88,12 +92,12 @@ public class Subcommands {
         for (TransferRequest request : requests) {
           try {
             var pendingTransfer =
-                HELPERS.submitTransfer(chainProfile, privateKeyHex, request, defaults);
+                helpers().submitTransfer(chainProfile, privateKeyHex, request, defaults);
             System.out.println(cInfo("🔄 Transaction initiated. TxHash: ") + pendingTransfer.txHash());
             org.web3j.protocol.core.methods.response.TransactionReceipt receipt =
                 Loader.runWithSpinner(
                     "Waiting for confirmation...",
-                    () -> HELPERS.waitForConfirmation(chainProfile, pendingTransfer));
+                    () -> helpers().waitForConfirmation(chainProfile, pendingTransfer));
             printTransferResult(receipt);
           } catch (Exception ex) {
             System.out.println(cError(Terminal.rootMessage(ex)));
@@ -113,7 +117,7 @@ public class Subcommands {
             Terminal.readPasswordWithStatus(
                 "Enter your password to decrypt the wallet: ", "Batch transfer cancelled.");
         try {
-          return HELPERS.unlockWalletPrivateKeyHex(walletName, password);
+          return helpers().unlockWalletPrivateKeyHex(walletName, password);
         } catch (IllegalArgumentException ex) {
           System.out.println(cError(Terminal.rootMessage(ex)));
         }
@@ -124,7 +128,7 @@ public class Subcommands {
       List<TransferRequest> requests = new ArrayList<>();
       while (true) {
         String target = promptRequiredText("Enter address");
-        String resolvedTarget = HELPERS.resolveRecipient(chainProfile, target);
+        String resolvedTarget = helpers().resolveRecipient(chainProfile, target);
         BigDecimal amount = promptAmount("Enter amount");
         requests.add(new TransferRequest(resolvedTarget, amount));
         if (!promptYesNo("Add another transaction?", false)) {
@@ -134,16 +138,20 @@ public class Subcommands {
     }
 
     private List<TransferRequest> loadRequestsFromFile(ChainProfile chainProfile, Path filePath) {
-      return HELPERS.loadRequestsFromFile(chainProfile, filePath);
+      return helpers().loadRequestsFromFile(chainProfile, filePath);
     }
 
     private void printWalletContext(ChainProfile chainProfile, String walletAddress) {
       System.out.println(cInfo("📄 Wallet Address: ") + walletAddress);
       System.out.println(
           cInfo("💰 Current Balance: ")
-              + formatAmount(HELPERS.nativeBalance(chainProfile, walletAddress))
+              + formatAmount(helpers().nativeBalance(chainProfile, walletAddress))
               + " "
               + chainProfile.nativeSymbol());
+    }
+
+    private Helpers helpers() {
+      return CliHelpers.deps(spec).batchTransferHelpers();
     }
 
     private void printTransferResult(org.web3j.protocol.core.methods.response.TransactionReceipt receipt) {

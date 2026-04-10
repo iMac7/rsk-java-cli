@@ -3,6 +3,7 @@ package com.rsk.commands.bridge;
 import static com.rsk.utils.Terminal.*;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.rsk.java_cli.CliHelpers;
 import com.rsk.utils.Chain;
 import com.rsk.utils.Chain.ChainProfile;
 import com.rsk.utils.Terminal;
@@ -18,15 +19,17 @@ import java.util.concurrent.Callable;
 import org.web3j.abi.datatypes.Type;
 import picocli.CommandLine.ArgGroup;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
+import picocli.CommandLine.Spec;
 
 public class Subcommands {
-  private static final Helpers HELPERS = Helpers.defaultHelpers();
-
   private Subcommands() {}
 
   @Command(name = "bridge", description = "Interact with RSK Bridge contract", mixinStandardHelpOptions = true)
   public static class BridgeCommand implements Callable<Integer> {
+    @Spec CommandSpec spec;
+
     @Option(names = "--wallet", description = "Wallet name for write calls (defaults to active wallet)")
     String wallet;
 
@@ -62,7 +65,7 @@ public class Subcommands {
     @Override
     public Integer call() {
       ChainProfile chainProfile =
-          HELPERS.resolveChain(
+          helpers().resolveChain(
               networkOptions.mainnet,
               networkOptions.testnet,
               networkOptions.chain,
@@ -71,9 +74,9 @@ public class Subcommands {
       System.out.println();
       System.out.println(cEmph("Initializing bridge for " + networkLabel(chainProfile) + "..."));
 
-      String contractAddress = HELPERS.bridgeAddress();
-      JsonNode abiArray = HELPERS.readAbiArrayResource();
-      List<JsonNode> functions = HELPERS.functions(abiArray);
+      String contractAddress = helpers().bridgeAddress();
+      JsonNode abiArray = helpers().readAbiArrayResource();
+      List<JsonNode> functions = helpers().functions(abiArray);
       if (functions.isEmpty()) {
         throw new IllegalStateException("No bridge functions available in ABI.");
       }
@@ -126,18 +129,18 @@ public class Subcommands {
       try {
         if (readOnly) {
           List<Type> results =
-              HELPERS.executeRead(
+              helpers().executeRead(
                   chainProfile,
                   contractAddress,
                   selected,
                   (label, type) -> readRequiredTextPrompt("Enter " + label + " (" + type + ")", ""));
           printReadResult(chainProfile, contractAddress, selected, results);
         } else {
-          String walletName = HELPERS.resolveWalletName(wallet);
+          String walletName = helpers().resolveWalletName(wallet);
           char[] password =
               Terminal.readPassword("Wallet password: ", "Bridge interaction cancelled.");
           Helpers.WriteResult result =
-              HELPERS.executeWrite(
+              helpers().executeWrite(
                   chainProfile,
                   contractAddress,
                   selected,
@@ -181,10 +184,10 @@ public class Subcommands {
       if (results.isEmpty()) {
         System.out.println(cPlain("  (no return value)"));
       } else if (results.size() == 1) {
-        System.out.println(cPlain("  " + HELPERS.readableTypeValue(results.get(0))));
+        System.out.println(cPlain("  " + helpers().readableTypeValue(results.get(0))));
       } else {
         for (int i = 0; i < results.size(); i++) {
-          System.out.println(cPlain("  [" + i + "] " + HELPERS.readableTypeValue(results.get(i))));
+          System.out.println(cPlain("  [" + i + "] " + helpers().readableTypeValue(results.get(i))));
         }
       }
       System.out.println();
@@ -240,6 +243,10 @@ public class Subcommands {
         return "mainnet";
       }
       return chainProfile.name();
+    }
+
+    private Helpers helpers() {
+      return CliHelpers.deps(spec).bridgeHelpers();
     }
   }
 

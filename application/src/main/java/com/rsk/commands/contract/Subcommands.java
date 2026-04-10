@@ -3,6 +3,7 @@ package com.rsk.commands.contract;
 import static com.rsk.utils.Terminal.*;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.rsk.java_cli.CliHelpers;
 import com.rsk.utils.Chain;
 import com.rsk.utils.Chain.ChainProfile;
 import com.rsk.utils.Terminal;
@@ -16,10 +17,11 @@ import org.jline.reader.UserInterruptException;
 import org.web3j.abi.TypeReference;
 import org.web3j.abi.datatypes.Type;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
+import picocli.CommandLine.Spec;
 
 public class Subcommands {
-  private static final Helpers HELPERS = Helpers.defaultHelpers();
   private static final LineReader PROMPT_READER = createPromptReader();
 
   private Subcommands() {}
@@ -33,6 +35,8 @@ public class Subcommands {
 
   @Command(name = "contract", description = "Interact with a contract", mixinStandardHelpOptions = true)
   public static class ContractCommand implements Callable<Integer> {
+    @Spec CommandSpec spec;
+
     @Option(
         names = {"-a", "--address"},
         required = true,
@@ -45,15 +49,15 @@ public class Subcommands {
 
     @Override
     public Integer call() {
-      HELPERS.validateAddress(address);
-      var chainProfile = HELPERS.resolveChain(false, testnet, null, null);
+      helpers().validateAddress(address);
+      var chainProfile = helpers().resolveChain(false, testnet, null, null);
 
       System.out.println(cEmph("🔧 Initializing interaction on " + networkLabel(chainProfile) + "..."));
       System.out.println(cInfo("🔎 Checking if contract " + address + " is verified..."));
       System.out.println();
 
-      JsonNode abiArray = HELPERS.resolveAbiArrayFromBlockscout(chainProfile, address);
-      List<JsonNode> readFunctions = HELPERS.readFunctions(abiArray);
+      JsonNode abiArray = helpers().resolveAbiArrayFromBlockscout(chainProfile, address);
+      List<JsonNode> readFunctions = helpers().readFunctions(abiArray);
       if (readFunctions.isEmpty()) {
         throw new IllegalStateException("No read functions found in verified ABI.");
       }
@@ -75,7 +79,7 @@ public class Subcommands {
           List<Type> inputs = promptFunctionInputs(selectedFunction);
           List<TypeReference<?>> outputRefs = outputRefs(selectedFunction);
           List<Type> results =
-              HELPERS.executeReadFunction(chainProfile, address, functionName, inputs, outputRefs);
+              helpers().executeReadFunction(chainProfile, address, functionName, inputs, outputRefs);
 
           System.out.println();
           System.out.println(cMuted("────────────────────────────────────────"));
@@ -113,7 +117,7 @@ public class Subcommands {
         String argName = input.path("name").asText();
         String label = (argName == null || argName.isBlank()) ? "arg" + (i + 1) : argName;
         String raw = readRequiredText(label + " (" + type + ")");
-        inputs.add(HELPERS.toAbiInputType(type, raw));
+        inputs.add(helpers().toAbiInputType(type, raw));
       }
       return inputs;
     }
@@ -125,7 +129,7 @@ public class Subcommands {
         return outputRefs;
       }
       for (JsonNode output : outputNodes) {
-        outputRefs.add(HELPERS.outputTypeReference(output.path("type").asText()));
+        outputRefs.add(helpers().outputTypeReference(output.path("type").asText()));
       }
       return outputRefs;
     }
@@ -136,11 +140,11 @@ public class Subcommands {
         return;
       }
       if (results.size() == 1) {
-        System.out.println(cPlain("Result: " + HELPERS.readableTypeValue(results.get(0))));
+        System.out.println(cPlain("Result: " + helpers().readableTypeValue(results.get(0))));
         return;
       }
       for (int i = 0; i < results.size(); i++) {
-        System.out.println(cPlain("Result[" + i + "]: " + HELPERS.readableTypeValue(results.get(i))));
+        System.out.println(cPlain("Result[" + i + "]: " + helpers().readableTypeValue(results.get(i))));
       }
     }
 
@@ -193,6 +197,10 @@ public class Subcommands {
         return "mainnet";
       }
       return chainProfile.name();
+    }
+
+    private Helpers helpers() {
+      return CliHelpers.deps(spec).contractHelpers();
     }
   }
 

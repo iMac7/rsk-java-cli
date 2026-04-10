@@ -47,6 +47,10 @@ public class CliHelpers {
     return commandLine;
   }
 
+  public static LazyDependencies deps(CommandSpec spec) {
+    return ((RootCommand) spec.root().userObject()).deps;
+  }
+
   private static void removeSubcommandVersionOptions(CommandLine root) {
     root.getSubcommands().values().forEach(CliHelpers::removeVersionOptionsRecursively);
   }
@@ -117,12 +121,121 @@ public class CliHelpers {
         VerifyCommand.class
       })
   static class RootCommand implements Callable<Integer> {
+    final LazyDependencies deps = new LazyDependencies();
+
     @Spec CommandSpec spec;
 
     @Override
     public Integer call() {
       spec.commandLine().usage(spec.commandLine().getOut());
       return 0;
+    }
+  }
+
+  public static final class LazyDependencies {
+    private com.rsk.commands.wallet.Helpers walletHelpers;
+    private com.rsk.commands.config.Helpers configHelpers;
+    private com.rsk.commands.balance.Helpers balanceHelpers;
+    private com.rsk.commands.batchtransfer.Helpers batchTransferHelpers;
+    private com.rsk.commands.bridge.Helpers bridgeHelpers;
+    private com.rsk.commands.contract.Helpers contractHelpers;
+    private com.rsk.commands.deploy.Helpers deployHelpers;
+    private com.rsk.commands.history.Helpers historyHelpers;
+    private com.rsk.commands.resolve.Helpers resolveHelpers;
+    private com.rsk.commands.simulate.Helpers simulateHelpers;
+    private com.rsk.commands.transfer.Helpers transferHelpers;
+    private com.rsk.commands.tx.Helpers txHelpers;
+    private com.rsk.commands.verify.Helpers verifyHelpers;
+
+    public com.rsk.commands.wallet.Helpers walletHelpers() {
+      if (walletHelpers == null) {
+        walletHelpers = com.rsk.commands.wallet.Helpers.defaultHelpers();
+      }
+      return walletHelpers;
+    }
+
+    public com.rsk.commands.config.Helpers configHelpers() {
+      if (configHelpers == null) {
+        configHelpers = com.rsk.commands.config.Helpers.defaultHelpers();
+      }
+      return configHelpers;
+    }
+
+    public com.rsk.commands.balance.Helpers balanceHelpers() {
+      if (balanceHelpers == null) {
+        balanceHelpers = com.rsk.commands.balance.Helpers.defaultHelpers();
+      }
+      return balanceHelpers;
+    }
+
+    public com.rsk.commands.batchtransfer.Helpers batchTransferHelpers() {
+      if (batchTransferHelpers == null) {
+        batchTransferHelpers = com.rsk.commands.batchtransfer.Helpers.defaultHelpers();
+      }
+      return batchTransferHelpers;
+    }
+
+    public com.rsk.commands.bridge.Helpers bridgeHelpers() {
+      if (bridgeHelpers == null) {
+        bridgeHelpers = com.rsk.commands.bridge.Helpers.defaultHelpers();
+      }
+      return bridgeHelpers;
+    }
+
+    public com.rsk.commands.contract.Helpers contractHelpers() {
+      if (contractHelpers == null) {
+        contractHelpers = com.rsk.commands.contract.Helpers.defaultHelpers();
+      }
+      return contractHelpers;
+    }
+
+    public com.rsk.commands.deploy.Helpers deployHelpers() {
+      if (deployHelpers == null) {
+        deployHelpers = com.rsk.commands.deploy.Helpers.defaultHelpers();
+      }
+      return deployHelpers;
+    }
+
+    public com.rsk.commands.history.Helpers historyHelpers() {
+      if (historyHelpers == null) {
+        historyHelpers = com.rsk.commands.history.Helpers.defaultHelpers();
+      }
+      return historyHelpers;
+    }
+
+    public com.rsk.commands.resolve.Helpers resolveHelpers() {
+      if (resolveHelpers == null) {
+        resolveHelpers = com.rsk.commands.resolve.Helpers.defaultHelpers();
+      }
+      return resolveHelpers;
+    }
+
+    public com.rsk.commands.simulate.Helpers simulateHelpers() {
+      if (simulateHelpers == null) {
+        simulateHelpers = com.rsk.commands.simulate.Helpers.defaultHelpers();
+      }
+      return simulateHelpers;
+    }
+
+    public com.rsk.commands.transfer.Helpers transferHelpers() {
+      if (transferHelpers == null) {
+        transferHelpers = com.rsk.commands.transfer.Helpers.defaultHelpers();
+      }
+      return transferHelpers;
+    }
+
+    public com.rsk.commands.tx.Helpers txHelpers() {
+      if (txHelpers == null) {
+        txHelpers = com.rsk.commands.tx.Helpers.defaultHelpers();
+      }
+      return txHelpers;
+    }
+
+    public com.rsk.commands.verify.Helpers verifyHelpers() {
+      if (verifyHelpers == null) {
+        verifyHelpers = com.rsk.commands.verify.Helpers.defaultHelpers();
+      }
+      return verifyHelpers;
     }
   }
 }

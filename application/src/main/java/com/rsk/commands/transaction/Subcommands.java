@@ -3,6 +3,7 @@ package com.rsk.commands.transaction;
 import static com.rsk.utils.Terminal.*;
 
 import com.rsk.commands.transfer.Helpers;
+import com.rsk.java_cli.CliHelpers;
 import com.rsk.java_cli.WelcomeScreen;
 import com.rsk.utils.Chain;
 import com.rsk.utils.Chain.ChainProfile;
@@ -21,12 +22,11 @@ import org.jline.terminal.TerminalBuilder;
 import org.jline.utils.NonBlockingReader;
 import picocli.CommandLine.ArgGroup;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
+import picocli.CommandLine.Spec;
 
 public class Subcommands {
-  private static final Helpers HELPERS = Helpers.defaultHelpers();
-  private static final com.rsk.commands.balance.Helpers BALANCE_HELPERS =
-      com.rsk.commands.balance.Helpers.defaultHelpers();
   private static final org.jline.terminal.Terminal MENU_TERMINAL = createTerminal();
   private static final LineReader READER = createReader();
   private static final String[] TX_TYPES = {
@@ -58,6 +58,8 @@ public class Subcommands {
       description = "Create and send transactions",
       mixinStandardHelpOptions = true)
   public static class TransactionCommand implements Callable<Integer> {
+    @Spec CommandSpec spec;
+
     @Option(names = "--wallet", paramLabel = "<wallet>", description = "Name of the wallet")
     String walletName;
 
@@ -83,13 +85,13 @@ public class Subcommands {
     @Override
     public Integer call() {
       ChainProfile chainProfile =
-          HELPERS.resolveChain(
+          helpers().resolveChain(
               networkOptions.mainnet,
               networkOptions.testnet,
               networkOptions.chain,
               networkOptions.chainUrl);
-      String selectedWallet = HELPERS.resolveWalletName(walletName);
-      String walletAddress = HELPERS.walletAddress(selectedWallet);
+      String selectedWallet = helpers().resolveWalletName(walletName);
+      String walletAddress = helpers().walletAddress(selectedWallet);
 
       System.out.println(cInfo("📊 Network: ") + Chain.networkDisplayName(chainProfile));
 
@@ -144,7 +146,7 @@ public class Subcommands {
               ? Transaction.defaultGasPriceWei(chainProfile)
               : Transaction.gasPriceRbtcToWei(input.gasPriceRbtc());
       if (input.tokenAddress() == null) {
-        return HELPERS.sendNative(
+        return helpers().sendNative(
             chainProfile,
             walletName,
             password,
@@ -154,7 +156,7 @@ public class Subcommands {
             gasPriceWei,
             input.data());
       }
-      return HELPERS.sendToken(
+      return helpers().sendToken(
           chainProfile,
           walletName,
           password,
@@ -174,7 +176,7 @@ public class Subcommands {
         while (true) {
           try {
             tokenAddress =
-                HELPERS.resolveTokenAddress(
+                helpers().resolveTokenAddress(
                     chainProfile, promptRequired("📝 Enter token contract address"));
             if (tokenAddress == null) {
               throw new IllegalArgumentException("Invalid token contract address");
@@ -210,7 +212,7 @@ public class Subcommands {
         ChainProfile chainProfile, String walletAddress, TransactionInput input) {
       BigDecimal currentGasPriceRbtc =
           new BigDecimal(Transaction.defaultGasPriceWei(chainProfile)).movePointLeft(18);
-      BigDecimal balance = HELPERS.nativeBalance(chainProfile, walletAddress);
+      BigDecimal balance = helpers().nativeBalance(chainProfile, walletAddress);
       BigInteger estimatedGas =
           input.gasLimit() == null
               ? (input.tokenAddress() == null
@@ -389,13 +391,21 @@ public class Subcommands {
     }
 
     private String resolveRecipient(ChainProfile chainProfile, String rawValue) {
-      return BALANCE_HELPERS.resolveAddressInput(chainProfile, rawValue);
+      return balanceHelpers().resolveAddressInput(chainProfile, rawValue);
     }
 
     private void redrawWelcome() {
       System.out.print("\u001b[H\u001b[2J");
       System.out.flush();
       WelcomeScreen.printWelcome();
+    }
+
+    private Helpers helpers() {
+      return CliHelpers.deps(spec).transferHelpers();
+    }
+
+    private com.rsk.commands.balance.Helpers balanceHelpers() {
+      return CliHelpers.deps(spec).balanceHelpers();
     }
   }
 

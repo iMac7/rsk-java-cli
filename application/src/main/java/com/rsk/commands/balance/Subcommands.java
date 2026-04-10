@@ -3,6 +3,7 @@ package com.rsk.commands.balance;
 import static com.rsk.utils.Terminal.*;
 import static com.rsk.utils.Format.formatAmount;
 
+import com.rsk.java_cli.CliHelpers;
 import com.rsk.utils.Chain.ChainProfile;
 import com.rsk.utils.Terminal;
 import java.math.BigInteger;
@@ -13,10 +14,11 @@ import org.jline.reader.LineReaderBuilder;
 import org.jline.reader.UserInterruptException;
 import picocli.CommandLine.ArgGroup;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
+import picocli.CommandLine.Spec;
 
 public class Subcommands {
-  private static final Helpers HELPERS = Helpers.defaultHelpers();
   private static final LineReader PROMPT_READER = createPromptReader();
   private static final String[] TOKEN_MENU_ITEMS = {"rBTC", "RIF", "USDRIF", "DoC", "Custom Token"};
 
@@ -31,6 +33,7 @@ public class Subcommands {
 
   @Command(name = "balance", description = "Get native balance", mixinStandardHelpOptions = true)
   public static class BalanceCommand implements Callable<Integer> {
+    @Spec CommandSpec spec;
     @ArgGroup(exclusive = true, multiplicity = "0..1")
     Target target;
 
@@ -74,7 +77,7 @@ public class Subcommands {
     @Override
     public Integer call() {
       ChainProfile chainProfile =
-          HELPERS.resolveChain(
+          helpers().resolveChain(
               networkOptions.mainnet,
               networkOptions.testnet,
               networkOptions.chain,
@@ -85,12 +88,12 @@ public class Subcommands {
       String rns = target == null ? null : target.rns;
       String address =
           rns != null && !rns.isBlank()
-              ? HELPERS.resolveAddressInput(chainProfile, rns)
+              ? helpers().resolveAddressInput(chainProfile, rns)
               : walletName != null && !walletName.isBlank()
-                  ? HELPERS.resolveWalletAddress(walletName)
+                  ? helpers().resolveWalletAddress(walletName)
                   : addressInput != null && !addressInput.isBlank()
-                      ? HELPERS.resolveAddressInput(chainProfile, addressInput)
-                      : HELPERS.resolveActiveWalletAddress();
+                      ? helpers().resolveAddressInput(chainProfile, addressInput)
+                      : helpers().resolveActiveWalletAddress();
 
       String selectedToken = token == null || token.isBlank() ? selectToken() : token.trim();
       if (selectedToken == null) {
@@ -133,7 +136,7 @@ public class Subcommands {
     private void printNativeBalance(ChainProfile chainProfile, String address) {
       BigInteger wei;
       try {
-        wei = HELPERS.nativeBalanceWei(chainProfile, address);
+        wei = helpers().nativeBalanceWei(chainProfile, address);
       } catch (Exception ex) {
         throw new IllegalStateException(
             "Unable to fetch balance on network '" + chainProfile.name() + "'.", ex);
@@ -141,17 +144,17 @@ public class Subcommands {
 
       printSuccess("Balance retrieved successfully");
       System.out.println(cInfo("📄 Wallet Address: ") + address.toLowerCase());
-      System.out.println(cInfo("🌐 Network: ") + HELPERS.networkDisplayName(chainProfile));
+      System.out.println(cInfo("🌐 Network: ") + helpers().networkDisplayName(chainProfile));
       System.out.println(
           cInfo("💰 Current Balance: ")
-              + formatAmount(HELPERS.toNative(wei))
+              + formatAmount(helpers().toNative(wei))
               + " "
               + chainProfile.nativeSymbol());
       System.out.println(cInfo("👍 Ensure that transactions are being conducted on the correct network."));
     }
 
     private void printKnownTokenBalance(ChainProfile chainProfile, String holderAddress, String tokenSymbol) {
-      String contractAddress = HELPERS.knownTokenAddress(tokenSymbol, chainProfile);
+      String contractAddress = helpers().knownTokenAddress(tokenSymbol, chainProfile);
       printTokenBalance(chainProfile, holderAddress, contractAddress);
     }
 
@@ -159,7 +162,7 @@ public class Subcommands {
       String contractAddress = initialValue;
       while (true) {
         try {
-          String validated = HELPERS.validateTokenAddress(contractAddress);
+          String validated = helpers().validateTokenAddress(contractAddress);
           printTokenBalance(chainProfile, holderAddress, validated);
           return;
         } catch (IllegalArgumentException ex) {
@@ -189,7 +192,7 @@ public class Subcommands {
             throw new IllegalStateException("Balance check cancelled.");
           }
           String trimmed = value.trim();
-          HELPERS.validateTokenAddress(trimmed);
+          helpers().validateTokenAddress(trimmed);
           return trimmed;
         } catch (UserInterruptException ex) {
           throw new IllegalStateException("Balance check cancelled.");
@@ -200,7 +203,7 @@ public class Subcommands {
     }
 
     private void printTokenBalance(ChainProfile chainProfile, String holderAddress, String contractAddress) {
-      Helpers.TokenBalance tokenBalance = HELPERS.tokenBalance(chainProfile, holderAddress, contractAddress);
+      Helpers.TokenBalance tokenBalance = helpers().tokenBalance(chainProfile, holderAddress, contractAddress);
       printSuccess("Balance retrieved successfully");
       System.out.println(cInfo("📄 Token Information:"));
       System.out.printf("         Name: %s%n", tokenBalance.name());
@@ -208,9 +211,9 @@ public class Subcommands {
       System.out.printf("      👤 Holder Address: %s%n", holderAddress.toLowerCase());
       System.out.printf(
           "      💰 Balance: %s %s%n",
-          formatAmount(HELPERS.tokenUnitsToDecimal(tokenBalance.balance(), tokenBalance.decimals())),
+          formatAmount(helpers().tokenUnitsToDecimal(tokenBalance.balance(), tokenBalance.decimals())),
           tokenBalance.symbol());
-      System.out.printf("      🌐 Network: %s%n", HELPERS.networkDisplayName(chainProfile));
+      System.out.printf("      🌐 Network: %s%n", helpers().networkDisplayName(chainProfile));
       System.out.println(cInfo("👍 Ensure that transactions are being conducted on the correct network."));
     }
     private boolean isNativeToken(String value) {
@@ -240,6 +243,9 @@ public class Subcommands {
 
     private void printError(String message) {
       System.out.println(cError("❌ " + message));
+    }
+    private Helpers helpers() {
+      return CliHelpers.deps(spec).balanceHelpers();
     }
   }
 

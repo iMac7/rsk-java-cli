@@ -2,19 +2,18 @@ package com.rsk.commands.tx;
 
 import static com.rsk.utils.Terminal.*;
 
+import com.rsk.java_cli.CliHelpers;
 import com.rsk.utils.Chain.ChainProfile;
 import com.rsk.utils.Loader;
 import com.rsk.utils.Rpc.TxReceiptDetails;
 import java.math.BigInteger;
 import java.util.concurrent.Callable;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
+import picocli.CommandLine.Spec;
 
 public class Subcommands {
-  private static final Helpers HELPERS = Helpers.defaultHelpers();
-  private static final com.rsk.commands.config.Helpers CONFIG_HELPERS =
-      com.rsk.commands.config.Helpers.defaultHelpers();
-
   private Subcommands() {}
 
   @Command(
@@ -22,6 +21,8 @@ public class Subcommands {
       description = "@|bold,fg(214)Check the status of a transaction|@",
       mixinStandardHelpOptions = true)
   public static class TxCommand implements Callable<Integer> {
+    @Spec CommandSpec spec;
+
     @Option(
         names = {"-id", "--txid"},
         required = true,
@@ -63,9 +64,9 @@ public class Subcommands {
     @Override
     public Integer call() {
       ChainProfile chainProfile =
-          CONFIG_HELPERS.resolveChain(mainnet, testnet, chain, chainUrl);
+          configHelpers().resolveChain(mainnet, testnet, chain, chainUrl);
       TxReceiptDetails details =
-          HELPERS
+          helpers()
               .receiptDetails(chainProfile, txid)
               .orElseThrow(() -> new IllegalStateException("Transaction receipt not found yet."));
       printReceipt(details);
@@ -126,11 +127,11 @@ public class Subcommands {
       try {
         while (true) {
           TxReceiptDetails currentDetails =
-              HELPERS
+              helpers()
                   .receiptDetails(chainProfile, txid)
                   .orElseThrow(() -> new IllegalStateException("Transaction receipt not found yet."));
           BigInteger receiptBlock = new BigInteger(currentDetails.blockNumber());
-          BigInteger currentBlock = HELPERS.currentBlockNumber(chainProfile);
+          BigInteger currentBlock = helpers().currentBlockNumber(chainProfile);
           long confirmationsCount = currentBlock.subtract(receiptBlock).add(BigInteger.ONE).max(BigInteger.ZERO).longValue();
           System.out.println(
               cInfo("📊 TX ")
@@ -164,6 +165,14 @@ public class Subcommands {
 
     private String abbreviate(String hash) {
       return hash.length() <= 12 ? hash : hash.substring(0, 10) + "...";
+    }
+
+    private Helpers helpers() {
+      return CliHelpers.deps(spec).txHelpers();
+    }
+
+    private com.rsk.commands.config.Helpers configHelpers() {
+      return CliHelpers.deps(spec).configHelpers();
     }
   }
 

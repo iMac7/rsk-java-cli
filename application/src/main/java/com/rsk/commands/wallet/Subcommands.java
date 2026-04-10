@@ -2,6 +2,7 @@ package com.rsk.commands.wallet;
 
 import static com.rsk.utils.Terminal.cOk;
 
+import com.rsk.java_cli.CliHelpers;
 import com.rsk.commands.wallet.Helpers.WalletMetadata;
 import com.rsk.utils.Terminal;
 import java.nio.file.Path;
@@ -15,10 +16,11 @@ import org.jline.reader.LineReaderBuilder;
 import org.jline.reader.UserInterruptException;
 import org.jline.reader.impl.DefaultParser;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
+import picocli.CommandLine.Spec;
 
 public class Subcommands {
-  private static final Helpers HELPERS = Helpers.defaultHelpers();
   private static final String INPUT_CANCELLED_MESSAGE = "Input cancelled.";
   private static final LineReader PROMPT_READER = createPromptReader();
 
@@ -51,7 +53,7 @@ public class Subcommands {
         Backup.class,
         Delete.class
       })
-  public static class WalletCommand implements Callable<Integer> {
+  public static class WalletCommand extends WalletScopedCommand {
     private static final String[] MENU_ITEMS = {
       Terminal.pick("\uD83C\uDD95 Create a new wallet", "Create a new wallet"),
       Terminal.pick("\uD83D\uDD11 Import existing wallet", "Import existing wallet"),
@@ -117,7 +119,7 @@ public class Subcommands {
       switch (selectedIndex) {
         case 0 -> runCreateFlow();
         case 1 -> runImportFlow();
-        case 2 -> new ListCmd().call();
+        case 2 -> runListFlow();
         case 3 -> runDumpFlow();
         case 4 -> runSwitchFlow();
         case 5 -> runRenameFlow();
@@ -136,7 +138,7 @@ public class Subcommands {
       char[] password =
           Terminal.readPasswordOrThrow(
               "Wallet password: ", INPUT_CANCELLED_MESSAGE, InteractiveCancelledException::new);
-      WalletMetadata wallet = HELPERS.createWallet(walletName, password);
+      WalletMetadata wallet = helpers().createWallet(walletName, password);
       System.out.printf("Created wallet %s (%s)%n", cOk(wallet.name()), wallet.address());
     }
 
@@ -148,7 +150,7 @@ public class Subcommands {
     private void runSwitchFlow() {
       printWalletChoices();
       String walletName = readRequiredText("Wallet name");
-      HELPERS.switchWallet(walletName);
+      helpers().switchWallet(walletName);
       System.out.println("Active wallet switched to " + cOk(walletName));
     }
 
@@ -160,7 +162,7 @@ public class Subcommands {
       char[] password =
           Terminal.readPasswordOrThrow(
               "Wallet password: ", INPUT_CANCELLED_MESSAGE, InteractiveCancelledException::new);
-      String privateKey = HELPERS.dumpPrivateKey(selectedWallet, password);
+      String privateKey = helpers().dumpPrivateKey(selectedWallet, password);
       copyPrivateKeyToClipboard(selectedWallet, privateKey);
     }
 
@@ -170,7 +172,7 @@ public class Subcommands {
         return;
       }
       String newName = readRequiredText("New wallet name");
-      HELPERS.renameWallet(walletName, newName);
+      helpers().renameWallet(walletName, newName);
       System.out.printf("Renamed wallet %s -> %s%n", cOk(walletName), cOk(newName));
     }
 
@@ -182,7 +184,7 @@ public class Subcommands {
         System.out.println("Delete cancelled.");
         return;
       }
-      HELPERS.deleteWallet(walletName);
+      helpers().deleteWallet(walletName);
       System.out.println("Deleted wallet " + cOk(walletName));
     }
 
@@ -192,7 +194,7 @@ public class Subcommands {
       String walletName = readRequiredText("Wallet name");
       String backupPathInput =
           readRequiredText("Enter an absolute directory path where you want to save the backup");
-      Path savedPath = HELPERS.backupWallet(walletName, backupPathInput);
+      Path savedPath = helpers().backupWallet(walletName, backupPathInput);
       System.out.println("Changes saved at " + savedPath);
       System.out.println("Wallet backup created successfully!");
       System.out.println("Backup saved successfully at: " + savedPath);
@@ -234,12 +236,12 @@ public class Subcommands {
     private void runAddAddressFlow() {
       String label = readRequiredText("Address label");
       String address = readRequiredText("Address");
-      HELPERS.addAddressBookEntry(label, address);
+      helpers().addAddressBookEntry(label, address);
       System.out.printf("Saved address %s -> %s%n", cOk(label), address);
     }
 
     private void runViewAddressBookFlow() {
-      Map<String, String> addressBook = HELPERS.listAddressBook();
+      Map<String, String> addressBook = helpers().listAddressBook();
       if (addressBook.isEmpty()) {
         System.out.println("Address book is empty.");
         return;
@@ -255,7 +257,7 @@ public class Subcommands {
       }
 
       String newAddress = readRequiredText("New address");
-      HELPERS.updateAddressBookEntry(label, newAddress);
+      helpers().updateAddressBookEntry(label, newAddress);
       System.out.printf("Updated address %s -> %s%n", cOk(label), newAddress);
     }
 
@@ -265,12 +267,12 @@ public class Subcommands {
         return;
       }
 
-      HELPERS.deleteAddressBookEntry(label);
+      helpers().deleteAddressBookEntry(label);
       System.out.println("Deleted address " + cOk(label));
     }
 
     private String selectAddressBookLabel(String title) {
-      Map<String, String> addressBook = HELPERS.listAddressBook();
+      Map<String, String> addressBook = helpers().listAddressBook();
       if (addressBook.isEmpty()) {
         System.out.println("Address book is empty.");
         return null;
@@ -285,13 +287,13 @@ public class Subcommands {
     }
 
     private String selectWalletName(String title) {
-      List<WalletMetadata> wallets = HELPERS.listWallets();
+      List<WalletMetadata> wallets = helpers().listWallets();
       if (wallets.isEmpty()) {
         System.out.println("No wallets found.");
         return null;
       }
 
-      String activeWallet = HELPERS.activeWallet().map(WalletMetadata::name).orElse("");
+      String activeWallet = helpers().activeWallet().map(WalletMetadata::name).orElse("");
       String activeMarker = Terminal.pick("\u2B50", "*");
       String inactiveMarker = Terminal.pick("\u2022", "-");
       String[] options =
@@ -310,12 +312,12 @@ public class Subcommands {
     }
 
     private void printWalletChoices() {
-      List<WalletMetadata> wallets = HELPERS.listWallets();
+      List<WalletMetadata> wallets = helpers().listWallets();
       if (wallets.isEmpty()) {
         throw new IllegalArgumentException("No wallets found.");
       }
 
-      String active = HELPERS.activeWallet().map(WalletMetadata::name).orElse("");
+      String active = helpers().activeWallet().map(WalletMetadata::name).orElse("");
       String activeMarker = Terminal.pick("\u2B50", "*");
       String inactiveMarker = Terminal.pick("\u2022", "-");
       System.out.println("Available wallets:");
@@ -328,9 +330,23 @@ public class Subcommands {
     }
 
     private void printCurrentWallet() {
-      HELPERS
+      helpers()
           .activeWallet()
           .ifPresent(wallet -> System.out.println("Current wallet: " + cOk(wallet.name())));
+    }
+
+    private void runListFlow() {
+      List<WalletMetadata> wallets = helpers().listWallets();
+      if (wallets.isEmpty()) {
+        System.out.println("No wallets found.");
+        return;
+      }
+      String active = helpers().activeWallet().map(WalletMetadata::name).orElse("");
+      wallets.forEach(
+          wallet -> {
+            String marker = wallet.name().equals(active) ? "*" : " ";
+            System.out.printf("%s %s %s%n", marker, cOk(wallet.name()), wallet.address());
+          });
     }
   }
 
@@ -341,7 +357,7 @@ public class Subcommands {
   }
 
   @Command(name = "create", description = "Create wallet", mixinStandardHelpOptions = true)
-  static class Create implements Callable<Integer> {
+  static class Create extends WalletScopedCommand {
     @Option(
         names = "--wallet",
         required = true,
@@ -354,7 +370,7 @@ public class Subcommands {
       char[] password =
           Terminal.readPasswordOrThrow(
               "Wallet password: ", INPUT_CANCELLED_MESSAGE, InteractiveCancelledException::new);
-      WalletMetadata wallet = HELPERS.createWallet(walletName, password);
+      WalletMetadata wallet = helpers().createWallet(walletName, password);
       System.out.printf("Created wallet %s (%s)%n", cOk(wallet.name()), wallet.address());
       return 0;
     }
@@ -364,7 +380,7 @@ public class Subcommands {
       name = "import",
       description = "Import wallet from private key",
       mixinStandardHelpOptions = true)
-  static class Import implements Callable<Integer> {
+  static class Import extends WalletScopedCommand {
     @Option(
         names = "--wallet",
         required = true,
@@ -380,15 +396,15 @@ public class Subcommands {
   }
 
   @Command(name = "list", description = "List wallets", mixinStandardHelpOptions = true)
-  static class ListCmd implements Callable<Integer> {
+  static class ListCmd extends WalletScopedCommand {
     @Override
     public Integer call() {
-      List<WalletMetadata> wallets = HELPERS.listWallets();
+      List<WalletMetadata> wallets = helpers().listWallets();
       if (wallets.isEmpty()) {
         System.out.println("No wallets found.");
         return 0;
       }
-      String active = HELPERS.activeWallet().map(WalletMetadata::name).orElse("");
+      String active = helpers().activeWallet().map(WalletMetadata::name).orElse("");
       wallets.forEach(
           wallet -> {
             String marker = wallet.name().equals(active) ? "*" : " ";
@@ -399,10 +415,10 @@ public class Subcommands {
   }
 
   @Command(name = "active", description = "Show active wallet", mixinStandardHelpOptions = true)
-  static class Active implements Callable<Integer> {
+  static class Active extends WalletScopedCommand {
     @Override
     public Integer call() {
-      HELPERS
+      helpers()
           .activeWallet()
           .ifPresentOrElse(
               wallet -> System.out.printf("%s %s%n", cOk(wallet.name()), wallet.address()),
@@ -412,7 +428,7 @@ public class Subcommands {
   }
 
   @Command(name = "dump", description = "Reveal wallet private key", mixinStandardHelpOptions = true)
-  static class Dump implements Callable<Integer> {
+  static class Dump extends WalletScopedCommand {
     @Option(names = "--wallet", paramLabel = "<name>", description = "Wallet name")
     String walletName;
 
@@ -421,7 +437,7 @@ public class Subcommands {
       String selectedWallet = walletName;
       if (selectedWallet == null || selectedWallet.isBlank()) {
         selectedWallet =
-            HELPERS
+            helpers()
                 .activeWallet()
                 .map(WalletMetadata::name)
                 .orElseThrow(
@@ -431,27 +447,27 @@ public class Subcommands {
       char[] password =
           Terminal.readPasswordOrThrow(
               "Wallet password: ", INPUT_CANCELLED_MESSAGE, InteractiveCancelledException::new);
-      String privateKey = HELPERS.dumpPrivateKey(selectedWallet, password);
+      String privateKey = helpers().dumpPrivateKey(selectedWallet, password);
       copyPrivateKeyToClipboard(selectedWallet, privateKey);
       return 0;
     }
   }
 
   @Command(name = "switch", description = "Switch active wallet", mixinStandardHelpOptions = true)
-  static class Switch implements Callable<Integer> {
+  static class Switch extends WalletScopedCommand {
     @Option(names = "--wallet", required = true, paramLabel = "<name>", description = "Wallet name")
     String walletName;
 
     @Override
     public Integer call() {
-      HELPERS.switchWallet(walletName);
+      helpers().switchWallet(walletName);
       System.out.println("Active wallet switched to " + cOk(walletName));
       return 0;
     }
   }
 
   @Command(name = "rename", description = "Rename wallet", mixinStandardHelpOptions = true)
-  static class Rename implements Callable<Integer> {
+  static class Rename extends WalletScopedCommand {
     @Option(
         names = "--wallet",
         required = true,
@@ -464,47 +480,61 @@ public class Subcommands {
 
     @Override
     public Integer call() {
-      HELPERS.renameWallet(walletName, newName);
+      helpers().renameWallet(walletName, newName);
       System.out.printf("Renamed wallet %s -> %s%n", cOk(walletName), cOk(newName));
       return 0;
     }
   }
 
   @Command(name = "backup", description = "Backup wallet data", mixinStandardHelpOptions = true)
-  static class Backup implements Callable<Integer> {
+  static class Backup extends WalletScopedCommand {
     @Override
     public Integer call() {
-      WalletCommand walletCommand = new WalletCommand();
-      walletCommand.runBackupFlow();
+      String walletName = readRequiredText("Wallet name");
+      String backupPathInput =
+          readRequiredText("Enter an absolute directory path where you want to save the backup");
+      Path savedPath = helpers().backupWallet(walletName, backupPathInput);
+      System.out.println("Changes saved at " + savedPath);
+      System.out.println("Wallet backup created successfully!");
+      System.out.println("Backup saved successfully at: " + savedPath);
       return 0;
     }
   }
 
   @Command(name = "delete", description = "Delete wallet", mixinStandardHelpOptions = true)
-  static class Delete implements Callable<Integer> {
+  static class Delete extends WalletScopedCommand {
     @Option(names = "--wallet", required = true, paramLabel = "<name>", description = "Wallet name")
     String walletName;
 
     @Override
     public Integer call() {
-      HELPERS.deleteWallet(walletName);
+      helpers().deleteWallet(walletName);
       System.out.println("Deleted wallet " + cOk(walletName));
       return 0;
     }
   }
 
-  private static void importWallet(String walletName) {
-    char[] privateKeyChars =
-        Terminal.readPasswordOrThrow(
-            "Private key (hex): ", INPUT_CANCELLED_MESSAGE, InteractiveCancelledException::new);
-    char[] password =
-        Terminal.readPasswordOrThrow(
-            "Wallet password: ", INPUT_CANCELLED_MESSAGE, InteractiveCancelledException::new);
-    try {
-      WalletMetadata wallet = HELPERS.importWallet(walletName, new String(privateKeyChars), password);
-      System.out.printf("Imported wallet %s (%s)%n", cOk(wallet.name()), wallet.address());
-    } finally {
-      Arrays.fill(privateKeyChars, '\0');
+  @Command
+  private abstract static class WalletScopedCommand implements Callable<Integer> {
+    @Spec CommandSpec spec;
+
+    protected final Helpers helpers() {
+      return CliHelpers.deps(spec).walletHelpers();
+    }
+
+    protected final void importWallet(String walletName) {
+      char[] privateKeyChars =
+          Terminal.readPasswordOrThrow(
+              "Private key (hex): ", INPUT_CANCELLED_MESSAGE, InteractiveCancelledException::new);
+      char[] password =
+          Terminal.readPasswordOrThrow(
+              "Wallet password: ", INPUT_CANCELLED_MESSAGE, InteractiveCancelledException::new);
+      try {
+        WalletMetadata wallet = helpers().importWallet(walletName, new String(privateKeyChars), password);
+        System.out.printf("Imported wallet %s (%s)%n", cOk(wallet.name()), wallet.address());
+      } finally {
+        Arrays.fill(privateKeyChars, '\0');
+      }
     }
   }
 

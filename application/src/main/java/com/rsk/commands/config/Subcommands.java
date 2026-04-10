@@ -3,6 +3,7 @@ package com.rsk.commands.config;
 import static com.rsk.utils.Terminal.*;
 
 import com.rsk.commands.wallet.Helpers.WalletMetadata;
+import com.rsk.java_cli.CliHelpers;
 import com.rsk.java_cli.WelcomeScreen;
 import com.rsk.utils.Terminal;
 import java.util.List;
@@ -12,11 +13,10 @@ import org.jline.reader.LineReader;
 import org.jline.reader.LineReaderBuilder;
 import org.jline.reader.UserInterruptException;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Model.CommandSpec;
+import picocli.CommandLine.Spec;
 
 public class Subcommands {
-  private static final Helpers HELPERS = Helpers.defaultHelpers();
-  private static final com.rsk.commands.wallet.Helpers WALLET_HELPERS =
-      com.rsk.commands.wallet.Helpers.defaultHelpers();
   private static final LineReader PROMPT_READER = createPromptReader();
   private static final String[] MAIN_MENU_ITEMS = {
     Terminal.pick("\uD83D\uDCCB View Current Configuration", "View Current Configuration"),
@@ -54,16 +54,18 @@ public class Subcommands {
 
   @Command(name = "config", description = "Config UI", mixinStandardHelpOptions = true)
   public static class ConfigCommand implements Callable<Integer> {
+    @Spec CommandSpec spec;
+
     @Override
     public Integer call() {
-      CliConfig config = HELPERS.loadConfig();
+      CliConfig config = helpers().loadConfig();
       boolean dirty = false;
 
       while (true) {
         try {
           int selected = selectMenu(mainTitle(config, dirty), MAIN_MENU_ITEMS, MAIN_SAVE_INDEX, "save");
           if (selected == MAIN_SAVE_INDEX) {
-            HELPERS.saveConfig(config);
+            helpers().saveConfig(config);
             printSuccess("Configuration saved.");
             WelcomeScreen.printWelcome();
             return 0;
@@ -278,12 +280,12 @@ public class Subcommands {
         return configuredWallet;
       }
 
-      List<WalletMetadata> wallets = WALLET_HELPERS.listWallets();
+      List<WalletMetadata> wallets = walletHelpers().listWallets();
       if (wallets.size() == 1) {
         return wallets.get(0).name() + " (auto)";
       }
 
-      return WALLET_HELPERS.activeWallet().map(WalletMetadata::name).orElse("Not set");
+      return walletHelpers().activeWallet().map(WalletMetadata::name).orElse("Not set");
     }
 
     private String maskApiKey(String value) {
@@ -385,6 +387,14 @@ public class Subcommands {
 
     private void printError(String message) {
       System.out.println(cError(message));
+    }
+
+    private Helpers helpers() {
+      return CliHelpers.deps(spec).configHelpers();
+    }
+
+    private com.rsk.commands.wallet.Helpers walletHelpers() {
+      return CliHelpers.deps(spec).walletHelpers();
     }
   }
 
