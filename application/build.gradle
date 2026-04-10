@@ -48,3 +48,12 @@ tasks.register('runCli', JavaExec) {
     classpath = sourceSets.main.runtimeClasspath
     mainClass.set('com.rsk.java_cli.Cli')
 }
+
+tasks.named('test') {
+    useJUnitPlatform()
+    testLogging {
+        events 'passed', 'failed', 'skipped'
+        showStandardStreams = true
+        exceptionFormat = 'short'
+    }
+}
