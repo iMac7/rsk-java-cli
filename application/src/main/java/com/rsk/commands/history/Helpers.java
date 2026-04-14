@@ -6,11 +6,11 @@ import com.rsk.commands.config.Helpers.ChainResolutionSupport;
 import com.rsk.utils.Chain.ChainProfile;
 import com.rsk.utils.Constants;
 import com.rsk.utils.Format;
+import com.rsk.utils.Http;
 import com.rsk.utils.Json;
 import com.rsk.utils.Storage;
 import java.math.BigInteger;
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Path;
@@ -132,7 +132,6 @@ public class Helpers extends ChainResolutionSupport {
 
   public JsonNode postJson(String url, JsonNode body) {
     try {
-      HttpClient client = HttpClient.newHttpClient();
       String requestBody = OBJECT_MAPPER.writeValueAsString(body);
       HttpRequest request =
           HttpRequest.newBuilder()
@@ -140,7 +139,7 @@ public class Helpers extends ChainResolutionSupport {
               .header("Content-Type", "application/json")
               .POST(HttpRequest.BodyPublishers.ofString(requestBody))
               .build();
-      HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+      HttpResponse<String> response = Http.client().send(request, HttpResponse.BodyHandlers.ofString());
       if (response.statusCode() < 200 || response.statusCode() >= 300) {
         throw new IllegalStateException("Alchemy HTTP error " + response.statusCode() + ": " + response.body());
       }

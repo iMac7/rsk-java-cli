@@ -6,12 +6,12 @@ import com.rsk.commands.config.Helpers.ChainResolutionSupport;
 import com.rsk.utils.Chain;
 import com.rsk.utils.Chain.ChainProfile;
 import com.rsk.utils.Format;
+import com.rsk.utils.Http;
 import com.rsk.utils.Json;
 import com.rsk.utils.Rpc;
 import com.rsk.utils.Rns;
 import java.math.BigInteger;
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Path;
@@ -184,9 +184,8 @@ public class Helpers extends ChainResolutionSupport {
 
   private static JsonNode getJson(String url) {
     try {
-      HttpClient client = HttpClient.newHttpClient();
       HttpRequest request = HttpRequest.newBuilder().uri(URI.create(url)).GET().build();
-      HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+      HttpResponse<String> response = Http.client().send(request, HttpResponse.BodyHandlers.ofString());
       if (response.statusCode() < 200 || response.statusCode() >= 300) {
         throw new IllegalStateException("HTTP " + response.statusCode() + ": " + response.body());
       }

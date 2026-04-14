@@ -1,6 +1,7 @@
 package com.rsk.utils;
 
 import java.io.IOException;
+import java.net.http.HttpClient;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import org.slf4j.Logger;
@@ -8,8 +9,13 @@ import org.slf4j.LoggerFactory;
 
 public final class Http {
   private static final Logger LOGGER = LoggerFactory.getLogger(Http.class);
+  private static final HttpClient CLIENT = HttpClient.newHttpClient();
 
   private Http() {}
+
+  public static HttpClient client() {
+    return CLIENT;
+  }
 
   public static class HistoryClient {
     private final OkHttpClient client = new OkHttpClient();

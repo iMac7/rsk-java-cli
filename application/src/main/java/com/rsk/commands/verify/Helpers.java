@@ -5,12 +5,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rsk.commands.config.Helpers.ChainResolutionSupport;
 import com.rsk.utils.Chain;
 import com.rsk.utils.Chain.ChainProfile;
+import com.rsk.utils.Http;
 import com.rsk.utils.Json;
 import com.rsk.utils.Rns;
 import com.rsk.utils.Storage;
 import java.io.IOException;
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
@@ -74,14 +74,13 @@ public class Helpers extends ChainResolutionSupport {
         multipartBody(boundary, fields, "files[0]", Path.of(jsonPath).getFileName().toString(), jsonFile);
 
     try {
-      HttpClient client = HttpClient.newHttpClient();
       HttpRequest request =
           HttpRequest.newBuilder()
               .uri(URI.create(endpoint))
               .header("Content-Type", "multipart/form-data; boundary=" + boundary)
               .POST(body)
               .build();
-      HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+      HttpResponse<String> response = Http.client().send(request, HttpResponse.BodyHandlers.ofString());
       if (response.statusCode() < 200 || response.statusCode() >= 300) {
         throw new IllegalStateException(
             "Verification API error " + response.statusCode() + ": " + response.body());
