@@ -9,6 +9,7 @@ import java.math.BigInteger;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.Supplier;
 import org.fusesource.jansi.Ansi;
@@ -29,6 +30,11 @@ public final class Terminal {
   private static final LineReader PASSWORD_READER = createPasswordReader();
 
   private Terminal() {}
+
+  @FunctionalInterface
+  public interface PasswordAction<T, E extends Exception> {
+    T run(char[] password) throws E;
+  }
 
   public static String pick(String unicodeValue, String asciiValue) {
     return UNICODE_SYMBOLS ? unicodeValue : asciiValue;
@@ -102,6 +108,31 @@ public final class Terminal {
     return readPassword(cOk("✔" + prompt), cancelMessage);
   }
 
+  public static void clearPassword(char[] password) {
+    if (password != null) {
+      Arrays.fill(password, '\0');
+    }
+  }
+
+  public static <T, E extends Exception> T withClearedPassword(
+      char[] password, PasswordAction<T, E> action) throws E {
+    try {
+      return action.run(password);
+    } finally {
+      clearPassword(password);
+    }
+  }
+
+  public static <T, E extends Exception> T withPassword(
+      String prompt, String cancelMessage, PasswordAction<T, E> action) throws E {
+    return withClearedPassword(readPassword(prompt, cancelMessage), action);
+  }
+
+  public static <T, E extends Exception> T withPasswordWithStatus(
+      String prompt, String cancelMessage, PasswordAction<T, E> action) throws E {
+    return withClearedPassword(readPasswordWithStatus(prompt, cancelMessage), action);
+  }
+
   public static <X extends RuntimeException> char[] readPasswordOrThrow(
       String prompt, String cancelMessage, Supplier<X> cancelledExceptionFactory) {
     try {
@@ -117,6 +148,27 @@ public final class Terminal {
   public static <X extends RuntimeException> char[] readPasswordWithStatusOrThrow(
       String prompt, String cancelMessage, Supplier<X> cancelledExceptionFactory) {
     return readPasswordOrThrow(cOk("✔" + prompt), cancelMessage, cancelledExceptionFactory);
+  }
+
+  public static <T, E extends Exception, X extends RuntimeException> T withPasswordOrThrow(
+      String prompt,
+      String cancelMessage,
+      Supplier<X> cancelledExceptionFactory,
+      PasswordAction<T, E> action)
+      throws E {
+    return withClearedPassword(
+        readPasswordOrThrow(prompt, cancelMessage, cancelledExceptionFactory), action);
+  }
+
+  public static <T, E extends Exception, X extends RuntimeException>
+      T withPasswordWithStatusOrThrow(
+          String prompt,
+          String cancelMessage,
+          Supplier<X> cancelledExceptionFactory,
+          PasswordAction<T, E> action)
+          throws E {
+    return withClearedPassword(
+        readPasswordWithStatusOrThrow(prompt, cancelMessage, cancelledExceptionFactory), action);
   }
 
   public static void copyToClipboard(String value) {

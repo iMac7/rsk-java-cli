@@ -147,11 +147,15 @@ public class Subcommands {
       printWalletChoices();
       String selectedWallet = readRequiredText("Wallet name");
       warnBeforePrivateKeyReveal(selectedWallet);
-      char[] password =
-          Terminal.readPasswordOrThrow(
-              "Wallet password: ", INPUT_CANCELLED_MESSAGE, InteractiveCancelledException::new);
-      String privateKey = helpers().dumpPrivateKey(selectedWallet, password);
-      copyPrivateKeyToClipboard(selectedWallet, privateKey);
+      Terminal.withPasswordOrThrow(
+          "Wallet password: ",
+          INPUT_CANCELLED_MESSAGE,
+          InteractiveCancelledException::new,
+          password -> {
+            String privateKey = helpers().dumpPrivateKey(selectedWallet, password);
+            copyPrivateKeyToClipboard(selectedWallet, privateKey);
+            return null;
+          });
     }
 
     private void runRenameFlow() {
@@ -385,13 +389,17 @@ public class Subcommands {
                 .orElseThrow(
                     () -> new IllegalArgumentException("No active wallet found. Provide --wallet."));
       }
-      warnBeforePrivateKeyReveal(selectedWallet);
-      char[] password =
-          Terminal.readPasswordOrThrow(
-              "Wallet password: ", INPUT_CANCELLED_MESSAGE, InteractiveCancelledException::new);
-      String privateKey = helpers().dumpPrivateKey(selectedWallet, password);
-      copyPrivateKeyToClipboard(selectedWallet, privateKey);
-      return 0;
+      String resolvedWallet = selectedWallet;
+      warnBeforePrivateKeyReveal(resolvedWallet);
+      return Terminal.withPasswordOrThrow(
+          "Wallet password: ",
+          INPUT_CANCELLED_MESSAGE,
+          InteractiveCancelledException::new,
+          password -> {
+            String privateKey = helpers().dumpPrivateKey(resolvedWallet, password);
+            copyPrivateKeyToClipboard(resolvedWallet, privateKey);
+            return 0;
+          });
     }
   }
 
@@ -462,23 +470,32 @@ public class Subcommands {
       char[] privateKeyChars =
           Terminal.readPasswordOrThrow(
               "Private key (hex): ", INPUT_CANCELLED_MESSAGE, InteractiveCancelledException::new);
-      char[] password =
-          Terminal.readPasswordOrThrow(
-              "Wallet password: ", INPUT_CANCELLED_MESSAGE, InteractiveCancelledException::new);
       try {
-        WalletMetadata wallet = helpers().importWallet(walletName, new String(privateKeyChars), password);
-        System.out.printf("Imported wallet %s (%s)%n", cOk(wallet.name()), wallet.address());
+        Terminal.withPasswordOrThrow(
+            "Wallet password: ",
+            INPUT_CANCELLED_MESSAGE,
+            InteractiveCancelledException::new,
+            password -> {
+              WalletMetadata wallet =
+                  helpers().importWallet(walletName, new String(privateKeyChars), password);
+              System.out.printf("Imported wallet %s (%s)%n", cOk(wallet.name()), wallet.address());
+              return null;
+            });
       } finally {
         Arrays.fill(privateKeyChars, '\0');
       }
     }
 
     protected final void createWallet(String walletName) {
-      char[] password =
-          Terminal.readPasswordOrThrow(
-              "Wallet password: ", INPUT_CANCELLED_MESSAGE, InteractiveCancelledException::new);
-      WalletMetadata wallet = helpers().createWallet(walletName, password);
-      System.out.printf("Created wallet %s (%s)%n", cOk(wallet.name()), wallet.address());
+      Terminal.withPasswordOrThrow(
+          "Wallet password: ",
+          INPUT_CANCELLED_MESSAGE,
+          InteractiveCancelledException::new,
+          password -> {
+            WalletMetadata wallet = helpers().createWallet(walletName, password);
+            System.out.printf("Created wallet %s (%s)%n", cOk(wallet.name()), wallet.address());
+            return null;
+          });
     }
 
     protected final void listWallets() {

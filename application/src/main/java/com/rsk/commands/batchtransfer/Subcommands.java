@@ -112,11 +112,11 @@ public class Subcommands {
 
     private String promptForUnlockedKey(String walletName) {
       while (true) {
-        char[] password =
-            Terminal.readPasswordWithStatus(
-                "Enter your password to decrypt the wallet: ", "Batch transfer cancelled.");
         try {
-          return helpers().unlockWalletPrivateKeyHex(walletName, password);
+          return Terminal.withPasswordWithStatus(
+              "Enter your password to decrypt the wallet: ",
+              "Batch transfer cancelled.",
+              password -> helpers().unlockWalletPrivateKeyHex(walletName, password));
         } catch (IllegalArgumentException ex) {
           System.out.println(cError(Terminal.rootMessage(ex)));
         }

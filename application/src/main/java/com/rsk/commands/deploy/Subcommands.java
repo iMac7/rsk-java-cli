@@ -10,7 +10,6 @@ import java.io.Console;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.file.Path;
-import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -66,27 +65,27 @@ public class Subcommands {
           walletName != null && !walletName.isBlank() ? walletName.trim() : helpers().activeWalletName();
 
       System.out.println(cInfo("Wallet: ") + selectedWallet);
-      char[] password =
-          Terminal.readPasswordWithStatus(
-              "Enter your password to decrypt the wallet: ", "Deployment cancelled.");
-      try {
-        System.out.println(cInfo("Reading ABI from ") + resolvedAbiPath + "...");
-        String abiContent = helpers().readRequiredFile(resolvedAbiPath, "ABI");
+      return Terminal.withPasswordWithStatus(
+          "Enter your password to decrypt the wallet: ",
+          "Deployment cancelled.",
+          password -> {
+            System.out.println(cInfo("Reading ABI from ") + resolvedAbiPath + "...");
+            String abiContent = helpers().readRequiredFile(resolvedAbiPath, "ABI");
 
-        System.out.println(cInfo("Reading bytecode from ") + resolvedBytecodePath + "...");
-        String bytecodeContent = helpers().readRequiredFile(resolvedBytecodePath, "bytecode");
+            System.out.println(cInfo("Reading bytecode from ") + resolvedBytecodePath + "...");
+            String bytecodeContent = helpers().readRequiredFile(resolvedBytecodePath, "bytecode");
 
-        List<String> resolvedArgs = resolveConstructorArgs(abiContent, constructorArgs);
-        String deploymentData = helpers().buildDeploymentData(bytecodeContent, abiContent, resolvedArgs);
-        Helpers.DeploymentExecution deployment =
-            helpers().deployContractFromWallet(chainProfile, selectedWallet, password, deploymentData);
+            List<String> resolvedArgs = resolveConstructorArgs(abiContent, constructorArgs);
+            String deploymentData =
+                helpers().buildDeploymentData(bytecodeContent, abiContent, resolvedArgs);
+            Helpers.DeploymentExecution deployment =
+                helpers().deployContractFromWallet(chainProfile, selectedWallet, password, deploymentData);
 
-        System.out.println(cInfo("Wallet account: ") + deployment.walletAddress());
-        printDeploymentResult(chainProfile.name(), deployment.walletAddress(), deployment.deploymentResult());
-        return 0;
-      } finally {
-        Arrays.fill(password, '\0');
-      }
+            System.out.println(cInfo("Wallet account: ") + deployment.walletAddress());
+            printDeploymentResult(
+                chainProfile.name(), deployment.walletAddress(), deployment.deploymentResult());
+            return 0;
+          });
     }
 
     private List<String> resolveConstructorArgs(String abiContent, List<String> providedArgs) {

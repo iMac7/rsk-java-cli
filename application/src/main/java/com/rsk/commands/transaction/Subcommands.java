@@ -83,13 +83,14 @@ public class Subcommands {
         try {
           TransactionInput input = collectTransactionInput(chainProfile, selectedType);
           printTransactionPreview(chainProfile, walletAddress, input);
-          char[] password =
-              readPasswordWithStatus(
-                  "Enter your password to decrypt the wallet: ", "Transaction cancelled.");
           Helpers.PendingTransfer pendingTransfer =
-              Loader.runWithSpinner(
-                  "Preparing transaction...",
-                  () -> submit(chainProfile, selectedWallet, password, input));
+              Terminal.withPasswordWithStatus(
+                  "Enter your password to decrypt the wallet: ",
+                  "Transaction cancelled.",
+                  password ->
+                      Loader.runWithSpinner(
+                          "Preparing transaction...",
+                          () -> submit(chainProfile, selectedWallet, password, input)));
           System.out.println(cOk("Transaction sent"));
           System.out.println(cInfo("Transaction Hash: ") + pendingTransfer.txHash());
           var receipt =

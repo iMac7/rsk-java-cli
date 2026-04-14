@@ -106,43 +106,45 @@ public class Subcommands {
 
       while (true) {
         try {
-          char[] password =
-              Terminal.readPasswordWithStatus(
-                  "Enter your password to decrypt the wallet: ", "Transfer cancelled.");
-          printWalletContext(chainProfile, walletAddress);
+          return Terminal.withPasswordWithStatus(
+              "Enter your password to decrypt the wallet: ",
+              "Transfer cancelled.",
+              password -> {
+                printWalletContext(chainProfile, walletAddress);
 
-          for (Helpers.TransferRequest request : requests) {
-            Helpers.PendingTransfer pendingTransfer =
-                tokenContract == null
-                    ? helpers().sendNative(
-                        chainProfile,
-                        selectedWallet,
-                        password,
-                        request.recipient(),
-                        Transaction.toWei(request.amount()),
-                        gasLimit == null ? Transaction.defaultGasLimit() : gasLimit,
-                        resolvedGasPrice,
-                        data)
-                    : helpers().sendToken(
-                        chainProfile,
-                        selectedWallet,
-                        password,
-                        tokenContract,
-                        request.recipient(),
-                        request.amount(),
-                        gasLimit,
-                        resolvedGasPrice,
-                        data);
-            System.out.println(cInfo("🔄 Transaction initiated. TxHash: ") + pendingTransfer.txHash());
-            var receipt =
-                Loader.runWithSpinner(
-                    "Waiting for confirmation...",
-                    () ->
-                        Transaction.waitForSuccessfulReceipt(
-                            chainProfile, pendingTransfer.txHash(), 120, 2000L));
-            printTransferResult(receipt);
-          }
-          return 0;
+                for (Helpers.TransferRequest request : requests) {
+                  Helpers.PendingTransfer pendingTransfer =
+                      tokenContract == null
+                          ? helpers().sendNative(
+                              chainProfile,
+                              selectedWallet,
+                              password,
+                              request.recipient(),
+                              Transaction.toWei(request.amount()),
+                              gasLimit == null ? Transaction.defaultGasLimit() : gasLimit,
+                              resolvedGasPrice,
+                              data)
+                          : helpers().sendToken(
+                              chainProfile,
+                              selectedWallet,
+                              password,
+                              tokenContract,
+                              request.recipient(),
+                              request.amount(),
+                              gasLimit,
+                              resolvedGasPrice,
+                              data);
+                  System.out.println(cInfo("🔄 Transaction initiated. TxHash: ") + pendingTransfer.txHash());
+                  var receipt =
+                      Loader.runWithSpinner(
+                          "Waiting for confirmation...",
+                          () ->
+                              Transaction.waitForSuccessfulReceipt(
+                                  chainProfile, pendingTransfer.txHash(), 120, 2000L));
+                  printTransferResult(receipt);
+                }
+                return 0;
+              });
         } catch (IllegalStateException | IllegalArgumentException ex) {
           if (!interactive) {
             throw ex;

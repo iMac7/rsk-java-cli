@@ -137,19 +137,22 @@ public class Subcommands {
           printReadResult(chainProfile, contractAddress, selected, results);
         } else {
           String walletName = helpers().resolveWalletName(wallet);
-          char[] password =
-              Terminal.readPassword("Wallet password: ", "Bridge interaction cancelled.");
           Helpers.WriteResult result =
-              helpers().executeWrite(
-                  chainProfile,
-                  contractAddress,
-                  selected,
-                  walletName,
-                  password,
-                  value,
-                  gasLimit,
-                  gasPrice,
-                  (label, type) -> readRequiredTextPrompt("Enter " + label + " (" + type + ")", ""));
+              Terminal.withPassword(
+                  "Wallet password: ",
+                  "Bridge interaction cancelled.",
+                  password ->
+                      helpers().executeWrite(
+                          chainProfile,
+                          contractAddress,
+                          selected,
+                          walletName,
+                          password,
+                          value,
+                          gasLimit,
+                          gasPrice,
+                          (label, type) ->
+                              readRequiredTextPrompt("Enter " + label + " (" + type + ")", "")));
           printWriteResult(chainProfile, contractAddress, selected, result);
         }
         return 0;
