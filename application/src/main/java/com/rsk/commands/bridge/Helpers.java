@@ -6,6 +6,7 @@ import com.rsk.commands.wallet.Helpers.WalletMetadata;
 import com.rsk.commands.config.Helpers.ChainResolutionSupport;
 import com.rsk.utils.Chain;
 import com.rsk.utils.Chain.ChainProfile;
+import com.rsk.utils.Format;
 import com.rsk.utils.Json;
 import com.rsk.utils.Rpc;
 import com.rsk.utils.Storage;
@@ -159,7 +160,7 @@ public class Helpers extends ChainResolutionSupport {
     String dataHex = FunctionEncoder.encode(function);
 
     Web3j web3j = Rpc.web3j(chainProfile);
-    BigInteger txValue = value == null ? BigInteger.ZERO : decimalToUnits(value, 18);
+    BigInteger txValue = value == null ? BigInteger.ZERO : Format.decimalToUnits(value, 18);
     EthGetTransactionCount nonceResponse =
         web3j.ethGetTransactionCount(credentials.getAddress(), DefaultBlockParameterName.PENDING).send();
     BigInteger nonce = nonceResponse.getTransactionCount();
@@ -201,14 +202,5 @@ public class Helpers extends ChainResolutionSupport {
   }
 
   public record WriteResult(String walletAddress, String txHash, String blockNumber, String gasUsed) {}
-
-  private static BigInteger decimalToUnits(BigDecimal value, int decimals) {
-    try {
-      return value.movePointRight(decimals).toBigIntegerExact();
-    } catch (ArithmeticException ex) {
-      throw new IllegalArgumentException(
-          "Too many decimal places for token decimals=" + decimals + ": " + value, ex);
-    }
-  }
 
 }

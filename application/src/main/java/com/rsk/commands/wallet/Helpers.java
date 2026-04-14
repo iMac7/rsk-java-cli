@@ -85,35 +85,35 @@ public class Helpers {
   }
 
   public WalletMetadata createWallet(String walletName, char[] password) {
-    return preserveAddressBook(() -> walletPort.createWallet(walletName, password));
+    return withAddressBookPreserved(() -> walletPort.createWallet(walletName, password));
   }
 
   public WalletMetadata importWallet(String walletName, String privateKeyHex, char[] password) {
-    return preserveAddressBook(() -> walletPort.importWallet(walletName, privateKeyHex, password));
+    return withAddressBookPreserved(() -> walletPort.importWallet(walletName, privateKeyHex, password));
   }
 
   public List<WalletMetadata> listWallets() {
-    return withWalletRegistryAccess(walletPort::listWallets);
+    return withAddressBookPreserved(walletPort::listWallets);
   }
 
   public Optional<WalletMetadata> activeWallet() {
-    return withWalletRegistryAccess(walletPort::getActiveWallet);
+    return withAddressBookPreserved(walletPort::getActiveWallet);
   }
 
   public void switchWallet(String walletName) {
-    preserveAddressBook(() -> walletPort.switchActiveWallet(walletName));
+    withAddressBookPreserved(() -> walletPort.switchActiveWallet(walletName));
   }
 
   public void renameWallet(String walletName, String newName) {
-    preserveAddressBook(() -> walletPort.renameWallet(walletName, newName));
+    withAddressBookPreserved(() -> walletPort.renameWallet(walletName, newName));
   }
 
   public void deleteWallet(String walletName) {
-    preserveAddressBook(() -> walletPort.deleteWallet(walletName));
+    withAddressBookPreserved(() -> walletPort.deleteWallet(walletName));
   }
 
   public String dumpPrivateKey(String walletName, char[] password) {
-    return withWalletRegistryAccess(() -> walletUnlockPort.unlockPrivateKeyHex(walletName, password));
+    return withAddressBookPreserved(() -> walletUnlockPort.unlockPrivateKeyHex(walletName, password));
   }
 
   public WalletMetadata requireWallet(String walletName) {
@@ -171,7 +171,7 @@ public class Helpers {
     addressBookStore.deleteEntry(label);
   }
 
-  private <T> T preserveAddressBook(Supplier<T> walletAction) {
+  private <T> T withAddressBookPreserved(Supplier<T> walletAction) {
     Map<String, String> addressBook = addressBookStore.listEntries();
     boolean hadAddressBook = addressBookStore.hasAddressBook();
     if (hadAddressBook) {
@@ -187,36 +187,12 @@ public class Helpers {
     }
   }
 
-  private void preserveAddressBook(Runnable walletAction) {
-    Map<String, String> addressBook = addressBookStore.listEntries();
-    boolean hadAddressBook = addressBookStore.hasAddressBook();
-    if (hadAddressBook) {
-      addressBookStore.removeAddressBook();
-    }
-
-    try {
-      walletAction.run();
-    } finally {
-      if (hadAddressBook || !addressBook.isEmpty()) {
-        addressBookStore.overwrite(addressBook);
-      }
-    }
-  }
-
-  private <T> T withWalletRegistryAccess(Supplier<T> walletAction) {
-    Map<String, String> addressBook = addressBookStore.listEntries();
-    boolean hadAddressBook = addressBookStore.hasAddressBook();
-    if (hadAddressBook) {
-      addressBookStore.removeAddressBook();
-    }
-
-    try {
-      return walletAction.get();
-    } finally {
-      if (hadAddressBook || !addressBook.isEmpty()) {
-        addressBookStore.overwrite(addressBook);
-      }
-    }
+  private void withAddressBookPreserved(Runnable walletAction) {
+    withAddressBookPreserved(
+        () -> {
+          walletAction.run();
+          return null;
+        });
   }
 
   private static String stripWrappingQuotes(String value) {

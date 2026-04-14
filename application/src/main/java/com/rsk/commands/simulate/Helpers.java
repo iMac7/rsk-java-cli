@@ -4,6 +4,7 @@ import static com.rsk.utils.Terminal.*;
 
 import com.rsk.commands.wallet.Helpers.WalletMetadata;
 import com.rsk.utils.Chain.ChainProfile;
+import com.rsk.utils.Format;
 import com.rsk.utils.Rns;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -71,7 +72,7 @@ public class Helpers {
 
   public BigInteger resolveGasPriceWei(Web3j web3j, BigDecimal gasPriceRbtc) throws Exception {
     if (gasPriceRbtc != null) {
-      return decimalToUnits(gasPriceRbtc, 18);
+      return Format.decimalToUnits(gasPriceRbtc, 18);
     }
     return web3j.ethGasPrice().send().getGasPrice();
   }
@@ -86,7 +87,7 @@ public class Helpers {
       BigDecimal gasPriceRbtc,
       String data)
       throws Exception {
-    BigInteger valueWei = decimalToUnits(value, 18);
+    BigInteger valueWei = Format.decimalToUnits(value, 18);
     BigInteger balanceWei =
         web3j.ethGetBalance(walletMeta.address(), DefaultBlockParameterName.LATEST).send().getBalance();
     BigInteger gasPriceWei = resolveGasPriceWei(web3j, gasPriceRbtc);
@@ -252,7 +253,7 @@ public class Helpers {
       logTokenReadFallback("balanceOf", token, ex);
     }
 
-    BigInteger amountUnits = decimalToUnits(value, decimals);
+    BigInteger amountUnits = Format.decimalToUnits(value, decimals);
     Function transferFn =
         new Function(
             "transfer",
@@ -389,15 +390,6 @@ public class Helpers {
 
   private static void printValidationWarning(String label, String warningText) {
     System.out.println(cInfo(label + ": ") + cWarn(warningText));
-  }
-
-  private static BigInteger decimalToUnits(BigDecimal value, int decimals) {
-    try {
-      return value.movePointRight(decimals).toBigIntegerExact();
-    } catch (ArithmeticException ex) {
-      throw new IllegalArgumentException(
-          "Too many decimal places for token decimals=" + decimals + ": " + value, ex);
-    }
   }
 
   private static BigDecimal unitsToDecimal(BigInteger units, int decimals) {

@@ -105,13 +105,13 @@ public class Helpers extends ChainResolutionSupport {
       params.put("pageKey", pageKey);
     }
 
-    List<String> categories = splitCsv(categoryCsv);
+    List<String> categories = Format.splitCsv(categoryCsv);
     if (!categories.isEmpty()) {
       var arr = params.putArray("category");
       categories.forEach(arr::add);
     }
 
-    List<String> contracts = splitCsv(contractAddressesCsv);
+    List<String> contracts = Format.splitCsv(contractAddressesCsv);
     if (!contracts.isEmpty()) {
       var arr = params.putArray("contractAddresses");
       contracts.forEach(arr::add);
@@ -158,10 +158,4 @@ public class Helpers extends ChainResolutionSupport {
     }
   }
 
-  private static List<String> splitCsv(String value) {
-    if (value == null || value.isBlank()) {
-      return List.of();
-    }
-    return List.of(value.split(",")).stream().map(String::trim).filter(s -> !s.isBlank()).toList();
-  }
 }

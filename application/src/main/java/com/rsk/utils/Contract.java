@@ -102,7 +102,7 @@ public final class Contract {
   }
 
   public static BigInteger tokenAmountToUnits(BigDecimal value, int decimals) {
-    return value.movePointRight(decimals).toBigIntegerExact();
+    return Format.decimalToUnits(value, decimals);
   }
 
   public static String encodeErc20Transfer(String to, BigInteger amountUnits) {

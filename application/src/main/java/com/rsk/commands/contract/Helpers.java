@@ -4,8 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rsk.commands.config.Helpers.ChainResolutionSupport;
 import com.rsk.utils.Chain;
-import com.rsk.utils.Format;
 import com.rsk.utils.Chain.ChainProfile;
+import com.rsk.utils.Format;
 import com.rsk.utils.Json;
 import com.rsk.utils.Rpc;
 import com.rsk.utils.Rns;
@@ -109,12 +109,15 @@ public class Helpers extends ChainResolutionSupport {
   public Type<?> toAbiInputType(String solidityType, String value) {
     if ("bytes[]".equals(solidityType)) {
       List<DynamicBytes> items =
-          splitCsv(value).stream().map(Numeric::hexStringToByteArray).map(DynamicBytes::new).toList();
+          Format.splitCsv(value).stream()
+              .map(Numeric::hexStringToByteArray)
+              .map(DynamicBytes::new)
+              .toList();
       return new DynamicArray<>(DynamicBytes.class, items);
     }
     if ("bytes32[]".equals(solidityType)) {
       List<Bytes32> items =
-          splitCsv(value).stream()
+          Format.splitCsv(value).stream()
               .map(v -> new Bytes32(Numeric.toBytesPadded(Numeric.toBigInt(v), 32)))
               .toList();
       return new DynamicArray<>(Bytes32.class, items);
@@ -169,13 +172,6 @@ public class Helpers extends ChainResolutionSupport {
 
   public String blockscoutAddressUrl(ChainProfile chainProfile, String address) {
     return Chain.blockscoutAddressUrl(chainProfile, address);
-  }
-
-  private static List<String> splitCsv(String value) {
-    if (value == null || value.isBlank()) {
-      return List.of();
-    }
-    return List.of(value.split(",")).stream().map(String::trim).filter(s -> !s.isBlank()).toList();
   }
 
   private static String blockscoutContractUrl(ChainProfile chainProfile, String address) {
