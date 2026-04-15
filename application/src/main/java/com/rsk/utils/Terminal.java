@@ -1,34 +1,13 @@
 package com.rsk.utils;
 
-import java.awt.GraphicsEnvironment;
-import java.awt.Toolkit;
-import java.awt.datatransfer.StringSelection;
-import java.io.Console;
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.function.Supplier;
-import org.fusesource.jansi.Ansi;
 import org.jline.reader.LineReader;
-import org.jline.reader.LineReaderBuilder;
 import org.jline.reader.Parser;
-import org.jline.reader.UserInterruptException;
-import org.jline.terminal.Attributes;
-import org.jline.terminal.TerminalBuilder;
-import org.jline.utils.AttributedString;
-import org.jline.utils.Display;
-import org.jline.utils.NonBlockingReader;
 
 public final class Terminal {
-  private static final boolean UNICODE_SYMBOLS = detectUnicodeSymbols();
-  private static final org.jline.terminal.Terminal MENU_TERMINAL = createInteractiveTerminal();
-  private static final org.jline.terminal.Terminal PROMPT_TERMINAL = createPromptTerminal();
-  private static final LineReader PASSWORD_READER = createPasswordReader();
-
   private Terminal() {}
 
   @FunctionalInterface
@@ -37,15 +16,15 @@ public final class Terminal {
   }
 
   public static String pick(String unicodeValue, String asciiValue) {
-    return UNICODE_SYMBOLS ? unicodeValue : asciiValue;
+    return TerminalText.pick(unicodeValue, asciiValue);
   }
 
   public static org.jline.terminal.Terminal interactiveTerminal() {
-    return MENU_TERMINAL;
+    return TerminalSession.interactiveTerminal();
   }
 
   public static org.jline.terminal.Terminal promptTerminal() {
-    return PROMPT_TERMINAL;
+    return TerminalSession.promptTerminal();
   }
 
   public static LineReader createPromptReader() {
@@ -53,101 +32,45 @@ public final class Terminal {
   }
 
   public static LineReader createPromptReader(Parser parser) {
-    LineReaderBuilder builder = LineReaderBuilder.builder();
-    if (promptTerminal() != null) {
-      builder.terminal(promptTerminal());
-    }
-    if (parser != null) {
-      builder.parser(parser);
-    }
-    return builder.build();
+    return TerminalSession.createPromptReader(parser);
   }
 
   public static char[] readPassword(String prompt, String cancelMessage) {
-    while (true) {
-      try {
-        Console console = System.console();
-        if (console != null) {
-          char[] password = console.readPassword(prompt);
-          if (password == null) {
-            throw new IllegalStateException(cancelMessage);
-          }
-          if (password.length == 0) {
-            System.out.println("Password is required.");
-            continue;
-          }
-          return password;
-        }
-        if (PASSWORD_READER == null) {
-          throw new IllegalStateException(
-              "Secure password entry requires a real terminal.");
-        }
-
-        String password = PASSWORD_READER.readLine(prompt, '*');
-        if (password == null) {
-          throw new IllegalStateException(cancelMessage);
-        }
-        if (password.isBlank()) {
-          System.out.println("Password is required.");
-          continue;
-        }
-        return password.toCharArray();
-      } catch (UserInterruptException ex) {
-        throw new IllegalStateException(cancelMessage);
-      } catch (RuntimeException ex) {
-        if (Thread.currentThread().isInterrupted()) {
-          Thread.interrupted();
-          throw new IllegalStateException(cancelMessage);
-        }
-        throw ex;
-      }
-    }
+    return TerminalPrompts.readPassword(prompt, cancelMessage);
   }
 
   public static char[] readPasswordWithStatus(String prompt, String cancelMessage) {
-    return readPassword(cOk("✔" + prompt), cancelMessage);
+    return TerminalPrompts.readPasswordWithStatus(prompt, cancelMessage);
   }
 
   public static void clearPassword(char[] password) {
-    if (password != null) {
-      Arrays.fill(password, '\0');
-    }
+    TerminalPrompts.clearPassword(password);
   }
 
   public static <T, E extends Exception> T withClearedPassword(
       char[] password, PasswordAction<T, E> action) throws E {
-    try {
-      return action.run(password);
-    } finally {
-      clearPassword(password);
-    }
+    return TerminalPrompts.withClearedPassword(password, action);
   }
 
   public static <T, E extends Exception> T withPassword(
       String prompt, String cancelMessage, PasswordAction<T, E> action) throws E {
-    return withClearedPassword(readPassword(prompt, cancelMessage), action);
+    return TerminalPrompts.withPassword(prompt, cancelMessage, action);
   }
 
   public static <T, E extends Exception> T withPasswordWithStatus(
       String prompt, String cancelMessage, PasswordAction<T, E> action) throws E {
-    return withClearedPassword(readPasswordWithStatus(prompt, cancelMessage), action);
+    return TerminalPrompts.withPasswordWithStatus(prompt, cancelMessage, action);
   }
 
   public static <X extends RuntimeException> char[] readPasswordOrThrow(
       String prompt, String cancelMessage, Supplier<X> cancelledExceptionFactory) {
-    try {
-      return readPassword(prompt, cancelMessage);
-    } catch (IllegalStateException ex) {
-      if (cancelMessage.equals(ex.getMessage())) {
-        throw cancelledExceptionFactory.get();
-      }
-      throw ex;
-    }
+    return TerminalPrompts.readPasswordOrThrow(prompt, cancelMessage, cancelledExceptionFactory);
   }
 
   public static <X extends RuntimeException> char[] readPasswordWithStatusOrThrow(
       String prompt, String cancelMessage, Supplier<X> cancelledExceptionFactory) {
-    return readPasswordOrThrow(cOk("✔" + prompt), cancelMessage, cancelledExceptionFactory);
+    return TerminalPrompts.readPasswordWithStatusOrThrow(
+        prompt, cancelMessage, cancelledExceptionFactory);
   }
 
   public static <T, E extends Exception, X extends RuntimeException> T withPasswordOrThrow(
@@ -156,8 +79,8 @@ public final class Terminal {
       Supplier<X> cancelledExceptionFactory,
       PasswordAction<T, E> action)
       throws E {
-    return withClearedPassword(
-        readPasswordOrThrow(prompt, cancelMessage, cancelledExceptionFactory), action);
+    return TerminalPrompts.withPasswordOrThrow(
+        prompt, cancelMessage, cancelledExceptionFactory, action);
   }
 
   public static <T, E extends Exception, X extends RuntimeException>
@@ -167,21 +90,12 @@ public final class Terminal {
           Supplier<X> cancelledExceptionFactory,
           PasswordAction<T, E> action)
           throws E {
-    return withClearedPassword(
-        readPasswordWithStatusOrThrow(prompt, cancelMessage, cancelledExceptionFactory), action);
+    return TerminalPrompts.withPasswordWithStatusOrThrow(
+        prompt, cancelMessage, cancelledExceptionFactory, action);
   }
 
   public static void copyToClipboard(String value) {
-    try {
-      if (GraphicsEnvironment.isHeadless()) {
-        throw new IllegalStateException("Clipboard access is unavailable in this environment.");
-      }
-      Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(value), null);
-    } catch (IllegalStateException ex) {
-      throw ex;
-    } catch (Exception ex) {
-      throw new IllegalStateException("Unable to copy to clipboard. Clipboard access is unavailable.", ex);
-    }
+    TerminalClipboard.copyToClipboard(value);
   }
 
   public static <X extends RuntimeException> String promptRequiredText(
@@ -189,27 +103,13 @@ public final class Terminal {
       String prompt,
       String requiredMessage,
       Supplier<X> cancelledExceptionFactory) {
-    while (true) {
-      try {
-        String value = reader.readLine(prompt);
-        if (value != null && !value.isBlank()) {
-          return value.trim();
-        }
-        System.out.println(cError(requiredMessage));
-      } catch (UserInterruptException ex) {
-        throw cancelledExceptionFactory.get();
-      }
-    }
+    return TerminalPrompts.promptRequiredText(
+        reader, prompt, requiredMessage, cancelledExceptionFactory);
   }
 
   public static <X extends RuntimeException> String promptOptionalText(
       LineReader reader, String prompt, Supplier<X> cancelledExceptionFactory) {
-    try {
-      String value = reader.readLine(prompt);
-      return value == null ? "" : value.trim();
-    } catch (UserInterruptException ex) {
-      throw cancelledExceptionFactory.get();
-    }
+    return TerminalPrompts.promptOptionalText(reader, prompt, cancelledExceptionFactory);
   }
 
   public static <X extends RuntimeException> BigDecimal promptPositiveAmount(
@@ -217,19 +117,8 @@ public final class Terminal {
       String prompt,
       String invalidMessage,
       Supplier<X> cancelledExceptionFactory) {
-    while (true) {
-      try {
-        String value = reader.readLine(prompt);
-        BigDecimal amount = new BigDecimal(value.trim());
-        if (amount.compareTo(BigDecimal.ZERO) > 0) {
-          return amount;
-        }
-      } catch (UserInterruptException ex) {
-        throw cancelledExceptionFactory.get();
-      } catch (Exception ignored) {
-      }
-      System.out.println(cError(invalidMessage));
-    }
+    return TerminalPrompts.promptPositiveAmount(
+        reader, prompt, invalidMessage, cancelledExceptionFactory);
   }
 
   public static <X extends RuntimeException> BigInteger promptOptionalInteger(
@@ -237,19 +126,8 @@ public final class Terminal {
       String prompt,
       String invalidMessage,
       Supplier<X> cancelledExceptionFactory) {
-    while (true) {
-      try {
-        String value = reader.readLine(prompt);
-        if (value == null || value.isBlank()) {
-          return null;
-        }
-        return new BigInteger(value.trim());
-      } catch (UserInterruptException ex) {
-        throw cancelledExceptionFactory.get();
-      } catch (Exception ignored) {
-        System.out.println(cError(invalidMessage));
-      }
-    }
+    return TerminalPrompts.promptOptionalInteger(
+        reader, prompt, invalidMessage, cancelledExceptionFactory);
   }
 
   public static <X extends RuntimeException> BigDecimal promptOptionalDecimal(
@@ -257,19 +135,8 @@ public final class Terminal {
       String prompt,
       String invalidMessage,
       Supplier<X> cancelledExceptionFactory) {
-    while (true) {
-      try {
-        String value = reader.readLine(prompt);
-        if (value == null || value.isBlank()) {
-          return null;
-        }
-        return new BigDecimal(value.trim());
-      } catch (UserInterruptException ex) {
-        throw cancelledExceptionFactory.get();
-      } catch (Exception ignored) {
-        System.out.println(cError(invalidMessage));
-      }
-    }
+    return TerminalPrompts.promptOptionalDecimal(
+        reader, prompt, invalidMessage, cancelledExceptionFactory);
   }
 
   public static <X extends RuntimeException> boolean promptYesNo(
@@ -278,67 +145,44 @@ public final class Terminal {
       boolean defaultValue,
       String invalidMessage,
       Supplier<X> cancelledExceptionFactory) {
-    while (true) {
-      try {
-        String raw = reader.readLine(prompt);
-        if (raw == null || raw.isBlank()) {
-          return defaultValue;
-        }
-        if ("y".equalsIgnoreCase(raw) || "yes".equalsIgnoreCase(raw)) {
-          return true;
-        }
-        if ("n".equalsIgnoreCase(raw) || "no".equalsIgnoreCase(raw)) {
-          return false;
-        }
-      } catch (UserInterruptException ex) {
-        throw cancelledExceptionFactory.get();
-      }
-      System.out.println(cError(invalidMessage));
-    }
+    return TerminalPrompts.promptYesNo(
+        reader, prompt, defaultValue, invalidMessage, cancelledExceptionFactory);
   }
 
   public static String rootMessage(Throwable ex) {
-    Throwable current = ex;
-    while (current.getCause() != null) {
-      current = current.getCause();
-    }
-    return current.getMessage() == null ? ex.getMessage() : current.getMessage();
+    return TerminalPrompts.rootMessage(ex);
   }
 
   public static String cInfo(String text) {
-    return Ansi.ansi().fg(Ansi.Color.CYAN).a(text).reset().toString();
+    return TerminalText.cInfo(text);
   }
 
   public static String cOk(String text) {
-    return Ansi.ansi().fg(Ansi.Color.GREEN).a(text).reset().toString();
+    return TerminalText.cOk(text);
   }
 
   public static String cError(String text) {
-    return Ansi.ansi().fg(Ansi.Color.RED).a(text).reset().toString();
+    return TerminalText.cError(text);
   }
 
   public static String cEmph(String text) {
-    return Ansi.ansi().fgRgb(255, 153, 51).bold().a(text).reset().toString();
+    return TerminalText.cEmph(text);
   }
 
   public static String cPlain(String text) {
-    return Ansi.ansi().fg(Ansi.Color.WHITE).a(text).reset().toString();
+    return TerminalText.cPlain(text);
   }
 
   public static String cMuted(String text) {
-    return Ansi.ansi().fgRgb(140, 140, 140).a(text).reset().toString();
+    return TerminalText.cMuted(text);
   }
 
   public static String cWarn(String text) {
-    return Ansi.ansi().fgRgb(255, 183, 77).a(text).reset().toString();
+    return TerminalText.cWarn(text);
   }
 
   public static String cRule() {
-    return Ansi.ansi()
-        .fgRgb(140, 140, 140)
-        .a("────────────────────────────────────────")
-        .reset()
-        .toString();
+    return TerminalText.cRule();
   }
 
   public static int selectMenu(
@@ -347,252 +191,11 @@ public final class Terminal {
       List<String> footerLines,
       int cancelIndex,
       String errorContext) {
-    if (MENU_TERMINAL == null) {
-      throw new IllegalStateException("Unable to initialize " + errorContext + " terminal.");
-    }
-
-    int selectedIndex = 0;
-    int windowStart = 0;
-
-    try {
-      Attributes originalAttributes = MENU_TERMINAL.enterRawMode();
-      NonBlockingReader reader = MENU_TERMINAL.reader();
-      Display display = new Display(MENU_TERMINAL, false);
-
-      try {
-        while (true) {
-          windowStart = clampWindowStart(titleLines, options, footerLines, selectedIndex, windowStart);
-          renderMenu(display, titleLines, options, footerLines, selectedIndex, windowStart);
-          int key = reader.read();
-          if (key < 0) {
-            continue;
-          }
-          if (key == 3) {
-            return cancelIndex;
-          }
-          if (key == 13 || key == 10) {
-            return selectedIndex;
-          }
-          if (isForwardCycleKey(key)) {
-            selectedIndex = moveDown(selectedIndex, options.length);
-            continue;
-          }
-          if (isBackwardCycleKey(key)) {
-            selectedIndex = moveUp(selectedIndex, options.length);
-            continue;
-          }
-          if (key == 224 || key == 0) {
-            selectedIndex = handleWindowsArrow(reader, selectedIndex, options.length);
-            continue;
-          }
-          if (key == 27) {
-            Integer updated = handleEscapeSequence(reader, selectedIndex, options.length);
-            if (updated == null) {
-              return cancelIndex;
-            }
-            selectedIndex = updated;
-          }
-        }
-      } finally {
-        display.update(List.of(AttributedString.fromAnsi("")), 0);
-        MENU_TERMINAL.writer().println();
-        MENU_TERMINAL.puts(org.jline.utils.InfoCmp.Capability.cursor_visible);
-        MENU_TERMINAL.setAttributes(originalAttributes);
-        MENU_TERMINAL.writer().flush();
-      }
-    } catch (Exception ex) {
-      throw new IllegalStateException("Unable to render " + errorContext + " menu.", ex);
-    }
+    return TerminalMenu.selectMenu(titleLines, options, footerLines, cancelIndex, errorContext);
   }
 
   public static int selectMenu(
       String title, String[] options, String footer, int cancelIndex, String errorContext) {
-    return selectMenu(
-        title == null ? List.of() : List.of(title),
-        options,
-        footer == null || footer.isBlank() ? List.of() : List.of(footer),
-        cancelIndex,
-        errorContext);
-  }
-
-  private static org.jline.terminal.Terminal createInteractiveTerminal() {
-    try {
-      return TerminalBuilder.builder()
-          .system(true)
-          .dumb(false)
-          .encoding(StandardCharsets.UTF_8)
-          .build();
-    } catch (Exception ignored) {
-      return null;
-    }
-  }
-
-  private static org.jline.terminal.Terminal createPromptTerminal() {
-    if (interactiveTerminal() != null) {
-      return interactiveTerminal();
-    }
-    try {
-      return TerminalBuilder.builder()
-          .system(false)
-          .streams(System.in, System.out)
-          .dumb(true)
-          .encoding(StandardCharsets.UTF_8)
-          .build();
-    } catch (Exception ignored) {
-      return null;
-    }
-  }
-
-  private static LineReader createPasswordReader() {
-    if (interactiveTerminal() != null) {
-      return LineReaderBuilder.builder().terminal(interactiveTerminal()).build();
-    }
-    return null;
-  }
-
-  private static void renderMenu(
-      Display display,
-      List<String> titleLines,
-      String[] options,
-      List<String> footerLines,
-      int selectedIndex,
-      int windowStart) {
-    List<AttributedString> rendered = new ArrayList<>();
-    int terminalRows = Math.max(1, MENU_TERMINAL.getSize().getRows());
-    int reservedRows = titleLines.size() + footerLines.size();
-    int availableOptionRows = Math.max(1, terminalRows - reservedRows);
-    int indicatorRows = options.length > availableOptionRows ? 2 : 0;
-    int visibleOptions = Math.max(1, availableOptionRows - indicatorRows);
-    int windowSize = Math.min(options.length - windowStart, visibleOptions);
-    int windowEnd = Math.min(options.length, windowStart + windowSize);
-
-    for (String titleLine : titleLines) {
-      rendered.add(AttributedString.fromAnsi(titleLine == null || titleLine.isBlank() ? "" : cTitle(titleLine)));
-    }
-
-    if (windowStart > 0) {
-      rendered.add(AttributedString.fromAnsi(cFooter("↑ more")));
-    }
-
-    for (int i = windowStart; i < windowEnd; i++) {
-      String pointer = i == selectedIndex ? pick("❯ ", "> ") : "  ";
-      String line = pointer + options[i];
-      rendered.add(AttributedString.fromAnsi(i == selectedIndex ? cSelected(line) : cPlain(line)));
-    }
-
-    if (windowEnd < options.length) {
-      rendered.add(AttributedString.fromAnsi(cFooter("↓ more")));
-    }
-
-    for (String footerLine : footerLines) {
-      rendered.add(AttributedString.fromAnsi(footerLine == null || footerLine.isBlank() ? "" : cFooter(footerLine)));
-    }
-
-    display.resize(MENU_TERMINAL.getSize().getRows(), MENU_TERMINAL.getSize().getColumns());
-    display.update(rendered, -1);
-  }
-
-  private static int clampWindowStart(
-      List<String> titleLines,
-      String[] options,
-      List<String> footerLines,
-      int selectedIndex,
-      int currentWindowStart) {
-    int terminalRows = Math.max(1, MENU_TERMINAL.getSize().getRows());
-    int reservedRows = titleLines.size() + footerLines.size();
-    int availableOptionRows = Math.max(1, terminalRows - reservedRows);
-    int indicatorRows = options.length > availableOptionRows ? 2 : 0;
-    int visibleOptions = Math.max(1, availableOptionRows - indicatorRows);
-    int maxWindowStart = Math.max(0, options.length - visibleOptions);
-    int windowStart = Math.max(0, Math.min(currentWindowStart, maxWindowStart));
-
-    if (selectedIndex < windowStart) {
-      windowStart = selectedIndex;
-    } else if (selectedIndex >= windowStart + visibleOptions) {
-      windowStart = selectedIndex - visibleOptions + 1;
-    }
-
-    return Math.max(0, Math.min(windowStart, maxWindowStart));
-  }
-
-  private static Integer handleEscapeSequence(
-      NonBlockingReader reader, int selectedIndex, int itemCount) {
-    try {
-      int second = reader.read(25);
-      if (second == NonBlockingReader.READ_EXPIRED || second < 0) {
-        return null;
-      }
-      if (second == '[' || second == 'O') {
-        int third = reader.read(25);
-        if (third == 'A') {
-          return moveUp(selectedIndex, itemCount);
-        }
-        if (third == 'B') {
-          return moveDown(selectedIndex, itemCount);
-        }
-      }
-      return null;
-    } catch (Exception ex) {
-      throw new IllegalStateException("Unable to read keyboard escape sequence.", ex);
-    }
-  }
-
-  private static int handleWindowsArrow(
-      NonBlockingReader reader, int selectedIndex, int itemCount) {
-    try {
-      int scan = reader.read(25);
-      if (scan == 72) {
-        return moveUp(selectedIndex, itemCount);
-      }
-      if (scan == 80) {
-        return moveDown(selectedIndex, itemCount);
-      }
-      return selectedIndex;
-    } catch (Exception ex) {
-      throw new IllegalStateException("Unable to read keyboard scan code.", ex);
-    }
-  }
-
-  private static int moveUp(int selectedIndex, int itemCount) {
-    return (selectedIndex - 1 + itemCount) % itemCount;
-  }
-
-  private static int moveDown(int selectedIndex, int itemCount) {
-    return (selectedIndex + 1) % itemCount;
-  }
-
-  private static boolean isForwardCycleKey(int key) {
-    return key == 9 || key == 's' || key == 'S' || key == 'j' || key == 'J';
-  }
-
-  private static boolean isBackwardCycleKey(int key) {
-    return key == 'w' || key == 'W' || key == 'k' || key == 'K';
-  }
-
-  private static boolean detectUnicodeSymbols() {
-    String msystem = System.getenv("MSYSTEM");
-    if (msystem != null && !msystem.isBlank()) {
-      return false;
-    }
-
-    String shell = System.getenv("SHELL");
-    if (shell != null && shell.toLowerCase().contains("bash")) {
-      return false;
-    }
-
-    Charset charset = Charset.defaultCharset();
-    return StandardCharsets.UTF_8.equals(charset);
-  }
-
-  private static String cTitle(String text) {
-    return Ansi.ansi().fgRgb(255, 183, 77).bold().a(text).reset().toString();
-  }
-
-  private static String cSelected(String text) {
-    return Ansi.ansi().fgRgb(255, 153, 51).bold().a(text).reset().toString();
-  }
-
-  private static String cFooter(String text) {
-    return Ansi.ansi().fgRgb(140, 140, 140).a(text).reset().toString();
+    return TerminalMenu.selectMenu(title, options, footer, cancelIndex, errorContext);
   }
 }
