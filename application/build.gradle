@@ -50,13 +50,13 @@ tasks.register('runCli', JavaExec) {
     mainClass.set('com.rsk.java_cli.Cli')
 }
 
-// dependencyCheck {
-//     analyzers {
-//         assemblyEnabled = false
-//     }
-//     formats = ['HTML', 'JSON']
-//     failBuildOnCVSS = 7.0f
-// }
+dependencyCheck {
+    analyzers {
+        assemblyEnabled = false
+    }
+    formats = ['HTML', 'JSON']
+    failBuildOnCVSS = 7.0f
+}
 
 // tasks.named('test') {
 //     useJUnitPlatform()
