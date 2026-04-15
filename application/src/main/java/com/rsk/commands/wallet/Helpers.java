@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
+import org.web3j.crypto.Credentials;
 
 public class Helpers {
   public record WalletMetadata(
@@ -26,7 +27,7 @@ public class Helpers {
   public interface WalletPort {
     WalletMetadata createWallet(String name, char[] password);
 
-    WalletMetadata importWallet(String name, String privateKeyHex, char[] password);
+    WalletMetadata importWallet(String name, char[] privateKeyHex, char[] password);
 
     List<WalletMetadata> listWallets();
 
@@ -43,6 +44,14 @@ public class Helpers {
 
   public interface WalletUnlockPort {
     String unlockPrivateKeyHex(String walletName, char[] password);
+
+    <T> T withUnlockedCredentials(
+        String walletName, char[] password, WalletCredentialsAction<T> action);
+  }
+
+  @FunctionalInterface
+  public interface WalletCredentialsAction<T> {
+    T run(Credentials credentials);
   }
 
   public static class WalletRegistry {
@@ -88,7 +97,7 @@ public class Helpers {
     return withAddressBookPreserved(() -> walletPort.createWallet(walletName, password));
   }
 
-  public WalletMetadata importWallet(String walletName, String privateKeyHex, char[] password) {
+  public WalletMetadata importWallet(String walletName, char[] privateKeyHex, char[] password) {
     return withAddressBookPreserved(() -> walletPort.importWallet(walletName, privateKeyHex, password));
   }
 
@@ -114,6 +123,12 @@ public class Helpers {
 
   public String dumpPrivateKey(String walletName, char[] password) {
     return withAddressBookPreserved(() -> walletUnlockPort.unlockPrivateKeyHex(walletName, password));
+  }
+
+  public <T> T withUnlockedCredentials(
+      String walletName, char[] password, WalletCredentialsAction<T> action) {
+    return withAddressBookPreserved(
+        () -> walletUnlockPort.withUnlockedCredentials(walletName, password, action));
   }
 
   public WalletMetadata requireWallet(String walletName) {

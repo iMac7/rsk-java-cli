@@ -96,10 +96,6 @@ public class Helpers extends ChainResolutionSupport {
         .orElseThrow(() -> new IllegalArgumentException("No active wallet found. Provide --wallet."));
   }
 
-  public String dumpPrivateKey(String walletName, char[] password) {
-    return walletHelpers.dumpPrivateKey(walletName, password);
-  }
-
   public List<Type> parseFunctionInputs(
       JsonNode functionNode, java.util.function.BiFunction<String, String, String> prompt) {
     List<Type> inputs = new ArrayList<>();
@@ -153,48 +149,74 @@ public class Helpers extends ChainResolutionSupport {
       java.util.function.BiFunction<String, String, String> prompt)
       throws Exception {
     Chain.validateChainId(chainProfile, "Bridge write");
-    String privateKeyHex = dumpPrivateKey(walletName, password);
-    Credentials credentials = Credentials.create(privateKeyHex);
+    return walletHelpers.withUnlockedCredentials(
+        walletName,
+        password,
+        credentials ->
+            executeWriteWithCredentials(
+                chainProfile,
+                contractAddress,
+                functionNode,
+                credentials,
+                value,
+                gasLimit,
+                gasPrice,
+                prompt));
+  }
+
+  private WriteResult executeWriteWithCredentials(
+      ChainProfile chainProfile,
+      String contractAddress,
+      JsonNode functionNode,
+      Credentials credentials,
+      BigDecimal value,
+      BigInteger gasLimit,
+      BigInteger gasPrice,
+      java.util.function.BiFunction<String, String, String> prompt) {
     List<Type> inputs = parseFunctionInputs(functionNode, prompt);
     Function function = new Function(functionNode.path("name").asText(), inputs, List.of());
     String dataHex = FunctionEncoder.encode(function);
 
-    Web3j web3j = Rpc.web3j(chainProfile);
-    BigInteger txValue = value == null ? BigInteger.ZERO : Format.decimalToUnits(value, 18);
-    EthGetTransactionCount nonceResponse =
-        web3j.ethGetTransactionCount(credentials.getAddress(), DefaultBlockParameterName.PENDING).send();
-    BigInteger nonce = nonceResponse.getTransactionCount();
-    BigInteger txGasPrice = gasPrice != null ? gasPrice : web3j.ethGasPrice().send().getGasPrice();
-    BigInteger txGasLimit;
-    if (gasLimit != null) {
-      txGasLimit = gasLimit;
-    } else {
-      EthEstimateGas estimate =
-          web3j.ethEstimateGas(
-                  Transaction.createFunctionCallTransaction(
-                      credentials.getAddress(), nonce, txGasPrice, null, contractAddress, txValue, dataHex))
-              .send();
-      if (estimate.hasError() || estimate.getAmountUsed() == null) {
-        txGasLimit = BigInteger.valueOf(300_000L);
+    try {
+      Web3j web3j = Rpc.web3j(chainProfile);
+      BigInteger txValue = value == null ? BigInteger.ZERO : Format.decimalToUnits(value, 18);
+      EthGetTransactionCount nonceResponse =
+          web3j.ethGetTransactionCount(credentials.getAddress(), DefaultBlockParameterName.PENDING).send();
+      BigInteger nonce = nonceResponse.getTransactionCount();
+      BigInteger txGasPrice = gasPrice != null ? gasPrice : web3j.ethGasPrice().send().getGasPrice();
+      BigInteger txGasLimit;
+      if (gasLimit != null) {
+        txGasLimit = gasLimit;
       } else {
-        txGasLimit = estimate.getAmountUsed().multiply(BigInteger.valueOf(12)).divide(BigInteger.TEN);
+        EthEstimateGas estimate =
+            web3j.ethEstimateGas(
+                    Transaction.createFunctionCallTransaction(
+                        credentials.getAddress(), nonce, txGasPrice, null, contractAddress, txValue, dataHex))
+                .send();
+        if (estimate.hasError() || estimate.getAmountUsed() == null) {
+          txGasLimit = BigInteger.valueOf(300_000L);
+        } else {
+          txGasLimit = estimate.getAmountUsed().multiply(BigInteger.valueOf(12)).divide(BigInteger.TEN);
+        }
       }
+      RawTransaction tx =
+          RawTransaction.createTransaction(nonce, txGasPrice, txGasLimit, contractAddress, txValue, dataHex);
+      byte[] signed = TransactionEncoder.signMessage(tx, chainProfile.chainId(), credentials);
+      EthSendTransaction sent = web3j.ethSendRawTransaction(Numeric.toHexString(signed)).send();
+      if (sent.hasError()) {
+        throw new IllegalStateException(sent.getError().getMessage());
+      }
+      String txHash = sent.getTransactionHash();
+      TransactionReceipt receipt =
+          com.rsk.utils.Transaction.waitForSuccessfulReceipt(web3j, txHash, 120, 2000L);
+      return new WriteResult(
+          credentials.getAddress(),
+          txHash,
+          receipt.getBlockNumber().toString(),
+          receipt.getGasUsed().toString());
+    } catch (Exception ex) {
+      throw new IllegalStateException("Bridge write failed.", ex);
     }
-    RawTransaction tx =
-        RawTransaction.createTransaction(nonce, txGasPrice, txGasLimit, contractAddress, txValue, dataHex);
-    byte[] signed = TransactionEncoder.signMessage(tx, chainProfile.chainId(), credentials);
-    EthSendTransaction sent = web3j.ethSendRawTransaction(Numeric.toHexString(signed)).send();
-    if (sent.hasError()) {
-      throw new IllegalStateException(sent.getError().getMessage());
-    }
-    String txHash = sent.getTransactionHash();
-    TransactionReceipt receipt =
-        com.rsk.utils.Transaction.waitForSuccessfulReceipt(web3j, txHash, 120, 2000L);
-    return new WriteResult(
-        credentials.getAddress(),
-        txHash,
-        receipt.getBlockNumber().toString(),
-        receipt.getGasUsed().toString());
   }
 
   public String readableTypeValue(Type type) {

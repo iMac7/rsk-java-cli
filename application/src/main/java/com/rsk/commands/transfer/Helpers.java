@@ -12,6 +12,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
 import java.nio.file.Path;
+import org.web3j.crypto.Credentials;
 
 public class Helpers extends ChainResolutionSupport {
   private final com.rsk.commands.wallet.Helpers walletHelpers;
@@ -58,6 +59,10 @@ public class Helpers extends ChainResolutionSupport {
         .divide(new BigDecimal("1000000000000000000"), 18, RoundingMode.HALF_UP);
   }
 
+  public void validateWalletPassword(String walletName, char[] password) {
+    walletUnlockPort.withUnlockedCredentials(walletName, password, credentials -> null);
+  }
+
   public PendingTransfer sendNative(
       ChainProfile chainProfile,
       String walletName,
@@ -67,18 +72,17 @@ public class Helpers extends ChainResolutionSupport {
       BigInteger gasLimit,
       BigInteger gasPriceWei,
       String data) {
-    String privateKeyHex = unlockWalletPrivateKeyHex(walletName, password);
-    return sendNativeWithPrivateKey(
-        chainProfile, privateKeyHex, to, valueWei, gasLimit, gasPriceWei, data);
+    return walletUnlockPort.withUnlockedCredentials(
+        walletName,
+        password,
+        credentials ->
+            sendNativeWithCredentials(
+                chainProfile, credentials, to, valueWei, gasLimit, gasPriceWei, data));
   }
 
-  public String unlockWalletPrivateKeyHex(String walletName, char[] password) {
-    return walletUnlockPort.unlockPrivateKeyHex(walletName, password);
-  }
-
-  public PendingTransfer sendNativeWithPrivateKey(
+  public PendingTransfer sendNativeWithCredentials(
       ChainProfile chainProfile,
-      String privateKeyHex,
+      Credentials credentials,
       String to,
       BigInteger valueWei,
       BigInteger gasLimit,
@@ -88,7 +92,7 @@ public class Helpers extends ChainResolutionSupport {
       Transaction.PendingTransaction pending =
           Transaction.submit(
               chainProfile,
-              privateKeyHex,
+              credentials,
               new Transaction.SendRequest(to, valueWei, gasLimit, gasPriceWei, data));
       return new PendingTransfer(pending.fromAddress(), pending.txHash());
     } catch (Exception ex) {
@@ -106,32 +110,37 @@ public class Helpers extends ChainResolutionSupport {
       BigInteger gasLimit,
       BigInteger gasPriceWei,
       String data) {
-    String privateKeyHex = walletUnlockPort.unlockPrivateKeyHex(walletName, password);
+    return walletUnlockPort.withUnlockedCredentials(
+        walletName,
+        password,
+        credentials -> {
+          try {
+            Contract.TokenMetadata metadata = Contract.readTokenMetadata(chainProfile, tokenAddress);
+            BigInteger amountUnits = Contract.tokenAmountToUnits(value, metadata.decimals());
+            String encodedData =
+                data != null && !data.isBlank()
+                    ? data
+                    : Contract.encodeErc20Transfer(to, amountUnits);
 
-    try {
-      Contract.TokenMetadata metadata = Contract.readTokenMetadata(chainProfile, tokenAddress);
-      BigInteger amountUnits = Contract.tokenAmountToUnits(value, metadata.decimals());
-      String encodedData =
-          data != null && !data.isBlank() ? data : Contract.encodeErc20Transfer(to, amountUnits);
-
-      BigInteger resolvedGasLimit = gasLimit;
-      if (resolvedGasLimit == null) {
-        resolvedGasLimit =
-            Contract.estimateTokenTransferGas(
-                chainProfile, walletAddress(walletName), tokenAddress, encodedData, gasPriceWei);
-      }
-      Transaction.PendingTransaction pending =
-          Transaction.submit(
-              chainProfile,
-              privateKeyHex,
-              new Transaction.SendRequest(
-                  tokenAddress, BigInteger.ZERO, resolvedGasLimit, gasPriceWei, encodedData));
-      return new PendingTransfer(pending.fromAddress(), pending.txHash());
-    } catch (ArithmeticException ex) {
-      throw new IllegalArgumentException("Invalid token amount for token decimals.", ex);
-    } catch (Exception ex) {
-      throw new IllegalStateException("Unable to send token transfer", ex);
-    }
+            BigInteger resolvedGasLimit = gasLimit;
+            if (resolvedGasLimit == null) {
+              resolvedGasLimit =
+                  Contract.estimateTokenTransferGas(
+                      chainProfile, walletAddress(walletName), tokenAddress, encodedData, gasPriceWei);
+            }
+            Transaction.PendingTransaction pending =
+                Transaction.submit(
+                    chainProfile,
+                    credentials,
+                    new Transaction.SendRequest(
+                        tokenAddress, BigInteger.ZERO, resolvedGasLimit, gasPriceWei, encodedData));
+            return new PendingTransfer(pending.fromAddress(), pending.txHash());
+          } catch (ArithmeticException ex) {
+            throw new IllegalArgumentException("Invalid token amount for token decimals.", ex);
+          } catch (Exception ex) {
+            throw new IllegalStateException("Unable to send token transfer", ex);
+          }
+        });
   }
 
   public String resolveTokenAddress(ChainProfile chainProfile, String tokenOption) {

@@ -45,7 +45,7 @@ public final class Rpc {
 
     String sendNativeTransfer(
         ChainProfile chainProfile,
-        String privateKeyHex,
+        Credentials credentials,
         String to,
         BigInteger valueWei,
         BigInteger gasLimit,
@@ -90,7 +90,7 @@ public final class Rpc {
     @Override
     public String sendNativeTransfer(
         ChainProfile chainProfile,
-        String privateKeyHex,
+        Credentials credentials,
         String to,
         BigInteger valueWei,
         BigInteger gasLimit,
@@ -99,7 +99,6 @@ public final class Rpc {
       try {
         Chain.validateChainId(chainProfile, "Transaction submission");
         Web3j web3j = web3j(chainProfile);
-        Credentials credentials = Credentials.create(privateKeyHex);
         EthGetTransactionCount nonceResponse =
             web3j
                 .ethGetTransactionCount(credentials.getAddress(), DefaultBlockParameterName.PENDING)

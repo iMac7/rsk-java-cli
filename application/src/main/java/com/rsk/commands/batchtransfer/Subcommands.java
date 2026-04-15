@@ -85,44 +85,51 @@ public class Subcommands {
           return 0;
         }
 
-        String privateKeyHex = promptForUnlockedKey(selectedWallet);
-        printWalletContext(chainProfile, walletAddress);
-
-        for (TransferRequest request : requests) {
-          try {
-            var pendingTransfer =
-                helpers().submitTransfer(chainProfile, privateKeyHex, request, defaults);
-            System.out.println(cInfo("🔄 Transaction initiated. TxHash: ") + pendingTransfer.txHash());
-            org.web3j.protocol.core.methods.response.TransactionReceipt receipt =
-                Loader.runWithSpinner(
-                    "Waiting for confirmation...",
-                    () -> helpers().waitForConfirmation(chainProfile, pendingTransfer));
-            printTransferResult(receipt);
-          } catch (Exception ex) {
-            System.out.println(cError(Terminal.rootMessage(ex)));
-            return 0;
-          }
-        }
-        return 0;
+        return runBatchWithPassword(chainProfile, selectedWallet, walletAddress, defaults, requests);
       } catch (IllegalArgumentException | IllegalStateException ex) {
         System.out.println(cError(Terminal.rootMessage(ex)));
         return 0;
       }
     }
 
-    private String promptForUnlockedKey(String walletName) {
+    private int runBatchWithPassword(
+        ChainProfile chainProfile,
+        String selectedWallet,
+        String walletAddress,
+        Helpers.TransferDefaults defaults,
+        List<TransferRequest> requests) {
       while (true) {
         try {
           return Terminal.withPasswordWithStatus(
               "Enter your password to decrypt the wallet: ",
               "Batch transfer cancelled.",
-              password -> helpers().unlockWalletPrivateKeyHex(walletName, password));
+              password -> {
+                helpers().validateWalletPassword(selectedWallet, password);
+                printWalletContext(chainProfile, walletAddress);
+
+                for (TransferRequest request : requests) {
+                  try {
+                    var pendingTransfer =
+                        helpers().submitTransfer(
+                            chainProfile, selectedWallet, password, request, defaults);
+                    System.out.println(cInfo("Transaction initiated. TxHash: ") + pendingTransfer.txHash());
+                    org.web3j.protocol.core.methods.response.TransactionReceipt receipt =
+                        Loader.runWithSpinner(
+                            "Waiting for confirmation...",
+                            () -> helpers().waitForConfirmation(chainProfile, pendingTransfer));
+                    printTransferResult(receipt);
+                  } catch (Exception ex) {
+                    System.out.println(cError(Terminal.rootMessage(ex)));
+                    return 0;
+                  }
+                }
+                return 0;
+              });
         } catch (IllegalArgumentException ex) {
           System.out.println(cError(Terminal.rootMessage(ex)));
         }
       }
     }
-
     private List<TransferRequest> collectInteractiveRequests(ChainProfile chainProfile) {
       List<TransferRequest> requests = new ArrayList<>();
       while (true) {

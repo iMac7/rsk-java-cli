@@ -241,7 +241,7 @@ Change test logging in application\build.gradle by uncommenting this
 // }
 ```
 
-## Dependency chacking
+## Dependency checking
 Check for vulnerabilities in your dependencies with `.\gradlew.bat :application:dependencyCheckAnalyze`.
 However, this takes too long without an NVD api key
 
@@ -283,6 +283,22 @@ To disable, comment this out in `application/build.gradle`
 //     failBuildOnCVSS = 7.0f
 // }
 ```
+
+## Potential vulnerabilities
+
+#### Web3j wallet password String copies
+Wallet commands read passwords into `char[]` values and clear those arrays promptly after use.
+
+The Web3j wallet APIs used for keystore operations require immutable `String` passwords:
+`Wallet.decrypt(String, WalletFile)` and `Wallet.createStandard(String, ECKeyPair)`.
+Because of that API contract, `Storage.JsonWalletRepository` must create a temporary `String`
+copy of the password when unlocking, creating, or importing wallet keystores.
+
+That temporary `String` cannot be explicitly zeroed and may remain in JVM heap memory until
+garbage collection. The code keeps this copy scoped to the Web3j call and clears the original
+`char[]` in the surrounding password scope, but the immutable Web3j `String` copy is a known
+library limitation. Track or file upstream Web3j support for `char[]`-accepting wallet APIs
+before treating password memory clearing as complete.
 
 ## Disclaimer
 The software provided in this GitHub repository is offered "as is," without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, and non-infringement.

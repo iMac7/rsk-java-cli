@@ -41,14 +41,13 @@ public final class Transaction {
   }
 
   public static PendingTransaction submit(
-      ChainProfile chainProfile, String privateKeyHex, SendRequest request) {
+      ChainProfile chainProfile, Credentials credentials, SendRequest request) {
     try {
-      Credentials credentials = Credentials.create(privateKeyHex);
       String txHash =
           new Rpc.Web3jRpcGateway()
               .sendNativeTransfer(
                   chainProfile,
-                  privateKeyHex,
+                  credentials,
                   request.to(),
                   request.valueWei(),
                   request.gasLimit(),

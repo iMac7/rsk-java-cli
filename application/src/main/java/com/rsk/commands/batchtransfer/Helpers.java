@@ -51,8 +51,8 @@ public class Helpers {
     return transferHelpers.nativeBalance(chainProfile, walletAddress);
   }
 
-  public String unlockWalletPrivateKeyHex(String walletName, char[] password) {
-    return transferHelpers.unlockWalletPrivateKeyHex(walletName, password);
+  public void validateWalletPassword(String walletName, char[] password) {
+    transferHelpers.validateWalletPassword(walletName, password);
   }
 
   public TransferDefaults transferDefaults(ChainProfile chainProfile) {
@@ -97,12 +97,14 @@ public class Helpers {
 
   public PendingTransfer submitTransfer(
       ChainProfile chainProfile,
-      String privateKeyHex,
+      String walletName,
+      char[] password,
       TransferRequest request,
       TransferDefaults defaults) {
-    return transferHelpers.sendNativeWithPrivateKey(
+    return transferHelpers.sendNative(
         chainProfile,
-        privateKeyHex,
+        walletName,
+        password,
         request.recipient(),
         Transaction.toWei(request.amount()),
         defaults.gasLimit(),

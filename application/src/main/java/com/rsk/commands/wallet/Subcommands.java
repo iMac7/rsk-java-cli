@@ -477,7 +477,7 @@ public class Subcommands {
             InteractiveCancelledException::new,
             password -> {
               WalletMetadata wallet =
-                  helpers().importWallet(walletName, new String(privateKeyChars), password);
+                  helpers().importWallet(walletName, privateKeyChars, password);
               System.out.printf("Imported wallet %s (%s)%n", cOk(wallet.name()), wallet.address());
               return null;
             });

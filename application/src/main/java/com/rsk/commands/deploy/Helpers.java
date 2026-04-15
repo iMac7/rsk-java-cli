@@ -106,9 +106,8 @@ public class Helpers extends ChainResolutionSupport {
   }
 
   public DeploymentResult deployContract(
-      ChainProfile chainProfile, String privateKeyHex, String deploymentData) {
+      ChainProfile chainProfile, Credentials credentials, String deploymentData) {
     Chain.validateChainId(chainProfile, "Contract deployment");
-    Credentials credentials = Credentials.create(privateKeyHex);
     try {
       Web3j web3j = Rpc.web3j(chainProfile);
       EthGetTransactionCount nonceResponse =
@@ -145,10 +144,13 @@ public class Helpers extends ChainResolutionSupport {
 
   public DeploymentExecution deployContractFromWallet(
       ChainProfile chainProfile, String walletName, char[] password, String deploymentData) {
-    String privateKeyHex = walletHelpers.dumpPrivateKey(walletName, password);
-    Credentials credentials = Credentials.create(privateKeyHex);
-    DeploymentResult deploymentResult = deployContract(chainProfile, privateKeyHex, deploymentData);
-    return new DeploymentExecution(credentials.getAddress(), deploymentResult);
+    return walletHelpers.withUnlockedCredentials(
+        walletName,
+        password,
+        credentials -> {
+          DeploymentResult deploymentResult = deployContract(chainProfile, credentials, deploymentData);
+          return new DeploymentExecution(credentials.getAddress(), deploymentResult);
+        });
   }
 
   public record DeploymentResult(String txHash, String contractAddress, String explorerUrl) {}

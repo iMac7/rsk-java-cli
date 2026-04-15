@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.web3j.crypto.Credentials;
 import org.web3j.crypto.ECKeyPair;
 import org.web3j.crypto.Keys;
 import org.web3j.crypto.Wallet;
@@ -162,10 +163,10 @@ public final class Storage {
     }
 
     @Override
-    public WalletMetadata importWallet(String name, String privateKeyHex, char[] password) {
+    public WalletMetadata importWallet(String name, char[] privateKeyHex, char[] password) {
       ensureNameAvailable(name);
       try {
-        BigInteger privateKey = Numeric.toBigInt(cleanHex(privateKeyHex));
+        BigInteger privateKey = parsePrivateKey(privateKeyHex);
         ECKeyPair keyPair = ECKeyPair.create(privateKey);
         return storeWallet(name, keyPair, password);
       } catch (Exception ex) {
@@ -269,8 +270,32 @@ public final class Storage {
       try {
         WalletFile walletFile =
             objectMapper.readValue(Path.of(wallet.keystorePath()).toFile(), WalletFile.class);
-        ECKeyPair keyPair = Wallet.decrypt(new String(password), walletFile);
+        ECKeyPair keyPair =
+            withWeb3jPassword(password, web3jPassword -> Wallet.decrypt(web3jPassword, walletFile));
         return Numeric.toHexStringNoPrefixZeroPadded(keyPair.getPrivateKey(), 64);
+      } catch (Exception ex) {
+        LOGGER.error("Unable to unlock wallet {}", walletName, ex);
+        throw new IllegalArgumentException("Unable to unlock wallet " + walletName, ex);
+      }
+    }
+
+    @Override
+    public <T> T withUnlockedCredentials(
+        String walletName,
+        char[] password,
+        com.rsk.commands.wallet.Helpers.WalletCredentialsAction<T> action) {
+      WalletMetadata wallet =
+          findByName(walletName)
+              .orElseThrow(() -> new IllegalArgumentException("Wallet not found: " + walletName));
+      try {
+        WalletFile walletFile =
+            objectMapper.readValue(Path.of(wallet.keystorePath()).toFile(), WalletFile.class);
+        ECKeyPair keyPair =
+            withWeb3jPassword(password, web3jPassword -> Wallet.decrypt(web3jPassword, walletFile));
+        Credentials credentials = Credentials.create(keyPair);
+        return action.run(credentials);
+      } catch (RuntimeException ex) {
+        throw ex;
       } catch (Exception ex) {
         LOGGER.error("Unable to unlock wallet {}", walletName, ex);
         throw new IllegalArgumentException("Unable to unlock wallet " + walletName, ex);
@@ -279,7 +304,8 @@ public final class Storage {
 
     private WalletMetadata storeWallet(String name, ECKeyPair keyPair, char[] password)
         throws Exception {
-      WalletFile walletFile = Wallet.createStandard(new String(password), keyPair);
+      WalletFile walletFile =
+          withWeb3jPassword(password, web3jPassword -> Wallet.createStandard(web3jPassword, keyPair));
       UUID walletId = UUID.randomUUID();
       Files.createDirectories(walletsDir);
       Path keystorePath = walletsDir.resolve(walletId + ".json");
@@ -361,8 +387,51 @@ public final class Storage {
       throw originalFailure;
     }
 
-    private static String cleanHex(String value) {
-      return value.startsWith("0x") ? value.substring(2) : value;
+    private static BigInteger parsePrivateKey(char[] value) {
+      if (value == null) {
+        throw new NumberFormatException("Private key is required.");
+      }
+      int start = 0;
+      int end = value.length;
+      while (start < end && Character.isWhitespace(value[start])) {
+        start++;
+      }
+      while (end > start && Character.isWhitespace(value[end - 1])) {
+        end--;
+      }
+      if (end - start >= 2 && value[start] == '0' && (value[start + 1] == 'x' || value[start + 1] == 'X')) {
+        start += 2;
+      }
+      if (start >= end) {
+        throw new NumberFormatException("Private key is required.");
+      }
+
+      BigInteger privateKey = BigInteger.ZERO;
+      for (int i = start; i < end; i++) {
+        int digit = Character.digit(value[i], 16);
+        if (digit < 0) {
+          throw new NumberFormatException("Invalid private key hex.");
+        }
+        privateKey = privateKey.shiftLeft(4).add(BigInteger.valueOf(digit));
+      }
+      return privateKey;
+    }
+
+    @FunctionalInterface
+    private interface Web3jPasswordAction<T> {
+      T run(String password) throws Exception;
+    }
+
+    private static <T> T withWeb3jPassword(char[] password, Web3jPasswordAction<T> action)
+        throws Exception {
+      // Web3j Wallet APIs require String passwords. Keep the immutable copy scoped to this call;
+      // callers still clear the original char[] promptly via Terminal password helpers.
+      String web3jPassword = new String(password);
+      try {
+        return action.run(web3jPassword);
+      } finally {
+        web3jPassword = null;
+      }
     }
   }
 }

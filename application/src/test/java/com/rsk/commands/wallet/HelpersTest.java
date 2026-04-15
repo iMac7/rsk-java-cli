@@ -14,13 +14,14 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.web3j.crypto.Credentials;
 
 class HelpersTest {
   @TempDir Path tempDir;
 
   @Test
   void resolveBackupDirectoryAcceptsUnixStyleAbsolutePaths() {
-    Helpers helpers = new Helpers(new NoOpWalletPort(), (walletName, password) -> "", addressBook());
+    Helpers helpers = new Helpers(new NoOpWalletPort(), new NoOpWalletUnlockPort(), addressBook());
 
     Path resolved = helpers.resolveBackupDirectory(tempDir.toString().replace('\\', '/'));
 
@@ -38,7 +39,7 @@ class HelpersTest {
     Helpers.WalletMetadata bob =
         helpers.importWallet(
             "bob",
-            "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
+            "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789".toCharArray(),
             "secret".toCharArray());
 
     assertThat(helpers.listWallets()).extracting(Helpers.WalletMetadata::name).containsExactly("alice", "bob");
@@ -61,7 +62,7 @@ class HelpersTest {
 
   @Test
   void requireWalletRejectsUnknownWalletName() {
-    Helpers helpers = new Helpers(new NoOpWalletPort(), (walletName, password) -> "", addressBook());
+    Helpers helpers = new Helpers(new NoOpWalletPort(), new NoOpWalletUnlockPort(), addressBook());
 
     assertThatThrownBy(() -> helpers.requireWallet("missing"))
         .isInstanceOf(IllegalArgumentException.class)
@@ -90,7 +91,7 @@ class HelpersTest {
     }
 
     @Override
-    public Helpers.WalletMetadata importWallet(String name, String privateKeyHex, char[] password) {
+    public Helpers.WalletMetadata importWallet(String name, char[] privateKeyHex, char[] password) {
       throw new UnsupportedOperationException();
     }
 
@@ -125,6 +126,19 @@ class HelpersTest {
     }
   }
 
+  private static final class NoOpWalletUnlockPort implements Helpers.WalletUnlockPort {
+    @Override
+    public String unlockPrivateKeyHex(String walletName, char[] password) {
+      return "";
+    }
+
+    @Override
+    public <T> T withUnlockedCredentials(
+        String walletName, char[] password, Helpers.WalletCredentialsAction<T> action) {
+      throw new UnsupportedOperationException();
+    }
+  }
+
   private final class FakeWalletPort implements Helpers.WalletPort, Helpers.WalletUnlockPort {
     private final AddressBookStore addressBookStore;
     private final Map<String, Helpers.WalletMetadata> wallets = new LinkedHashMap<>();
@@ -148,11 +162,11 @@ class HelpersTest {
     }
 
     @Override
-    public Helpers.WalletMetadata importWallet(String name, String privateKeyHex, char[] password) {
+    public Helpers.WalletMetadata importWallet(String name, char[] privateKeyHex, char[] password) {
       assertAddressBookIsTemporarilyRemoved();
       Helpers.WalletMetadata metadata = wallet(name, hexAddress('2'));
       wallets.put(name, metadata);
-      privateKeys.put(name, privateKeyHex);
+      privateKeys.put(name, new String(privateKeyHex));
       return metadata;
     }
 
@@ -216,6 +230,14 @@ class HelpersTest {
       assertAddressBookIsTemporarilyRemoved();
       requireExisting(walletName);
       return privateKeys.get(walletName);
+    }
+
+    @Override
+    public <T> T withUnlockedCredentials(
+        String walletName, char[] password, Helpers.WalletCredentialsAction<T> action) {
+      assertAddressBookIsTemporarilyRemoved();
+      requireExisting(walletName);
+      return action.run(Credentials.create(privateKeys.get(walletName)));
     }
 
     private Helpers.WalletMetadata requireExisting(String name) {
