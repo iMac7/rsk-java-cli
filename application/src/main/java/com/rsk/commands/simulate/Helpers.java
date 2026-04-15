@@ -402,7 +402,6 @@ public class Helpers {
         tokenAddress,
         functionName,
         ex);
-    System.err.println("Unable to read token " + ex);
   }
 
 }

@@ -111,11 +111,6 @@ public class Subcommands {
       System.out.println();
       System.out.println(cOk("✔ Monitor initialized successfully"));
 
-      Loader.runWithSpinner("Starting transaction monitoring...", () -> {
-        Thread.sleep(900L);
-        return null;
-      });
-
       System.out.println(cOk("✅ Started monitoring transaction: ") + txid);
       System.out.println(cOk("✔ Transaction monitoring started successfully"));
       System.out.println();

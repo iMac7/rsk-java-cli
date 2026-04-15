@@ -212,8 +212,8 @@ public class Helpers extends ChainResolutionSupport {
       return new WriteResult(
           credentials.getAddress(),
           txHash,
-          receipt.getBlockNumber().toString(),
-          receipt.getGasUsed().toString());
+          receiptValue(receipt.getBlockNumber()),
+          receiptValue(receipt.getGasUsed()));
     } catch (Exception ex) {
       throw new IllegalStateException("Bridge write failed.", ex);
     }
@@ -221,6 +221,10 @@ public class Helpers extends ChainResolutionSupport {
 
   public String readableTypeValue(Type type) {
     return contractHelpers.readableTypeValue(type);
+  }
+
+  private static String receiptValue(BigInteger value) {
+    return value == null ? "(not available)" : value.toString();
   }
 
   public record WriteResult(String walletAddress, String txHash, String blockNumber, String gasUsed) {}
