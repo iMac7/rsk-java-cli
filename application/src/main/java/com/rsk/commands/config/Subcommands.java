@@ -23,7 +23,6 @@ public class Subcommands {
     Terminal.pick("\u26FD Configure Gas Settings", "Configure Gas Settings"),
     Terminal.pick("\uD83D\uDD11 Configure API Keys", "Configure API Keys"),
     Terminal.pick("\uD83C\uDFA8 Configure Display Preferences", "Configure Display Preferences"),
-    Terminal.pick("\uD83D\uDC5B Configure Wallet Preferences", "Configure Wallet Preferences"),
     Terminal.pick("\uD83D\uDD04 Reset to Defaults", "Reset to Defaults"),
     Terminal.pick("\uD83D\uDCBE Save and Exit", "Save and Exit"),
     Terminal.pick("\u274C Exit without saving", "Exit without saving")
@@ -72,8 +71,7 @@ public class Subcommands {
             case 2 -> dirty = configureGasSettings(config) || dirty;
             case 3 -> dirty = configureApiKeys(config) || dirty;
             case 4 -> dirty = configureDisplayPreferences(config) || dirty;
-            case 5 -> dirty = configureWalletPreferences(config) || dirty;
-            case 6 -> {
+            case 5 -> {
               if (confirmReset()) {
                 config = Helpers.defaultConfig();
                 dirty = true;
@@ -206,19 +204,6 @@ public class Subcommands {
       return true;
     }
 
-    private boolean configureWalletPreferences(CliConfig config) {
-      printSectionHeader(
-          Terminal.pick("\uD83D\uDC5B Configure Wallet Preferences", "Configure Wallet Preferences"));
-      config
-          .getWallet()
-          .setAutoConfirmTransactions(
-              promptBoolean(
-                  "Auto-confirm transactions (skip password prompt)?",
-                  config.getWallet().isAutoConfirmTransactions()));
-      printSuccess("Wallet preferences updated!");
-      return true;
-    }
-
     private void viewCurrentConfiguration(CliConfig config) {
       printSectionHeader(
           Terminal.pick("\uD83D\uDCCB View Current Configuration", "View Current Configuration"));
@@ -244,10 +229,7 @@ public class Subcommands {
       System.out.println("  📦 Show Block Details: " + yesNo(config.getDisplay().isShowBlockDetails()));
       System.out.println("  📱 Compact Mode: " + yesNo(config.getDisplay().isCompactMode()));
       System.out.println();
-      System.out.println(cInfo("👛 Wallet Preferences:"));
-      System.out.println(
-          "  ✅ Auto Confirm Transactions: "
-              + yesNo(config.getWallet().isAutoConfirmTransactions()));
+      System.out.println(cInfo("👛 Wallet:"));
       System.out.println("  🏦 Default Wallet: " + resolveDefaultWalletLabel(config));
       System.out.println();
       waitForEnter("Press Enter to go back");

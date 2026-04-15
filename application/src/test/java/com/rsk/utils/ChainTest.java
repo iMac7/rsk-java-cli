@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.rsk.commands.config.CliConfig;
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
@@ -11,13 +14,31 @@ class ChainTest {
   @Test
   void resolveChainUsesCustomUrlBeforeConfigResolution() {
     CliConfig config = com.rsk.commands.config.Helpers.defaultConfig();
+    Chain.ChainProfile[] resolved = new Chain.ChainProfile[1];
 
-    Chain.ChainProfile resolved =
-        Chain.resolveChain(config, true, false, "custom", "http://localhost:4444");
+    String output =
+        captureStdout(
+            () -> resolved[0] = Chain.resolveChain(config, true, false, "custom", "http://localhost:4444"));
 
-    assertThat(resolved.name()).isEqualTo("custom-url");
-    assertThat(resolved.rpcUrl()).isEqualTo("http://localhost:4444");
-    assertThat(resolved.chainId()).isZero();
+    assertThat(resolved[0].name()).isEqualTo("custom-url");
+    assertThat(resolved[0].rpcUrl()).isEqualTo("http://localhost:4444");
+    assertThat(resolved[0].chainId()).isZero();
+    assertThat(output)
+        .contains(
+            "WARNING: Using unencrypted HTTP. Signed transactions will be transmitted in plaintext.");
+  }
+
+  @Test
+  void resolveChainDoesNotWarnWhenCustomUrlUsesHttps() {
+    CliConfig config = com.rsk.commands.config.Helpers.defaultConfig();
+
+    String output =
+        captureStdout(
+            () -> Chain.resolveChain(config, true, false, "custom", "https://localhost:4444"));
+
+    assertThat(output)
+        .doesNotContain(
+            "WARNING: Using unencrypted HTTP. Signed transactions will be transmitted in plaintext.");
   }
 
   @Test
@@ -38,7 +59,8 @@ class ChainTest {
     assertThatThrownBy(() -> Chain.validateChainId(custom, "Transaction submission"))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("requires a positive chain ID")
-        .hasMessageContaining("disables EIP-155 replay protection");
+        .hasMessageContaining("disables EIP-155 replay protection")
+        .hasMessageContaining("use --chain <name> instead of --chainurl");
   }
 
   @Test
@@ -71,5 +93,17 @@ class ChainTest {
     assertThatThrownBy(() -> Chain.resolveChain(config, false, false, "unknown", null))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("Unknown custom chain: unknown");
+  }
+
+  private static String captureStdout(Runnable action) {
+    PrintStream originalOut = System.out;
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    try (PrintStream capture = new PrintStream(output, true, StandardCharsets.UTF_8)) {
+      System.setOut(capture);
+      action.run();
+    } finally {
+      System.setOut(originalOut);
+    }
+    return output.toString(StandardCharsets.UTF_8);
   }
 }

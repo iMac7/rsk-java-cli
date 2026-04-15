@@ -567,7 +567,7 @@ public class Subcommands {
   private static void copyPrivateKeyToClipboard(String walletName, String privateKey) {
     Terminal.copyToClipboard(privateKey);
     System.out.println("Private key for wallet " + cOk(walletName) + " copied to your clipboard.");
-    System.out.println("Paste it only into a secure location.");
+    System.out.println("Warning: your private key is very sensitive data. It remains in your clipboard until you overwrite it.");
   }
 
   private static void warnBeforePrivateKeyReveal(String walletName) {

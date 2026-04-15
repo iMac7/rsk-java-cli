@@ -91,25 +91,7 @@ public class CliConfig {
   }
 
   public static class WalletPreferences {
-    private boolean cachePasswordInMemory = false;
-    private boolean autoConfirmTransactions = false;
     private String defaultWalletName = "";
-
-    public boolean isCachePasswordInMemory() {
-      return cachePasswordInMemory;
-    }
-
-    public void setCachePasswordInMemory(boolean cachePasswordInMemory) {
-      this.cachePasswordInMemory = cachePasswordInMemory;
-    }
-
-    public boolean isAutoConfirmTransactions() {
-      return autoConfirmTransactions;
-    }
-
-    public void setAutoConfirmTransactions(boolean autoConfirmTransactions) {
-      this.autoConfirmTransactions = autoConfirmTransactions;
-    }
 
     public String getDefaultWalletName() {
       return defaultWalletName;

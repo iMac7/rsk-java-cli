@@ -130,6 +130,18 @@ public class Subcommands {
               helpers()
                   .receiptDetails(chainProfile, txid)
                   .orElseThrow(() -> new IllegalStateException("Transaction receipt not found yet."));
+          if (currentDetails.blockNumber() == null || currentDetails.blockNumber().isBlank()) {
+            System.out.println(
+                cInfo("📊 TX ")
+                    + abbreviate(txid)
+                    + cInfo(" - Status: ")
+                    + "pending"
+                    + cInfo(", Confirmations: ")
+                    + "(not available yet)");
+            checkCount++;
+            waitForNextConfirmationCheck();
+            continue;
+          }
           BigInteger receiptBlock = new BigInteger(currentDetails.blockNumber());
           BigInteger currentBlock = helpers().currentBlockNumber(chainProfile);
           long confirmationsCount = currentBlock.subtract(receiptBlock).add(BigInteger.ONE).max(BigInteger.ZERO).longValue();
@@ -153,14 +165,20 @@ public class Subcommands {
             return;
           }
 
-          Loader.runWithSpinner("Waiting for next confirmation check...", () -> {
-            Thread.sleep(3000L);
-            return null;
-          });
+          waitForNextConfirmationCheck();
         }
       } catch (RuntimeException ex) {
         throw ex;
       }
+    }
+
+    private void waitForNextConfirmationCheck() {
+      Loader.runWithSpinner(
+          "Waiting for next confirmation check...",
+          () -> {
+            Thread.sleep(3000L);
+            return null;
+          });
     }
 
     private String abbreviate(String hash) {

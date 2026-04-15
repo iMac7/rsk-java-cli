@@ -69,6 +69,7 @@ public final class Chain {
       if (custom == null) {
         throw new IllegalArgumentException("Unknown custom chain: " + selection.chain());
       }
+      warnIfUnencryptedHttp(custom.rpcUrl());
       return custom;
     }
 
@@ -151,7 +152,8 @@ public final class Chain {
       throw new IllegalArgumentException(
           operation
               + " requires a positive chain ID. Custom RPC URLs currently resolve with chainId=0, "
-              + "which disables EIP-155 replay protection.");
+              + "which disables EIP-155 replay protection. Configure the chain with a positive chain ID "
+              + "and use --chain <name> instead of --chainurl.");
     }
   }
 
@@ -166,9 +168,29 @@ public final class Chain {
       if (uri.getHost() == null || uri.getHost().isBlank()) {
         throw new IllegalArgumentException("Custom RPC URL must include a hostname");
       }
+      warnIfUnencryptedHttp(uri);
       return uri.toString();
     } catch (URISyntaxException ex) {
       throw new IllegalArgumentException("Invalid custom RPC URL: " + chainUrl, ex);
+    }
+  }
+
+  private static void warnIfUnencryptedHttp(String rpcUrl) {
+    if (rpcUrl == null || rpcUrl.isBlank()) {
+      return;
+    }
+    try {
+      warnIfUnencryptedHttp(new URI(rpcUrl.trim()));
+    } catch (URISyntaxException ignored) {
+      // Configured custom chains may be validated elsewhere; avoid hiding the selected chain here.
+    }
+  }
+
+  private static void warnIfUnencryptedHttp(URI uri) {
+    if ("http".equalsIgnoreCase(uri.getScheme())) {
+      System.out.println(
+          Terminal.cWarn(
+              "WARNING: Using unencrypted HTTP. Signed transactions will be transmitted in plaintext."));
     }
   }
 
